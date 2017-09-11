@@ -1,0 +1,129 @@
+Can I do resolving on the turn?
+
+It's computationally very expensive.  Even allowing only one bet and
+one bet size, get 5 seconds per endgame for full deck game.
+
+True progressive endgame solving has shown poor results.  That means
+we resolve with a new betting abstraction when we get to an unexpected
+bet size by the opponent, which may be at a street-internal node.
+
+I've tried experiment with a) solving the base with a turn and river
+abstraction, b) resolving only the river.  Used mb2b2t.  Results are mixed.
+From 164 to 333 (river resolving).  Compare to 83 to 111 (turn resolving).
+
+Expansion works pretty well.
+
+Could try resolving entire turn and river for big pots.  Don't start any
+resolving at an internal node.
+
+Need to shrink subgame and speed up as much as possible.
+
+Only allow an all-in bet or raise for us.
+
+What if I only allow a min bet or an all-in for the opponent?  Rely
+on translation for all other bet sizes.
+
+What about the river?  Same thing?  Or just all-in for both ourselves and
+opponent?
+
+Need to do timing experiments with full deck.
+
+Need to do exploitability experiments - use small deck?
+
+What if I use ms3f1t1r1 with stack size that allows only three pot
+size bets?
+  6 + 12 + 36 + 108 = 162.
+  6 + 12 + 36 = 54.
+  
+Maybe I can measure exploitability with full deck.
+
+Well, the issue may be time to resolve more than time to measure
+exploitability.
+
+Want to resolve only the turn subgames where there was a pot size
+bet on the preflop and flop.
+
+ms3f1t1r1h5/none/mb1b1ss54
+200: Exploitability: 18.08 mbb/g
+ms3f1t1r1h5/none/mb2b2tss54
+200: Exploitability: 16.54 mbb/g
+
+Solve turn subgames with very limited betting abstraction.
+Use expand_strategy to expand to bigger betting abstraction.
+Hope for good results.
+
+Limited betting abstraction allows:
+1) Opponent opening bet: min-bet or all-in.  (Min-bet needed for expansion
+to work.)
+2) Our opening bet: all-in.
+3) Opponent raise: not possible.
+4) Our raise: all-in.
+Larger betting abstraction allows:
+1) At least one more opponent opening bet.
+
+Do I want to do this only for large pots?  Not sure that can be specified
+now.  What if I do this for all pots?
+
+Wait, do I even need to do resolving at this point?  Isn't the first
+question just whether I can have an asymmetric system with very few
+options for the target player in large pots, and whether that will be
+good enough.  Can just solve a base asymmetric game with run_cfrp and
+look at exploitability.
+
+What about just using our only all in threshold?
+
+Did we already do this experiment in asymmetric_results?
+
+OK, but maybe I also want to know if I can expand to multiple bets from
+opponent.
+
+There are two slightly different questions:
+1) Can I give myself one bet only in large pot (all-in) and my opponent
+many bets and not give up much in exploitability?  Can answer this just
+by running CFR on a base asymmetric system and then running run_rgbr.
+Answer seems to be yes.
+2) Can I give opponent two bets only in large pots (min bet and all-in)
+and use translation to defend well against intermediate bets?  Requires
+running expand_strategy and then run_rgbr.
+
+trbase
+Always all-in for both players
+Pot size bets preflop and flop
+Small pots turn and river (pot size < 36)
+  Pot size bets for both players
+Big pots turn and river (pot size >= 36)
+  All-in bets only for us
+  Min-bet and all-in for opponent
+  All-in raises for us
+
+200: Exploitability: 15.27 mbb/g
+300: Exploitability: 10.04 mbb/g
+
+Would like to build expansion system that has more bets for opponent,
+but only in big pots.  Can't allow more bets in small pots because
+we didn't allow min bets in small pots.
+
+trbase2
+Test expansion
+Symmetric system
+Stack size 54
+Always allow min bet and all-in for both players on all streets
+Allow 1/2 pot bet for both players on all streets
+  Except: I say no regular bets above pot size 36
+trexp2 allows 1/2 pot bet for opponent everywhere, including above pot
+  size 36.
+
+200 (110m): Exploitability: 60.74 mbb/g
+Expand to trexp2
+200: Exploitability: 186.82 mbb/g
+After bug fixes to expand_strategy: Exploitability: 170.59 mbb/g
+After "facing bet" fix: Exploitability: 175.42 mbb/g
+
+
+Timing seems good.  In fact, we may have some slack.  See timing_results.
+I could further shrink river to allow only all-in bet by either player.
+
+trbase3
+Stack size 45 (was 54)
+200 (64m): Exploitability: 36.56 mbb/g
+trbase3->trexp3 200: Exploitability: 67.53 mbb/g

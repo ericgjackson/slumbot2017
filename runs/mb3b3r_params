@@ -1,0 +1,10 @@
+# Three bets, three bet sizes starting on river
+# One bet and one bet size prior to river
+BettingAbstractionName mb3b3r
+Limit false
+StackSize 400
+Asymmetric false
+NoLimitTreeType 1
+MinBet 2
+AlwaysAllIn false
+BetSizes 1.0|1.0|1.0|0.5,1.0,2.0;0.5,1.0,2.0;0.5,1.0,2.0

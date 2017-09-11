@@ -1,0 +1,114 @@
+How bad would it be to not do any resolving for the turn?  This is tempting
+because turn resolves are very slow, especially a) when using the full deck,
+and b) when having a suitably rich betting abstraction.
+
+time ../bin/solve_all_endgames ms3f1t1r1h5_params hshshshsbc3_params none_params mb2b2t_params mb2b2t_params tcfr_params cfrps_params 3 3 16 200 combined cbrs bucket zerosum
+
+Base mb2b2t system solved with hshshshsbc3 abstraction
+Base 16: Exploitability: 479.06 mbb/g
+Base 96: Exploitability: 459.82 mbb/g
+  EVs: -0.505819, 1.134771
+
+River resolve
+16/200: Exploitability: 133.18 mbb/g
+16/500 (83m): Exploitability: 125.92 mbb/g
+96/200 (42m): Exploitability: 128.63 mbb/g
+
+Try with abstraction on turn as well as river.
+absturn_params uses hshshsbc1 for turn (243 buckets)
+Base 0: Exploitability: 729.76 mbb/g
+Base 8: Exploitability: 742.60 mbb/g
+EVs: 1.027203, 1.943216
+River combined 8/200 (46m): Exploitability: 333.29 mbb/g
+Turn combined 8/200 (34m):  Exploitability: 110.55 mbb/g
+Try with hshsbc3 for turn (321 buckets)
+Base 0: Exploitability: 505.70 mbb/g
+Base 8: Exploitability: 488.73 mbb/g
+EVs: 0.386038, 1.568884
+River combined 8/200: Exploitability: 163.53 mbb/g
+River combined 8/300: Exploitability: 158.00 mbb/g
+Turn combined 8/200:  Exploitability: 83.15 mbb/g
+
+Try with bigger game
+ms3f1t1r1h8
+hshshshsbc3tr_params
+  St 2 num buckets 2911
+  St 3 num buckets 38844
+null_params
+  St 2 num buckets 24200
+  St 3 num buckets 576800
+hshshshsbc3tr_params
+Base 0:  Exploitability: 403.18 mbb/g
+Base 8:  Exploitability: 324.72 mbb/g
+Base 16: Exploitability: 290.68 mbb/g
+Base 24: Exploitability: 271.38 mbb/g
+Base 32: Exploitability: 258.86 mbb/g
+Base 40: Exploitability: 249.20 mbb/g
+Base 48: Exploitability: 241.70 mbb/g
+Base 96: Exploitability: 218.79 mbb/g
+River combined 96/200 (488m): Exploitability: 73.38 mbb/g
+
+
+mb3b3t
+tcfr base solved with nhs3 abstraction
+448/200 (418m): Exploitability: 125.72 mbb/g
+
+Maybe we need to evaluate games where there is more betting on the preflop
+and flop.  So we get a greater likelihood of a big pot on the turn.
+
+Games quickly get too big though when we allow a lot of betting.
+Can we solve a game with mb2b2 and holdem5?  Looks like I can.
+
+mb2b2
+cfrps
+200 (262m): Exploitability: 201.00 mbb/g
+
+
+hshshshsbc3/tcfr
+1b (87m):    Exploitability: 1027.48 mbb/g
+2b (+87m):   Exploitability: 837.13 mbb/g
+3b (+63m):   Exploitability: 763.82 mbb/g
+4b (+81m):   Exploitability: 717.12 mbb/g
+11b:         Exploitability: 617.29 mbb/g
+12b (+717m): Exploitability: 611.22 mbb/g
+EVs: 0.013477, 1.196922
+12b/200 (~800m): Exploitability: 238.71 mbb/g
+Hmm, is this good or bad?  Would things get much better if I resolved
+for more iterations?  Experience with mb2b2t above suggests no.
+
+------------------------------------------------------------
+
+Compare these two options:
+a) Solve with perfect turn, resolve river only
+b) Solve with abstracted turn, resolve turn and river
+I'm not sure what this is going to prove, because neither of these is
+feasible.
+I guess I want to know whether to devote space on the turn to the
+betting abstraction or to the card abstraction.
+
+ms3f1t1r1h5
+hshshshsbc3 (perfect turn, abstracted river)
+mb1b1
+cfrps1
+250: Exploitability: 164.31 mbb/g
+cfrps
+200: Exploitability: 181.02 mbb/g
+250: Exploitability: 177.56 mbb/g
+Resolve river cfrps1/250
+  EVs: -0.187455, 0.844714
+  River combined 250/200: Exploitability: 54.75 mbb/g
+Resolve turn cfrps1/250
+  Turn combined 250/200: Exploitability: 45.63 mbb/g
+absturn_params (abstracted turn and river)
+  hsbc1 on turn (122 buckets)
+160: Exploitability: 439.17 mbb/g
+Resolve turn cfrps1/160
+  EVs: 0.537566, 1.219113
+  Turn combined 160/200: Exploitability: 80.22 mbb/g
+hshshsbc1 on turn (243 buckets)
+200: Exploitability: 274.99 mbb/g
+Resolve turn cfrps1/200
+  EVs: 0.076887, 1.023067
+  Turn combined 200/200: Exploitability: 58.96 mbb/g
+
+At least for this game, resolving the turn doesn't seem to help that much.

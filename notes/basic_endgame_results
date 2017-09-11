@@ -1,0 +1,317 @@
+ms1f1_params
+mb1/b1
+Two streets, one card flop
+
+Base
+Hard warmup
+200: Exploitability: 2.734472 mbb/g
+Soft warmup
+200: Exploitability: 2.856009 mbb/g
+Soft warmup, explore=0.01
+200: Exploitability: 13.34 mbb/g
+Soft warmup, double regrets/sumprobs, explore=0.01
+200: Exploitability: 13.61 mbb/g
+Soft warmup, double regrets/sumprobs, explore=0.01 (no term)
+200: Exploitability: 10.22 mbb/g
+Redid soft warmup, double regrets/sumprobs, explore=0.01 (no term)
+200: Exploitability: 10.72 mbb/g
+  Not sure what changed
+Int regrets, double sumprobs, explore=0.01 (no term), soft warmup
+200: Exploitability: 10.76 mbb/g
+Int regrets, double sumprobs, new explore=0.01 (no term), soft warmup
+200: Exploitability: 12.69 mbb/g
+
+Unsafe
+200: Exploitability: 3.700785 mbb/g
+Accumulate unweighted sumprobs during warmup
+200: Exploitability: 3.910091 mbb/g
+Soft warmup in both base and resolving
+200: Exploitability: 3.84
+Explore 0.01 in base, soft warmup in both base and resolving
+200/200: Exploitability: 9.12 mbb/g
+Base: double regrets/sumprobs, explore 0.01; soft warmup in both
+200/200: Exploitability: 8.63 mbb/g
+Base: double regrets/sumprobs, explore 0.01 (no term); soft warmup in both
+200/200: Exploitability: 3.34 mbb/g
+Base: int regrets, double sumprobs, explore 0.01 (no term); soft warmup in both
+200/200: Exploitability: 3.61 mbb/g
+Base: Int regrets, double sumprobs, new explore=0.01 (no term), soft warmup
+200/200: Exploitability: 3.56 mbb/g
+
+CFR-D
+200: Exploitability: 2.924146 mbb/g
+Accumulate unweighted sumprobs during warmup
+200: Exploitability: 2.938428 mbb/g
+
+Training base with warmup 0
+Base 200: Exploitability: 12.425989 mbb/g
+Unsafe 200/200: Exploitability: 10.127338 mbb/g
+Base 300: Exploitability: 8.541877 mbb/g
+Unsafe 300/200: Exploitability: 7.568736 mbb/g
+Base 400: Exploitability: 6.398304 mbb/g
+Unsafe 400/200: Exploitability: 5.819705 mbb/g
+Base 1000: Exploitability: 2.695956 mbb/g
+Unsafe 1000/200: Exploitability: 2.870973 mbb/g
+
+Some improvement in unsafe endgame solving, but only if you're willing
+to train base with no warmup to the same quality as the base trained with
+a warmup, which takes a lot longer.
+
+Redo 7/18
+CFR-D, soft warmup of 100 in both base and endgames
+200: Exploitability: 3.05 mbb/g
+CFR-D, soft warmup of 100 in base, hard warmup of 100 in endgames
+200: Exploitability: 2.94 mbb/g MATCHES
+Unsafe, soft warmup of 100 in base, hard warmup of 100 in endgames
+200: Exploitability: 3.91 mbb/g MATCHES
+
+CFR-D with CFR (not CBR) values
+CFR-D, soft warmup of 100 in both base and endgames
+200: Exploitability: 16.05 mbb/g
+
+---------------------------------------------------
+
+ms1f2_params
+mb1/b1
+Two streets, two card flop
+
+Base
+200 iterations in 22s
+Exploitability: 2.178422 mbb/g
+Identical to slumbot2016.
+
+Unsafe
+200 iterations in 18s
+Exploitability: 6.689441 mbb/g
+Scale up by 1000 before rounding to int in WalkEndgame():
+Exploitability: 6.687410 mbb/g
+Using doubles in merged endgames
+Exploitability: 6.663181 mbb/g
+
+
+CFR-D
+200 iterations in 39s
+Exploitability: 2.371207 mbb/g
+Scale up by 1000 before rounding to int in WalkEndgame():
+Exploitability: 2.370154 mbb/g
+Using doubles in merged endgames
+Exploitability: 2.368482 mbb/g
+
+Training base with warmup 0
+Base 1000 (1m25s): Exploitability: 2.587977 mbb/g
+Unsafe 1000/200: Exploitability: 3.064581 mbb/g
+
+Significant improvement in unsafe endgame solving.
+
+---------------------------------------------------
+
+ms1f3_params
+mb1/b1
+Two streets, three card flop
+
+Base
+200 iterations in 3m31s (now 2m36s, 2m38s, 2m34s)
+Hard warmup
+200: Exploitability: 1.084633 mbb/g
+Soft warmup
+200: Exploitability: 1.431931 mbb/g
+Soft warmup, explore=0.01
+200: Exploitability: 14.10 mbb/g
+Soft warmup, double regrets/sumprobs, explore=0.01
+200: Exploitability: 14.28 mbb/g
+Soft warmup, double regrets/sumprobs, explore=0.01 (no term)
+200: Exploitability: 10.30 mbb/g
+Int regrets, double sumprobs, new explore=0.01 (no term), soft warmup
+200 (3m29s): Exploitability: 11.24 mbb/g
+
+Unsafe
+200 iterations in 2m51s
+Base hard warmup
+Unsafe 200/200: Exploitability: 612.517011 mbb/g
+Base soft warmup
+Unsafe 200/200: Exploitability: 1.118997 mbb/g
+Base soft warmup, explore=0.01
+Unsafe 200/200: Exploitability: 3.85 mbb/g
+Base: double regrets/sumprobs, explore 0.01; soft warmup in both
+Unsafe 200/200: Exploitability: 3.91 mbb/g
+Base: double regrets/sumprobs, explore 0.01 (no term); soft warmup in both
+Unsafe 200/200: Exploitability: 1.56 mbb/g
+Base: Int regrets, double sumprobs, new explore=0.01 (no term), soft warmup
+Unsafe 200/200: Exploitability: 2.13 mbb/g
+
+CFR-D
+200 iterations in 6m18s (now 5m13s)
+Exploitability: 1.374051 mbb/g
+
+Training base with warmup 0
+Base 1000 (10m38s): Exploitability: 2.468950 mbb/g
+Unsafe 1000/200: Exploitability: 1.591486 mbb/g
+
+Obviously huge improvement in unsafe endgame solving.  Competitive with
+CFR-D now.
+
+---------------------------------------------------
+
+ms2f1t1_params
+mb1/b1
+Three streets, one card flop, one card turn
+200 iterations in 1m43s, 1m36s, 1m41s
+Exploitability: 6.002642 mbb/g
+Soft warmup
+200: Exploitability: 6.830837 mbb/g
+Soft warmup, explore=0.01
+200: Exploitability: 27.49 mbb/g
+Soft warmup, explore=0.001
+200: Exploitability: 6.49 mbb/g
+Soft warmup, double regrets/sumprobs, explore=0.01
+200: Exploitability: 27.63 mbb/g
+Soft warmup, double regrets/sumprobs, explore=0.01 (no term)
+200: Exploitability: 21.86 mbb/g
+Soft warmup, subgame street 1, compression, ints
+200 iterations in 5m53s (old compression, single threaded)
+200 iterations in 6m4s (new compression, single threaded)
+200 iterations in 2m56s (old compression, three threaded)
+200 iterations in 2m57s (new compression, three threaded)
+200: Exploitability: 6.83 mbb/g
+Int regrets, double sumprobs, new explore=0.01 (no term), soft warmup
+200 (2m2s): Exploitability: 27.38 mbb/g
+
+---
+
+Resolve turn endgames
+Unsafe:
+200 iterations in 1m41s (now 1m33s)
+Exploitability: 23.941853 mbb/g
+Base soft warmup, soft warmup in resolving too
+Turn unsafe 200/200: Exploitability: 18.437975 mbb/g
+Base explore 0.01, soft warmup in base and resolving
+Turn unsafe 200/200: Exploitability: 16.37 mbb/g
+Base explore 0.001, soft warmup in base and resolving
+Turn unsafe 200/200: Exploitability: 11.26 mbb/g
+Base: double regrets/sumprobs, explore 0.01; soft warmup in both
+Turn unsafe 200/200: Exploitability: 13.72 mbb/g
+Base: double regrets/sumprobs, explore 0.01 (no term); soft warmup in both
+Turn unsafe 200/200: Exploitability: 10.07 mbb/g
+
+CFR-D
+200 iterations in 3m41s (now 3m8s, 3m24s)
+Exploitability: 5.433039 mbb/g
+
+---
+
+Resolve flop subgames
+Unsafe:
+200 iterations in 1m33s (now 1m19s, 1m29s, 1m28s, 1m26s)
+  2.26s per subgame
+Flop unsafe 200/200: Exploitability: 22.652636 mbb/g
+Base explore 0.01, soft warmup in base and resolving
+Flop unsafe 200/200: Exploitability: 9.64 mbb/g
+Base explore 0.001, soft warmup in base and resolving
+Flop unsafe 200/200: Exploitability: 16.94 mbb/g
+Base: double regrets/sumprobs, explore 0.01; soft warmup in both
+Flop unsafe 200/200: Exploitability: 9.92 mbb/g
+Base: double regrets/sumprobs, explore 0.01 (no term); soft warmup in both
+Flop unsafe 200/200: Exploitability: 7.55 mbb/g
+Base: Int regrets, double sumprobs, new explore=0.01 (no term), soft warmup
+Flop unsafe 200/200: Exploitability: 7.38 mbb/g
+
+Redid 8/25
+Flop unsafe 200/200: Exploitability: 24.15 mbb/g
+
+CFR-D
+200 iterations in 2m59s, 2m48s
+Exploitability: 7.746392 mbb/g
+
+---
+
+Solving base with warmup 0
+Base 1000 (8m8s): Exploitability: 15.650721 mbb/g
+Resolve all flop subgames
+Unsafe 1000/200: Exploitability: 50.397244 mbb/g
+Base 2000 (+7m41s): Exploitability: 11.940788 mbb/g
+Unsafe 2000/200: Exploitability: 49.748476 mbb/g
+Base 10000 (+59m): Exploitability: 9.880116 mbb/g
+Unsafe 10000/200: Exploitability: 49.239461 mbb/g
+
+CFR-D
+(build_cbrs: EV: 0.340608; EV: -0.301087)
+10000/200: Exploitability: 9.989988 mbb/g
+
+This is very weird actually.  Why isn't exploitability of resolved game
+coming down?  Did I break something?  There's only a small gap in the
+exploitability of the base system.
+
+Uniform probs when sum-pos-regrets 0
+Warmup 0
+Base 1000 (7m54s): Exploitability: 9.133145 mbb/g
+Unsafe 1000/200
+CC has P1 reach prob sum around 9.4
+Unsafe 1000/200: Exploitability: 26.041100 mbb/g
+Better than before, but a bit worse than warmup 100, always-call policy
+Base 2000 (+7m13s): Exploitability: 7.398410 mbb/g
+Unsafe 2000/200
+CC has P1 reach prob sum around 4.7
+Unsafe 2000/200: Exploitability: 25.624399 mbb/g
+Still not as good as warmup 100, always-call policy
+
+Accumulate sumprobs with weight 1 during warmup period.  Overweight
+after warmup as per usual.  Go back to always-call when sum-pos-regrets zero.
+Base 200 (1m42s): Exploitability: 6.830837 mbb/g
+Unsafe 200/200
+CC has P1 reach prob sum around 4.3
+Flop unsafe 200/200: Exploitability: 22.147820 mbb/g
+Slightly better than original system.
+Turn unsafe 200/200: Exploitability: 18.315897 mbb/g
+Better than original game
+
+--------------------------------------------
+
+ms3f1t1r1_params
+mb1/b1
+Four streets, one card flop, turn and river
+
+CFR-D 200/200: Exploitability: 45.158720 mbb/g
+
+Accumulate sumprobs with weight 1 during warmup period.  Overweight
+after warmup as per usual.
+cfrp2_params
+Base 200: Exploitability: 36.182385 mbb/g
+  With no sumprob accumulation during warmup: 34.350577
+Solve all flop endgames (200 its) in 129m
+CC P1 sum reach probs around 12.8
+Unsafe 200/200: Exploitability: 22.516250 mbb/g
+Better than CFR-D even!
+Solve all flop endgames (300 its) in 192m
+Unsafe 200/300: Exploitability: 17.221839 mbb/g
+Base 200-300 in 81m
+Base 300: Exploitability: 18.181543 mbb/g
+Solve all flop endgames (300 its) in 195m
+Unsafe 300/300: Exploitability: 27.387830 mbb/g
+Worse?!?
+
+Solve all river subgames (200 its) in 141m
+Unsafe 200/200: Exploitability: 58.966587 mbb/g
+Loss of 24 mbb/g compared to base system.
+
+Subgames, compression, subgame street 2, soft warmup
+200 iterations in 325m
+200: Exploitability: 36.18 mbb/g
+  Matches
+
+Redid 7/26
+cfrps_params
+Base 200 (264m): Exploitability: 36.18 mbb/g
+
+tcfr, nhs3_params
+1b (43m):    Exploitability: 242.57 mbb/g
+2b (+43m):   Exploitability: 194.23 mbb/g
+3b (+53m):   Exploitability: 200.04 mbb/g
+4b (+51m):   Exploitability: 194.82 mbb/g
+5b (+59m):   Exploitability: 180.15 mbb/g
+22b (+660m): Exploitability: 120.29 mbb/g
+26b (+142m): Exploitability: 118.89 mbb/g
+build_cbrs 2b EVs: -0.236948, 0.775133
+CFR-D river 2b/200 (616m):  Exploitability: 111.16 mbb/g
+Unsafe river 2b/200 (216m): Exploitability: 110.61 mbb/g
+
+

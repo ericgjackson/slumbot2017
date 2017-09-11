@@ -1,0 +1,83 @@
+Solve two street (turn and river) endgames with an impoverished betting
+abstraction on the river.  Merge and resolve river with full betting
+abstraction.  How do results look?
+
+mb3b1t->mb3b3tmb3b1r->mb3b3t
+
+time ../bin/solve_all_endgames ms3f1t1r1h5_params hshshshsbc3_params none_params mb3b1t_params mb3b3tmb3b1r_params tcfr_params cfrps_params 2 2 96 200 combined cbrs bucket zerosum
+
+96/200 (91m): Exploitability: 90.19 mbb/g
+Used build_cbrs
+EVs: -0.567900, 0.928659
+
+Resolved river subgames with full mb3b3t
+time ../bin/solve_all_endgames ms3f1t1r1h5_params null2none_params none_params mb3b3tmb3b1r_params mb3b3t_params cfrpsm_params cfrps_params 3 3 200 200 combined cbrs card zerosum
+200/200 (305m): Exploitability: 188.61 mbb/g
+
+Was 128.89 for mb3b1t->mb3b3t turn resolve.  Is this unexpectedly bad
+or just normally bad?
+
+Does nesting make us worse even when there is no change in abstraction?
+What if we go mb2b2t (turn resolve) -> mb2b2t (river resolve) -> mb2b2t?
+
+mb2b2t->mb2b2t (turn resolve 2000/200) gives us exploitability of 66.12
+EVs: -0.849261, 1.113743
+200/200: Exploitability: 79.10 mbb/g
+Some slippage, but not a lot.
+
+What about resolving all river endgames from base?
+2000/200: Exploitability: 97.88 mbb/g
+
+What about mb2b2t->mb2b2tmb2b1r->mb2b2t
+mb2b2t->mb2b2tmb2b1r
+Turn 2000/200 cfrps/cfrps: Exploitability: 72.73 mbb/g
+EVs: -0.874700, 1.165615
+River 200/200 cfrps/cfrps: Exploitability: 166.96 mbb/g
+
+Hmm, got much worse.  So the river betting abstraction is too poor?
+
+We have bad results for a nested resolve producing an mb3b3r system?
+Don't know where the problem lies exactly.  Trying to see if we can get
+similarly bad results with an mb2b2t system.
+
+The river system started with a base system with missing bets on the turn
+and river, and which was solved with card abstraction.  The turn system
+started with mb2b2t and had no card abstraction.  So those could be
+differences.
+
+-------------------------------------------------------------------
+
+What happens if we resolve all streets?
+ms1f1t1r1h5/mb1b1/cfrps
+Base 1000: Exploitability: 2.76 mbb/g
+Flop 1000/200 (1m57s): Exploitability: 22.45 mbb/g
+EVs: -0.539221, 0.629028
+Turn 200/200 (2m2s): Exploitability: 27.21 mbb/g
+EVs: -0.520673, 0.629515
+River 200/200 (2m31s): Exploitability: 32.50 mbb/g
+Not too much slippage.
+
+Try mb2b2 next
+Base 200:  Exploitability: 201.00 mbb/g
+Base 1000: Exploitability: 18.05 mbb/g
+EVs: -0.662550, 0.734765
+Flop 1000/200 (335m): Exploitability: 272.41 mbb/g
+Turn 200/200 (353m):  Exploitability: 121.78 mbb/g
+River 200/200 (677m): Exploitability: 137.36 mbb/g
+
+Resolve mb2b2 with mb2b2pfo
+Flop 1000/200 (35m):  Exploitability: 163.21 mbb/g
+Turn 200/200 (131m):  Exploitability: 282.12 mbb/g
+River 200/200 (553m): Exploitability: 459.19 mbb/g
+
+For flop resolve mb2b2 with mb2b2pfo
+Then resolve turn/river with mb2b2
+Turn 200/200 (746m) cfrspm4: Exploitability: 326.29 mbb/g
+
+Lesson: we give up a lot by resolving the flop with a impoverished
+(pot only) turn and river betting abstraction.
+
+Implication: it's going to be very challenging to do endgame resolving
+on the flop.  Unless there is a dramatic improvement - like what DeepStack
+does.
+

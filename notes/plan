@@ -1,0 +1,244 @@
+Combine a base system with endgame solving.
+
+Base system should be used at least for the preflop.
+
+Endgame solving can be done for turn (probably) and river, at least if
+we are willing to allow only a single future bet size for ourselves and the
+opponent.
+
+Challenging case is the flop.  But we have promising results using some
+sort of quick and dirty approach.  The river strategy learned is terrible,
+but we will be resolving if we get that far.
+
+For speed reasons, it may not be possible to resolve every flop subgame.
+In general, we can achieve more speed by either a) speeding up the resolving
+algorithm, or b) resolving less often.  (b) is going to be easier than
+(a).
+
+We should be able to solve a base game with lots of betting sequences on
+the flop and no card abstraction.  As long as the betting sequence is
+in-abstraction at runtime then we will likely do fine to use the base
+strategy.  I mean, it's got to be better than whatever quick and dirty
+strategy we compute at runtime, right?
+
+When facing a bet that is outside of the abstraction we will face a
+decision - do I perform translation or do I endgame solve?  There are
+probably a lot of experiments I need to run in order to learn when to
+do which.
+
+The optimal decision can probably only be made at runtime because I have a time
+quota for the whole match.  If an opponent pushes me off abstraction a lot,
+then I need to be more conservative in terms of how often I invoke endgame
+solving.
+
+Initial experiments suggest that I don't need a 3/4 pot bet if I have
+a 1/2 pot bet and a full pot bet.  Interpolating has very little cost.
+But if I have only pot size bets and all-ins, then I can't handle a 2x pot
+bet very well.
+
+Observe the following things:
+1) Allowing lots of raises increases the size of our betting abstraction
+dramatically.
+2) In practice, hands rarely go to many bets.
+3) Large pots are more important.
+4) The remaining subgame tree is shallow after the pot is large.
+
+All of these factors point towards using subgame solving after multiple
+bets.
+
+Proposal: have a dense abstraction (lot of bet sizes) for any number of
+bets preflop.  Have a similar number of bet sizes for up to three bets on
+the flop.  After that only allow pot size bets.  That's for succeeding
+bets on the flop and for all bets on the turn and river.  The number 3
+is a parameter.  Could try 2 or 4.  We will endgame solve whenever we
+get beyond 3 bets.
+
+Remember that we can use an asymmetric abstraction.  We don't need to
+give ourselves tons of bet sizes.  My default assumption is that I should
+give the target player a 1/2 pot bet and a full pot bet in all situations.
+Last year I tried even fewer early in the tree, but I think that might
+have been a mistake.
+
+Do I want to do four street experiments on a game with a small deck,
+or one or two street experiments on a game with a full deck.  Could try
+a mixture.
+
+Should focus on the areas that are most "open".  Either those where there
+is risk, or those where performance is very uncertain; e.g., there is
+hope of an algorithmic advance that could radically improve things.
+I think maybe the area that is most open is endgame solving on the flop.
+
+Goal:
+Solve all endgames that make it to the turn
+Resolve if we make it to the river
+40% of the time we make it to the turn
+27% of the time we make it to the river
+Solve 10% of flop hands?
+Is our budget seven seconds per hand?
+Allow 20 seconds for flop resolve.
+Allow 4 seconds for turn resolve.
+Allow 2 seconds for river resolve.
+0.1 * 20 + 0.4 * 4 + 0.27 * 2 = 4.14
+This isn't really the proper calculation though.
+Same result as:
+0.27 * 6 + 0.13 * 4 + 0.1 * 20 = 4.14
+Surely 90% of flop hands are easy to handle?
+
+I still have many big problems and/or sources of error:
+1) Unsafe endgame solving underperforms CFR-D by up to 90 mbb/g.  This was
+on holdem4.  On full deck game I don't see worse than 20 mbb/g (which is
+on mismatched system).  See ms2/mb2b2 game.
+2) CFR-D underperforms unsafe endgame solving by up to 47 mbb/g.  See
+abstracted_endgame_results.  Base solved with nhs3 and PCS.
+3) CFR-D requires a ton of storage for the CBR values at turn-initial nodes.
+Unless I can calculate these values as needed at runtime.
+4) Using a limited betting abstraction (one bet) for the future can cause
+a loss of as much as 26 mbb/g (if resolving two streets) or 51 mbb/g (if
+resolving one street).  See mb2b2t results in endgame_mismatched_results.
+Also see loss of 64-69 mbb/g for holdem8 game.
+5) Quick and dirty solve for flop only causing degradation of 12 mbb/g?!?
+This doesn't seem to be a big source of problems.
+6) Resolving river endgames gives exploitability 90 mbb/g worse than
+resolving turn endgames.  This was with holdem4.
+7) Need more than 200 iterations to get low exploitability with CFR+,
+when pots get big.
+
+I guess I should be focused on (4).  Can I do quick and dirty solve on
+turn with good betting abstraction on river, then resolve on river?
+
+What would improve results on holdem8/mb2b2t case?
+1) Solve the base with CFR+, no abstraction and a slightly better betting
+abstraction (mb2b1).  This helped a lot.
+2) Solve the base with PCS, the full mb2b2t betting abstraction, and a
+better river betting abstraction.  This helped.
+
+Want fairly good coverage on flop (up to eight bet sizes for opponent!).  We
+seem to need at least one raise on the turn and river in the base.  Does
+this mean we can only handle a very crude card abstraction in the base?
+How crude is too crude?
+
+Do we need very full betting abstraction in base system?  That would
+suggest we need to cut corners elsewhere.  Don't try to cover every
+betting sequence on flop, for example.
+
+Proposal:
+4 bet sizes for opponent preflop and flop (1/4, 1/2, 1, 2x)
+2 bet sizes for us preflop and flop (1/2, 1)
+Unlimited number of bets on turn and river
+One bet size (?) on turn and river
+Max of 4 bets on preflop and flop
+221.5k betting sequences in both P1 and P2 trees
+24,457 preflop/flop betting sequences in both P1 and P2 trees
+~42b flop infosets.  8 bytes per double.  ~336 gigabytes for flop.
+
+--------------------------------------------------------------------
+
+Some recent results are discouraging.  See holdem5/mb3b3t.
+
+Running CFR+ for 200 iterations is not enough.  Exploitability >= 165.
+
+Using a reduced betting abstraction on the later streets in the base
+leads to high exploitability when we resolve with the full betting
+abstraction.
+
+These observations suggest that we should rely on resolving less and
+rely on expansion more.  Should we only resolve for the river?
+
+--------------------------------------------------------------------
+
+The dream would be in some sense solving the whole game without card
+abstraction.  We can solve a base game with TCFR and an unabstracted
+preflop and possibly an unabstracted flop as well.  We could use the
+base flop, or maybe resolve the flop games.  The flop resolving would
+have to be done offline.  Maybe it would be feasible if we have an
+impoverished future betting abstraction.  Turn and river would be
+solved on the fly.
+
+The base can have an unabstracted flop so why not just use that?
+1) The future streets will be heavily abstracted which could impact
+the solution quality; 2) The base is solved with TCFR which takes much
+longer to converge.  If we can solve the flop with CFR+, we might get
+a better solution.
+
+Can I solve 1755 * 100 flop endgames?  Hmm, that's 175,500 endgames,
+which is a lot.
+
+Key questions:
+1) How badly do results degrade when the abstraction gets coarse?
+2) How badly do results degrade when betting abstraction is too coarse?
+
+What kind of trade-offs are we likely to face for real system?
+mb3b3aa (1/4/1/2/1.0): 3,950,770 betting sequences
+mb4b4aa (1/2/1/2/5): 714,074 betting sequences
+
+With 2TB of RAM, 500k buckets perhaps?  2.5b hands means a reduction
+of 5000:1.  How bad is that?
+
+Last year we did about 200k river nodes and 10m river buckets.
+
+About 40.5% of hands make it to the turn.
+About 38.4% of hands make it to the turn with at least one bet
+About 29.1% of hands make it to the turn with at least two bets
+About 12.0% of hands make it to the turn with at least three bets
+About 3.0% of hands make it to the turn with at least four bets
+bbb3: turn betting sequences
+Two bets on flop: 15124
+Two bets on turn: 17094
+Two bets on flop *and* turn: 1163
+About 2.6% of hands make it to the turn with two or more bets on the
+  flop and/or turn.
+
+Could I solve a base system that only allows one bet on the flop, turn
+and river?  I thought we decided that was bad.
+
+Plan:
+1) Resolve all rivers
+2) Resolve turns where pot size is big, allowing only one bet for either
+player.
+3) Have a rich betting abstraction in the base for betting states that will
+not be resolved.  All of preflop and flop; smaller pots on turn.
+
+Progressive endgame solving didn't seem that great on small test games.
+So maybe I better be conservative and only resolve turns when the pot
+gets so big that we can resolve the whole turn and river and not
+resolve.  Perhaps when there is one pot size bet left?
+
+Two questions:
+1) Even on the river, I am going to have to deal with the following problem
+of seeing a bet from the opponent that was not in my betting abstraction.
+Option A is to resolve starting at the point the opponent makes the bet.
+Option B is to back up and resolve from some earlier point.  That earlier
+point could be the start of the street.
+  The concern with option A is that progressive endgame solving with
+    solve_all_endgames2 didn't work that well.
+  The concern with option B is that we may not play our actual hand to
+    the target node when we back up and resolve.  So we get a mostly
+    uninitialized strategy for ourselves below the target node.  Solution
+    may be to force ourselves to play to the target node.
+  Another concern with option B is that it may take longer.  I think
+    that's manageable though.
+
+It's hard to get good results when we resolve after the street-initial
+node.  Try a) resolving with a decent betting abstraction, and b)
+use exploration.
+
+Unfortunately, recent experiments indicate there is no easy way to build
+a low exploitability system.
+* Expansion can yield bad results once you allow nested expansion, if the
+gaps between bet sizes are non-trivial.
+* Resolving the flop with an impoverished future betting abstraction
+yields bad results.
+* Progressive endgame solving at internal nodes yields bad results.
+* Allowing three bets for ourselves, but four bets for opponent yields bad
+results.
+* I see Act1 making bets as large as 2x pot postflop.
+Bright notes:
+* I might only need to allow one bet for target player preflop.
+* We can take a game with an abstracted turn and river, resolve just the river,
+and get decent exploitability.
+
+Upshot seems to be that we need a base system with lots of bets and lots
+of bet sizes.  We will always resolve the river.  Still an open question
+whether we can resolve the turn.  Probably would only be for very large
+pots.
+

@@ -1,0 +1,352 @@
+Endgame todo
+1) Improve play with endgames.  Could evaluate every betting sequence an equal
+number of times.  Should I evaluate folds more often because they are cheap?
+Should I evaluate big pots more often as a form of importance sampling?  I could
+exhaustively evaluate range vs. range EV on the early streets.  Only
+employ sampling for the later streets.
+2) Solve endgame for particular hole card pair (e.g., using blanks approach).
+Enable loading of correct endgame solution.  Need an index for hcp in the
+filename.
+3) Try PCS+resolving approach with abstraction on turn as well as river.
+Maybe make abstraction worse (?).
+4) Use doubles in CFR+.  No need for ints now that we have gotten rid of
+compression.  In fact, even with compression we could use doubles for the
+trunk.
+5) Still seeing poor exploitability in best-response calculation inside
+endgame solving.  For flop subgames in ms3 using SampleMSB.  Expected?
+6) It's ugly that I need to set value_calculation_ carefully or else
+things break.
+7) Have I solved the problem of pathological cases for unsafe endgame solving
+when very few hands reach the subgame?  It helped a lot to accumulate
+sumprobs during the warmup.  If I need to do more, can I force the opponent to
+play to the subgame a little bit?  Suppose there is a call action at the root
+and we must choose which hand to take that action with.  Each hand will have
+a regret.  Over time we will learn a mixed strategy.  Could probably force
+more or fewer hands to call.
+9) Implement a tree building method that tries to choose the set of bets
+that minimizes the gaps.  Also have a minimum raise size.  This is needed
+to prohibit a hundred bet sequence of min-raises.
+10) Add multithreading back to either some or all users of CFR class.
+Ideal would be one technique that all can share.  I may also want to limit
+memory use, in which case I should bring back subgames.
+11) Try to get CFR-D working for endgame solving when base was solved
+with abstraction.  PRBRs didn't solve the problem.
+11a) Try smoothing towards zero-sum.  Compare Deep Stack.  But how exactly?
+DeepStack just subtracted a constant from every counterfactual value.
+Have to do this at each information set.  What ranges do we apply?  Target
+player's reach range against opponent uniform?
+11b) Can compute optimistic and pessimistic values.  Choose a weight for
+blending the two that yields a zero-sum game.  Pessimistic values are
+values for us if opponent players real-game best-response and we play
+according to strategy.
+11c) Do I want to err on the low side for the "T" values?  That would
+encourage the opponent to play more hands to the subgame and possibly
+encourage a better trained more robust target player strategy.
+12) If I give the wrong merged card abstraction to assemble_endgames
+and then, subsequently, to run_rgbr I get no errors, just terrible
+exploitability.  Should catch this.
+13) Seems like our best solution to ms3f1t1r1 involves solving base with
+PCS and resolving endgames with unsafe method.  Surprising!  What can we
+learn from this?  Maybe PCS explores all the subtrees more and yields more
+robust reach ranges?
+14) Implement and evaluate subgame solving with Outcome Sampling.  Add a
+bias towards the cards we hold.
+15) Looks like I wastefully write out data for every bucket when I write
+the strategy for a subgame.  I guess I don't know which buckets are active.
+16) Should I solve turn endgames with some speedup that allows us to solve
+a bigger betting abstraction in < 2s.  Could we even use PCS?
+17) Does it ever make sense to back up?  We are at a certain subgame but
+we back up and solve a bigger subgame.
+18) Calculate CBR values dynamically at runtime?  Not for flop perhaps, but
+for turn or river.
+19) Weighted CV sums at subgame roots often are not zero-sum.  Even for
+subtrees that are commonly reached.  Maybe this is not surprising because
+it is only in the abstract game (i.e., with buckets) that we expect to see
+zero-sum.
+19a) I'm reluctant to force CVs to be zero-sum.  They are very far apart
+currently.
+20) What if we force opponent to play his known range to the subgame, but
+then give him the option of playing additional hands with the "T" value
+gadget.
+21) For unsafe endgame solving mix reach range with some small epsilon
+probability of uniform random hand?
+22) Can we resolve deeply nested endgames?  Does unsafe method fall apart?
+Hard to evaluate with exploitability because we would normally have to
+resolve and assemble *all* of the deeply embedded endgames.
+23) Can I do a large scale test?
+24) More assessment of action translation.  Maybe test on larger games
+that will lead to higher exploitability.  Four streets with raises?
+Will take longer to train.  May need to use smaller deck.
+25) Getting bad results with holdem5/mb2b1t/mb3b3t/unsafe.  What is it about
+this game that yields such horrible results?  Do I need to have three bets
+in the base system?  More generally, do I need to have an unlimited number
+of bets in the base system?  Or is the problem that the deck is small?  I had
+bad results with holdem4, didn't I?  Is the problem that we almost never reach
+CC/CC?
+26) What if we have full base betting abstraction for turn (but very
+limited betting abstraction for river)?  Solve turn and then resolve river
+with full betting abstraction for river.
+27) Why is CFR-D doing badly when we resolve ms3f1t1r1h5/mb3b3t?  Well,
+it was doing poorly after solving subgames for 200 its, but after solving
+subgames for 1000 its it is pretty good.  Competitive with unsafe endgame
+solving then (although still slightly worse).
+28) Unsafe endgame solving can turn around and go downhill if the base is
+trained for too long.  See ms3f1t1r1h5/mb2b2t.  Why?  Is it the barely
+reachable nodes?  Try again with exploration.
+30) Try Noam's approach to adding random noise to "T" values.
+32) Find games with worse performance.  Find games where unsafe endgame
+solving underperforms CFR-D by the most.  One example is holdem5/mb2b2s100,
+but that is doing much better now.  Another example is mb2b2to->mb2b2t in
+holdem5.
+34) If exploration works, try to make it work with ints again.  Stochastic
+rounding?  Scale up a lot more?  I'm going to want to use ints if I ever
+solve a large system because that will require multithreading and subgames and
+compression.
+36) Try exploration with hard warmup.
+37) Try turning off exploration for final iterations?
+38) Try explore=0.001.  Seems better on holdem5/mb2b2to->mb2b2t.
+39) More testing of subgames.  Try large game.  Check speed with compression.
+40) Swap my new compression code in; see if results identical.  See if time
+identical.
+41) Get sumprobs to work with ints using separate maintenance of shared
+floor.  First maintain floor.  Index floor by street, P1/P2, nt and succ.
+Will this work with buckets?  Maybe store floor by depth.  Maintain depth
+as we walk tree in CFR.  What about endgame solving?  For unsafe endgame
+solving, min opp prob for prior streets is factored into reach probs.  For
+CFR-D, we want to start at depth zero for subgame.  Print out opp prob
+and imputed opp prob and different nodes in small test games.  See if they
+match for hands that only reach because of explore.  On first iteration for
+P1, all nodes that are not along CC/CC/CC/C path should only have exploration
+probs.
+41a) Change how explore done.  Instead of dividing 0.01 amongst three succs,
+give 0.01 to each succ.  Evaluate.
+42) Determine if compression needs to work with buckets.
+43) Are we maintaining and updating new_distributions_?
+44) Back up and solve enclosing subgame.  See backup and hybrid.
+45) Learn T values for CFR-D.
+46) Need to simultaneously evaluate expansion and endgame solving.  Are we
+better off relying on expansion or a coarse base abstraction?  This is for
+the base.  What about for the endgame?  I don't think I'm going to have much
+of a choice.  I guess one choice will be endgame solving or rely on the base.
+47) Can I decompose the expansion problem?  Evaluate the loss of not having a
+certain bet in isolation.
+48) Support multiplayer.
+49) Regret ceilings are not imposed when nn_regrets_ is false.  Is that
+correct?
+50) Is there any difference between warmup and overweighting and
+discounting as Noam does it?
+51) Experiment with Noam's large betting abstraction.  What could account
+for bad results?  Seems like the problem is already present in the trunk.
+Could just be the quality of the card abstraction.  Noam uses doubles, not
+ints; I should try the same.
+52) Can we combine CFR-D and unsafe somehow?  Play a hand to the subgame
+if it is in the unsafe range *or* its value exceeds the "T" value.  Seems
+better to play more hands to the subgame rather than fewer.  Produces a
+more robust target player strategy.  Optimize against *two* opponents:
+an "unsafe" opponent and a "CFR-D" opponent.
+53) Get multithreading working again in CFR+.
+54) Seems like I'm getting slightly degraded results in endgame resolving
+with no card abstraction.  For example, for ms2f1t1.  Should be 18.44,
+getting 24.15.  Can I run this code in slumbot2016?  See if we get the
+same results.
+55) Redo exploration experiments now that I have changed when exploration
+is applied.
+56) Revisit some of my worst systems.  Do they benefit from Noam's tips?
+319 holdem5 system?  mb2b1t->mb3b3t.  Try using soft warmup, exploration.
+57) Evaluate combination of expansion and endgame solving; i.e., do
+endgame solving on a base produced by expansion.  Although expanded
+systems can have high exploitability, maybe they can function well as
+bases.
+58) What if we do a best-response calculation where both the best-responder
+and the target player are forced to check/call on the river?  If this
+lowers exploitability dramatically, then maybe we know most exploitability
+comes from the river.  
+Or maybe the best-responder is only allowed to check or call on the river?
+59) Compare:
+  a) River resolve of TCFR system with big betting abstraction and small card
+     abstraction.
+  b) Turn resolve of TCFR system with big betting abstraction up to river;
+     and bigger card abstraction than (a).
+  Size of two base systems should be comparable.  Can we do mb3b3s100 and
+  mb2b2s100?  Former is twice size of latter.
+  Problem is not time to solve the base.  It's the sheer number of endgames.
+  What about mb2b2t and mb3b3t?  7x difference in size of tree.
+  But I suspect that having more paths to endgames makes endgame solving
+  harder.
+60) Try running iterations with current strategy derived from average strategy.
+Should have similar effect to exploration.
+61) Why does mb1b1 get results worse than mb2b2r?  What game is this?
+62) Why is maxmargin so bad?  Print out margin.  Does bad performance correlate
+with high or low margin?
+63) Why is mb3b3t cfr-d system so bad?  Does training the base more help?
+64) Force the T values for P0 and P1 to be zero-sum.  Various options for how
+to do it.  1) Subtract a constant from every T value such that the
+values end up zero-sum.  2) Shrink CVs towards a target mean by multiplying
+by a constant.  3) Like (2), but lowest CVs don't get shrunk.  4) Adapt
+T values so that opponent is indifferent between subgame and T values.
+Where does the target mean come from?  1) (Obs p0 mean + obs p1 mean) / 2.
+2) Get it from CFRs.  But using CFRs in place of CBRs is known to work poorly.
+65) Do I have a memory leak in solve_all_endgames?  Process size is 9.8g, but
+is it growing?  Now 10.8g.  This is using unsafe endgame solving.
+66) Isn't it surprising that our CVs are so far from zero-sum?  Is the issue
+just that the system has not converged?  Seems like it may take forever for
+the CVs to become zero-sum.
+67) Where is exploitability coming from in the highly exploitable CFR-D
+systems?  Is it from rarely reached subtrees (e.g., after an open limp)?
+Can have run_rgbr print out how often P1 as best responder limps.
+68) Why does using CFRs in place of CBRs work so poorly?  Should be zero-sum
+which we know to be a good thing.  Should avoid extreme best-response values
+in rarely reached subtrees.  T values that are too low should just force
+play to the subgame too often which seems better than forcing play to the
+subgame too rarely.  Could try using in maxmargin.
+69) Start CFR-D resolving with bias towards opponent hands that reach -
+like DeepStack.
+70) Can RGBR find subgames where we get much worse?  We used to print
+out best-response values for subgame.  When the P1 best-response value was
+not the reflection of the P2 best-response value, that normally indicated
+a problem.  What if we force P1 to check to the river?
+71) Compute subgame best responses during subgame solving, identify those
+subgames where the best responses are very far from zero sum.
+72) Try street-by-street resolving of mb2b2s100.  If this works well, can
+we solve flop with very impoverished future betting abstraction?
+73) Reimplement CombinedHalfIteration() in more principled way.
+74) How badly do results degrade when we switch to coarser card abstraction
+for the base?  For full holdem, we may use a card abstraction with 1m buckets.
+What would be a comparable size card abstraction for holdem5?
+75) There's a middle ground between card-level and bucket-level best-response
+values.  Use card-level best-response strategy for N actions from target node.
+Generate and use these values with N of 1.  How can I generate these
+easily?
+76) Suppose we use the base for all hands with small pot size or small number
+of bets.  How much more exploitable are we?  Alternative goal: all hands
+with at most one bet on the flop/turn (but any number of bets preflop).
+77) Make RGBR more memory efficient.  Read subtrees as needed.  Have
+StartStreaming() and FinishStreaming() methods which initialize and delete
+readers.
+78) Do more experiments with exploration in the base.  Does it help combined
+endgame solving?
+79) Tune combined endgame solving parameters on bigger game.
+80) Max street only exploitability gives grossly optimistic value for
+exploitability of merged systems resolved with unsafe endgame solving.  The
+whole flaw of unsafe endgame solving is that it assumes a fixed reach range,
+and this sort of exploitability measure fails to take advantage of that at all.
+81) Is there some other way to do a fast best-response calculation?
+82) Evaluate asymmetric systems simply by running run_rgbr.  The best-responder
+has all the betting options of the opponent.  If the missing bets for the
+target player matter, it will show up in the exploitability.
+83) Can I do maxmargin CFR where opponent is forced to play a hand to unused
+bet, and we try to maximize the margin?  Maybe same as my old idea of
+forcing players to take each action at least occasionally.
+84) Evaluate no open limp preflop.  Evaluate no flop/turn donk.
+85) Very few hands have five or more bets on preflop and flop.  Almost all
+of those end in an all-in.  Truncate tree by allowing only all-in for
+5th bet?
+86) Is mb1b8x getting bad results on ms3f1t1r1h5?  Much worse than on
+ms2f1t1h10?  Or is it just taking many more iterations to converge?
+How can I tell what bets are needed?
+87) Why is memory usage so large with ms3/h5/mb1b8a?  Bug or normal?
+88) Do we need 1/8 pot bet?
+89) How much does a 10x increase in abstraction size buy us?
+90) Dynamically compute CBRs.
+91) How can I speed up resolving of turn subgames?  Can I do 70-100
+iterations with no warmup instead of 200 iterations with a warmup?
+92) Got bad results with nested endgame resolving.  Try to figure out where
+the problem comes from.
+93) How exploitable would it be to use our tcfr base for the entire turn,
+and only resolve on the river?  Seems good, but a real test would be games
+where the pot can grow large prior to the river.  Trying mb2b2 now.
+94) What happens if we only resolve subgames where the pot size is greater
+than some threshold?  Can we capture most of the gain with much faster
+resolving?  Can I start by doing a base solve with a mixture of buckets
+and non-buckets on the final street?  Move BucketThresholds to card
+abstraction.
+95) Can we do a fast endgame solve where we sample from our distribution and
+from opponent's distribution?  Perhaps 10 hands from each.  That would
+lead to up to 20 hands on river.  And maybe more pruning.  Can also use
+buckets so that learning will proceed faster.  But put the target hand in
+its own bucket.  Will take a while to evaluate.  Need to solve ~1000
+endgames for every 1 endgame evaluated the old way.
+96) Resolve turn endgames with PCS or TCFR?
+97) For fast endgame solving of turn endgames, can I sample one river card?
+How would this work with NNR?  Seems like you can't floor regrets at zero
+if you are sampling.
+98) Currently nhs3_params (for example) has bucketings of
+null, null, null and nhs.  Could it instead use "none" for the early streets?
+99) How can I reconcile recent asymmetric results that suggest the target
+player can have only one bet size when the pot size gets large with
+earlier results that suggested there was a real cost to having only three
+bet sizes.  Maybe you really need to have eight bets for the opponent
+before you see the loss from having only a couple of bets.  How am I
+going to measure that?  Expensive to evaluate systems with eight bets,
+even if only for one player.
+100) Can I not maintain sumprobs for river nodes and turn nodes with large
+pot sizes?  I will have no fallback if I find I can't solve endgames fast
+enough.  Well maybe I could keep the one-byte regrets around so I have the
+current strategy.
+101) Is it too soon to start thinking about abstractions for the turn and
+river?  Can we encode lots of information about ranks?  Also need stuff
+about suits.  Flush/flush draw/no-draw.  Five of a suit, four of a suit,
+three of a suit, two of a suit, rainbow.
+102) If I resolve turn endgames with large pots, do I still need to
+have many bet sizes for the opponent?
+103) Redo geometric experiments.  Miscalculated bet size.
+104) Finish mb1b8a experiment:
+../bin/run_cfrp ms3f1t1r1h5_params none_params mb1b8a_params cfrpsss1_params 8 11 200 p1
+105) I'm not comfortable with the threshold on turn pot sizes for when
+we assume we can resolve them.  More experiments.  I may have proven that I
+only need one bet size for myself.  But most likely I need multiple bet sizes
+for the opponent.  Well, unclear.  When the opponent acts, I will be able
+to resolve with knowledge of his initial bet size.  But I will have to
+assume all future bets are a single size.  How can I test this?
+Solve turn endgames with:
+a) Maximum of one bet on turn and river
+b) Two bet sizes on turn for opponent
+c) One bet size on river for opponent.
+Then *resolve* river endgames with turn merger as base.  This time allow
+two bets on river for opponent.
+What if I resolve an mb2b2r river with an mb1b1 base?  But only for large
+pots.
+107) Test that we do not delete files from last_checkpoint_it_.
+109) Do I need strategy for both players to get next batch of CBR values?
+Only need our strategy for zero-summing.  Can I estimate the offset to apply
+in a more simple way?  If I know what mean CV I can achieve (perhaps from
+the base), then I can calculate the offset.  But to calculate my actual
+mean CV, I need both my reach range and my opponent's.
+113) Symmetric combined endgame solving?  Each player has t-values.
+Useful in solve_all_endgames2.
+115) Can we improve progressive endgame solving with solve_all_endgames2.
+Terrible results on mb1b1->mb2b2f.  A bug or just inherently difficult?
+116) solve_all_endgames3 seems to be working OK.  But on initial test seems
+to work worse than solve_all_endgames2.  Test more and compare more.
+116a) Can I support an additional number of bets that is not in the base
+abstraction?
+117) Why can't build augmented allow any number of bets, especially after
+we have left the base betting abstraction?  Can just take the betting
+abstraction and get bet sizes from there, no?
+119) Try choosing fold based on blending CFR values of adjacent bet actions.
+DynamicCBR class now supports CFR values.  May need to normalize by sum
+of opponent probs.
+* Getting low on i-nodes.  Delete old directories.  Can we create fewer
+  files in build_cbrs or solve_all_endgames?
+* Expanding to nearest bet looks terrible, even just expanding to 5/8 and
+  7/8.  Bug or not?
+* Support asymmetric endgame solving.
+* Can I use current strategy?
+* Should we distinguish if we bet all-in or if we called all-in?
+* Could try blending between two nearest base nodes.  Nearest could mean
+  closest pot sizes.  Do I want to force at least one above and at least one
+  below?  Or weighting could take into account the current pot size (after
+  the bet in question).
+* Can I try something DeepStack like where I continually resolve from
+  root to leaf?  Didn't have great results with progressive endgame solving
+  even on small game, but maybe it's better than expansion?
+* Should I have max *total* bets for ourselves?  Better might be to specify
+  that the nth bet can only be all-in.  If we hit that cap on the flop,
+  the opponent can make an additional bet on the turn and one on the river.
+  But maybe we will get all-in naturally before this is an issue?
+  Maybe OurNoRegularBetThreshold already does what we want.
+* Can I do a quick and dirty real-game best-response?  What if we fix the
+  preflop strategy and only let the best-responder optimize postflop?
+  Then we can sample one or a small number of flops.  I could also look
+  at just one flop subtree.  Should maybe look at gap between EV we
+  achieve with fixed strategies vs. EV we get by best-responding.

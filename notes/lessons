@@ -1,0 +1,46 @@
+When running CFR+ on system with card abstraction, important to only floor
+the regrets once per iteration at the end of the iteration (rather than
+every time we update the regret of a bucket).
+
+Exploration sometimes helps unsafe endgame solving a lot.  Believe it's
+cases where there are subtrees that are not reached (or barely reached).
+A common scenario is when P1 learns to never open-limp.
+
+Forcing CBR values to be zero-sum can improve CFR-D results.
+
+maxmargin underperforming CFR-D currently
+
+Unsafe endgame solving sometimes outperforms CFR-D, and sometimes vice
+versa.
+
+Combined method of endgame solving works well.
+
+Blending in uniform range helps.
+
+Best to use zero-summed bucket-level CBRs for "T" values.
+
+Seems like we don't need a very rich card abstraction for the streets that
+we are replacing with a resolved strategy.  Compare nhs3 and
+hshshshsbc3 for holdem5/mb2b2s100.
+
+Getting rid of limp options seems to hurt exploitability by ~15 mbb/g.
+See asymmetric_results.
+
+A 40:1 card abstraction reduction seems to cost us ~110 mbb/g of
+exploitability on the flop.  See abstraction_results.
+
+Seems like we can have a 6:1 card abstraction reduction which will
+cost us ~10 mbb/g of exploitability on the flop.  See abstraction_results.
+
+Seems like we can only get a null abstraction for big pots and still get
+a big chunk of the possible exploitability reduction.  See mixed_results.
+
+Having only one bet for target player is good enough once the pot
+get sufficiently large.  0.2 * all-in-pot-size is a better test of
+"sufficiently large" than 1/9 * all-in-pot-size.  See asymmetric_results.
+
+It works really well to do the following.  Give the opp a range of bets
+like 1 BB, 4 BB, 16 BB, 64 BB, etc.  Use translation to get strategies
+for the in-between bet sizes.  Seems to be very little loss in
+exploitability.
+

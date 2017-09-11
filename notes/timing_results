@@ -1,0 +1,62 @@
+ms3f1t1r1h5
+mb1b1
+nhs3 base
+
+Resolve turn
+cfrps_params
+96/150: Exploitability: 41.04 mbb/g
+96/200: Exploitability: 35.14 mbb/g
+96/300: Exploitability: 32.44 mbb/g
+cfrps1_params
+96/50:  Exploitability: 94.85 mbb/g
+96/90:  Exploitability: 51.82 mbb/g
+96/100: Exploitability: 48.04 mbb/g
+96/150: Exploitability: 38.89 mbb/g
+
+mb2b2t->mb2b2t
+2000/200 cfrps (47m):  Exploitability: 66.12 mbb/g
+2000/100 cfrps1 (23m): Exploitability: 165.64 mbb/g
+2000/150 cfrps1 (36m): Exploitability: 98.08 mbb/g
+
+------------------------------------------
+
+Full-deck game
+Compare speed to 20-card deck game
+ms3f1t1r1
+mb1b1/mb1b1
+Remember to double counts of endgames solved because combined endgame
+solving is asymmetric.
+
+River
+mb1b1->mb1b1
+6000 river endgames at CC/CC/CC in 0.09s each
+  Later 0.055.
+mb1b1->mb2b2r: 0.16s per endgame
+mb1b1->mb3b3r: 0.78s per endgame
+mb1b1->bigr:   2.1s per endgame
+  
+80 turn endgames at CC/CC in 5.1s each (5.4s later)
+mb1b1/mb2b2t
+200 river endgames at CC/CC/CC in 0.255s each
+10 turn endgames at CC/CC in 84s each (112.5s later for two)
+2 turn endgames at CBC/CBC (ps 36) in 86s each (later)
+mb1b1/mb3b3t
+1 turn endgame at CC/CC/CC in ~28m (yikes!)
+mb1b1/mb2b1t
+7.6s/turn endgame at CC/CC
+6.3s/turn endgame at BC/BC (three bets remaining)
+mb1b1/mb2wb1ob2t
+36s/turn endgame at BC/BC (pot size 36)
+
+holdem5
+mb1b1/mb2b2t
+50 turn endgames at CC/CC in 4.14s each
+Full-deck about 20x slower.
+1176 hole card pairs vs. 136 hole card pairs.
+Hmm, that's a lot less than 20x.
+
+
+mb1b1->trbase
+Full deck
+20 turn endgames at BC/BC in 4.5s each
+

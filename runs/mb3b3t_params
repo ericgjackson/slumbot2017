@@ -1,0 +1,10 @@
+# Three bets, three bet sizes starting on turn
+# One bet and one bet size prior to turn
+BettingAbstractionName mb3b3t
+Limit false
+StackSize 400
+Asymmetric false
+NoLimitTreeType 1
+MinBet 2
+AlwaysAllIn false
+BetSizes 1.0|1.0|0.5,1.0,2.0;0.5,1.0,2.0;0.5,1.0,2.0|0.5,1.0,2.0;0.5,1.0,2.0;0.5,1.0,2.0

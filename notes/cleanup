@@ -1,0 +1,24 @@
+Would like to clean up the code.
+solve_all_endgames2 is a mess.  I'm scared to touch it or debug it.
+cfr_values.cpp is a bit of a mess.
+Had lots of problems where data expressed as class members (like root_bd_st_)
+caused mysterious bugs because I wasn't setting them appropriately.  Now
+believe that I should avoid those entirely and pass values around.
+See the CBR methods in solve_all_endgames2.  We get long parameter lists,
+but that's a lot better than mysterious bugs.
+I might want to bundle some parameters together.
+For example, maybe a Node, a root_bd_st and a root_bd together form a
+SubgameSpec.
+The CBR methods in solve_all_endgames2 require more arguments, though,
+including
+* A sumprobs object
+* Buckets
+* A card abstraction object
+* A hand tree
+Part of the reason I wrote the CBR functions, which are largely redundant
+with the code in vcfr.cpp, is that VCFR has the sumprobs as a member.
+So should the VCFR code pass the sumprobs around?  What about the regrets?
+Once you go down that road how far do you have to go?  Maybe not that far.
+Maybe just the sumprobs.  Well, maybe also the buckets, card abstraction
+and hand tree, just like the CBR methods.
+

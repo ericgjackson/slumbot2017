@@ -1,0 +1,59 @@
+Can we do something deep stack like?
+
+Why would we?  Well, expansion seems to introduce huge exploitability.
+Even when expanding to 3/4 from 1/2 and 1x.  Don't see this when we
+expand just on the river for a single bet.  But when we have nexted
+expansion with raises, exploitability goes way up.
+
+Progressive internal endgame resolving didn't seem that great.  Maybe
+it would work better if we started with a rich betting abstraction
+and just added intermediate bets.
+
+Nested resolving seems OK.  But nested resolving doesn't allow for any
+expansion.
+
+Maybe it's especially challenging to resolve at street-internal nodes.
+Stick to resolving once per street.  That means we will have to rely on
+expansion on a single street.  Although if the first action is a bet by
+the opponent we can force our betting abstraction to incorporate that.
+And if we forbid flop and/or turn donks, then we can do the same for
+the first bet by the opponent in position.
+
+How can I test nested resolving in combination with expansion?
+One easy thing we can do is simply to change the betting abstraction
+with each resolve.  I've done some experiments like that in the past,
+in fact.  Seem to need some raises on the next street.  Ideally two
+raises.
+
+I wonder if we need two raises on each future street or a total of two
+raises in the future.
+
+Maybe expansion is our biggest problem now?  We can take a base system and
+resolve the river with no card abstraction, and we get a pretty low
+exploitability *so long as we don't expand*.
+
+Maybe I should lower my goals to handling all bet sizes in a certain
+range.  Maybe 1/4 to 2x.  Might need 1/4x, 1/2x, 3/4x, 1x, 1.5x, 2x.
+Maybe always add all-in.
+
+Asymmetric experiments suggest we need fewer bet sizes and number of bets
+than I might have imagined.  Can solve base with lots of bet sizes for
+opponent.
+
+Do I need to do biggish experiment on Amazon?
+
+Solve base with:
+1) One bet for us preflop; two bets on flop; two bets on turn; how many on
+   river?
+2) Two bets for opponent preflop; three bets on flop; three bets on turn;
+   how many on river?
+3) Null abstraction preflop and flop.  Very good abstraction turn.
+   River abstraction need not be that great.
+4) Many bet sizes for opponent.  1/4, 1/2, 3/4, 1, 1.5, 2, all-in?
+5) Few bet sizes for us.
+
+Can I solve for ms3f1t1r1h5 on a reasonable size instance on Amazon?
+
+Can I solve with CFR+ or do I need to use tcfr?
+
+Can I measure real-game exploitability on Amazon?

@@ -1,0 +1,83 @@
+Eventual endgame solving will be progressive.  We may resolve multiple
+times in the same hand.  We will resolve trees that are rooted at a node
+that is not street-initial.
+
+Will start by solving game with few choices for the opponent.  Maybe
+mb1b1.  Then when the opponent makes a different bet we solve with that
+bet.  Should we add that bet on top of the standard bet, or replace
+the standard bet with the actual bet?  Let's try replacing.
+
+Let's say we get to a turn-initial node.  Let's say it's CC/CC.
+Solve mb1/b1 at CC/CC with initial pot size bet.  Then solve it
+with half-pot.  If pot-size is our default bet, then the strategy
+after check is the strategy from that solve.
+
+In my experiments, at CB I will not let opponent make another bet.
+But in the real game I will need to.
+
+Need to method to build a subtree using a betting abstraction
+(e.g., mb1b1) starting from any point in another tree.
+
+How are the nonterminal IDs going to work?  Ugh.
+
+Could I save files under their betting sequence name?
+Like b1000?  Then piece together tree based on what exists.
+
+I need to be able to start resolving at both our-choice and
+opp-choice nodes.
+
+How will I specify future betting and immediate betting?  Just having
+a single endgame betting abstraction doesn't seem to be sufficient.
+What if I combine a endgame betting abstraction with some sort of
+lookahead?  Or maybe just a boolean for immediate or entire.
+
+If the first action is our-choice, which instructions do we use for
+the next opponent action?
+
+BettingTreeBuilder needs an interface for creating a subtree rooted at
+a street-internal node and distinguishing immediate and future betting
+options.  Pass betting abstraction around methods.
+
+We'll solve the base with a betting abstraction.  Maybe mb1b1.
+We'll have a resolve criterion (maybe turn and pot size >= 100 or
+  river and pot size >= 0).
+We need to specify the endgame betting abstraction, but that has two parts:
+  * The future betting that we will allow for ourselves and the opponent.
+  * The immediate abstraction that will dictate what bets are allowed at
+    the root node that we are solving at right now.
+New solve_all_endgames will iterate through base betting tree.
+When it gets to a node where resolve criterion is met it starts
+  progressive resolving.
+
+After first resolve at flop, say, I have:
+1) Trunk strategy for preflop still in memory
+2) Resolved flop strategy on disk
+3) Base flop strategy was in memory, but currently deleted
+Will need:
+1) Reach probs to next resolve node
+2) Current flop strategy for getting CBRs
+For both of these I need the sumprobs from the last resolve.
+What if I read the whole thing in.
+
+-------------------------------------------------------------------
+
+How can I do progressive endgame solving?
+Suppose our base is mb1b1 and our endgame is mb2b2.
+We're supposed to imagine that the half-pot bet is the bet that the opponent
+makes that we weren't expecting.
+Could start by solving game with two bets at flop-initial nodes, and one
+bet afterwards.
+Then recurse one level deeper and allow two bets at the next node.
+On the solve_all_endgames3 approach, for this internal node, we are going
+  to back up and solve the entire street subtree.
+On the solve_all_endgames2 approach, we solve a tree rooted at this internal
+  node.  We get reach probs from the previous resolve.
+solve_all_endgames3 seems to have a potential consistency problem.
+  Maybe we could force the existing reach range to still play to the target
+  node.  Target player and opponent are allowed to play *additional* hands
+  to the subgame.
+But will this work any better than solve_all_endgames2 which did not work
+  so well?
+
+-------------------------------------------------------------------
+

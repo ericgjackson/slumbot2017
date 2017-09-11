@@ -1,0 +1,188 @@
+t1 betting abstraction has ~300,000 betting sequences.  Many bet sizes
+on preflop and flop.  About eight.  Bet and raise on turn and river.
+9118 hands with four bets on flop out of 5.6m that make it to the
+flop.  59,375 hands with three bets on flop.  That's a bit over 1%.
+
+Preflop 11,122 out of 11m hands with four bets.  That's 1/1000.
+Preflop 73,182 out of 11m hands with three bets.  That's a bit less than 1%.
+
+It seems like current plan of supporting four bets on preflop and flop
+is a good one.  Will very rarely need to resolve on either preflop or
+flop.  Could easily allow a minute or two to resolve on those streets.
+
+I wonder though if we should allow a richer betting abstraction on the
+turn or river.  Can I test this on a small game?  I guess I should trade
+betting granularity for card granularity?
+
+Suppose I want to solve something on my machine with 300,000 betting
+sequences.  Maybe I'll use targeted CFR with one byte per river bucket.
+1000 buckets would be 300m infosets and 300 megabytes. 10k buckets
+would be 3g.  Maybe 50k buckets?
+
+With base, I am trading off abstraction size in early streets vs. abstraction
+size in later streets.
+
+I guess I need to evaluate with expand_strategy.
+
+Seems like I need a bet as small as 1/16 pot.  If I try to expand 1/8
+to 1/16 I lose 100 mbb/g.  See testi/testj in expansion_results.
+
+Even with 0.03 and 0.06 if I try to expand from 0.06 to 0.03 then I lose
+20 mbb/g.
+
+Seems like I need a huge number of bets.  Or I can build a system with
+lots of missing bets and dynamically solve whenever opponent makes a small
+bet.
+
+We only need a large number of bets when the pot gets large.  Can I
+get by with a moderate number in smaller pots?
+
+11m hands.
+497,138 have a bet to 10,000 or more.
+  10,000 is 100 big blinds.
+  That's around 5%.
+171,006 have a bet to 10,000 or more and a call
+  That's around 1.5%.
+An additional 101,411 have  abet to 5,000 or more and a call
+Total: 272417
+  That's around 2.5%.
+
+Have tree construction method.  Up to pot size X adds equally
+spaced bets.  Start with minbet and with all-in bet and compute pot
+fractions.  Suppose we double pot frac.  Suppose pot size is 10 BB.
+All-in is 190BB which is 19x.  Min bet is 1/10.  So 1/10, 1/5, 2/5, 4/5, 8/5,
+~3x, ~6x, ~12x, all-in.  9 bet sizes.
+Suppose pot size is 20 BB.  Min bet is 1/20.  So 1 BB, 2 BB, 4 BB, 8 BB,
+16 BB, 32 BB, 64 BB, 128 BB, all-in.  9 bet sizes.
+Suppose pot size is 40 BB.  So 1 BB, 2 BB, 4 BB, 8 BB, 16 BB, 32 BB, 64 BB,
+128 BB, all-in.  9 bet sizes.
+Larger pots don't have more bet sizes.
+
+Use doubling approach starting from min bet for opponent.  Allow 1/2 pot
+and full pot for us with a maximum of four bets.
+ms0: 1699 betting sequences in each of P1 and P2 tree
+ms1: 82811 betting sequences in each of P1 and P2 tree
+82,811 betting sequences times 1.7m hands is 140 billion information sets.
+A lot.  With 8 bytes per info set that would be a bit over a terabyte.
+Would also need a bit of room for the turn and river.
+
+So I need to make cuts.  This will mean I will need to resolve on the flop
+sometimes.  That's OK, I was already anticipating that.  Shouldn't be that
+often, I hope.  More than half of the betting sequences have six or
+more bets.  That's got to be pretty uncommon in practice.
+
+ms1f1/none/n2a requires 10.2g.
+
+n2a@200: Exploitability: 263.293055 mbb/g
+
+---------------------------------------------------------------------
+
+How big would a betting tree be that is mb4b7aa on preflop and flop,
+but mb3b1 after that?
+734,226 betting sequences
+  2,935 preflop
+  69,514 flop
+  175,042 turn
+  486,735 river
+1,286,792 null flop buckets
+1286792 * 69514 = 89,450,059,088 flop information sets (~90b)
+If I can encode regrets with one byte and maintain only the current
+strategy, that's 90 gigs.
+
+Hang on, I should use asymmetric betting abstraction.  So there would
+be many fewer betting sequences.
+
+big1asym p0 or p1:
+  268,615 betting sequences
+  22,616 flop betting sequences
+  29,102,087,872 flop information sets
+  183,516 river betting sequences
+
+Maybe I can reduce betting tree after N bets on preflop and flop.
+
+Out of 22,616 flop betting sequences in big1asym/p0:
+22,614 have at least one bet
+22,574 have at least two bets
+22,270 have at least three bets
+20,750 have at least four bets
+15,302 have at least five bets
+
+big2asym
+1,246,451 betting sequences (for both P0 and P1 trees)
+22,616 flop betting sequences
+About 1m river betting sequences
+1m river buckets, one byte per bucket, would mean 1 TB
+29 gigabytes for perfect flop with one byte per bucket
+116 gigabytes for perfect flop with four bytes per bucket
+233 gigabytes for perfect flop with eight bytes per bucket
+466 gigabytes for perfect flop with sixteen bytes per bucket
+About 145,340 river betting sequences
+1m turn buckets, one byte per bucket, would mean 145 GB
+
+big3asym
+498,552 betting sequences (for both P0 and P1)
+16,538 flop betting sequences
+94,038 turn betting sequences
+387,129 river betting sequences
+Suppose I want to use 1m turn buckets and two doubles for turn regrets
+and sumprobs.  That's 1.5 TB.  Maybe doable actually.  But I can
+shrink if I don't need to save turn strategy in big pots.
+340 GB for flop assuming perfect abstraction and doubles for regret and
+sumprob.
+79,612 turn nodes have pot size of 100 or more.
+58,988 turn nodes have pot size of 200 or more.
+0.2 * 800 is 160.
+
+Should allow more bets for opponent on turn, but only when pot is small.
+
+nlt3
+1,009,304 betting sequences (for both P0 and P1)
+27,198 flop betting sequences
+203,490 turn betting sequences
+777,237 river betting sequences
+
+big4asym
+Allows up to five bets on each street
+1,395,733 (for both P0 and P1)
+9,730 flop betting sequences
+123,286 turn betting sequences
+  52,052 have pot sizes >= 400
+  69,064 have pot sizes >= 300
+  90,306 have pot sizes >= 200
+1,262,340 river betting sequences
+
+With 16 bytes per river bucket could perhaps have 50,000 river buckets
+50,000 * 16 * 1,262,340 = 1 terabyte
+With 1 byte per river bucket could perhaps have 800,000 river buckets
+With 16 bytes per turn bucket could perhaps have 500,000 turn buckets
+  500,000 * 16 * 123286 = 1 terabyte
+  500,000 turn buckets is about a 100:1 reduction
+Null flop will take 200 GB: 
+  1286792 * 9730 * 16 = 200,327,778,560
+
+big5asym
+Allows up to five bets on each street
+Don't use multipliers for opp; specify a bunch of bet sizes
+1,499,368 betting sequences (for both P0 and P1)
+17,252 flop betting sequences
+177,992 turn betting sequences
+1,303,557 river betting sequences
+
+-----------------------------
+
+Used asymmetric experiments to determine what bets I need for target
+player.  I gave the opponent a wide variety of bet sizes (roughly eight).
+I gave the target player two or three bet sizes.  I ran run_rgbr on the
+resulting system.  The closer the exploitability is to zero, the better
+the set of target player bet sizes.
+
+How do I determine the best set of bet sizes for the opponent?
+
+One approach is to:
+1) Build a system with a small candidate set of bet sizes
+2) Measure exploitability
+3) Expand to a larger set of bet sizes
+4) Measure exploitability
+
+If the exploitability gap between (2) and (4) is small, then the small
+candidate set of bet sizes may be sufficient.

@@ -1,0 +1,187 @@
+Want to investigate expansion on multiple streets.
+
+"Old" all-in bug fix: we were always ignoring all-in base node
+
+"Facing bet" bug fix: with all-in base node, assume always-call when
+facing bet, ignore node when not facing bet.
+
+temp1: min-bet and pot on all streets
+temp2: min-bet, 1/2 pot and pot on all streets
+temp1 200: Exploitability: 8.44 mbb/g
+temp1->temp2 200: Exploitability: 116.35 mbb/g
+After "facing bet" bug fix: Exploitability: 113.14 mbb/g
+After fixing mapping problems: Exploitability: 112.27 mbb/g
+
+Expand to closer bet sizes
+temp2 base 200: Exploitability: 14.88 mbb/g
+  P0 best response: 0.730077 (365.04 mbb/g)
+  P1 best response: -0.670547 (-335.27 mbb/g)
+temp3: min-bet, 1/4 pot, 3/4 pot and pot on all streets
+temp2->temp3 200: Exploitability: 101.64 mbb/g             OLD
+  Got worse after old all-in fix?!?
+After "facing bet" bug fix: Exploitability: 81.26 mbb/g    OLD
+
+Only expand on river
+temp4: Pot only prior to river; 1/2 pot and pot on river; always min-bet
+temp5: Pot only prior to river; 1/4, 1/2, 3/4, 1x on river; always min-bet
+temp4 base 200: Exploitability: 8.49 mbb/g
+temp4->temp5 200: Exploitability: 13.59 mbb/g
+
+Try only expanding on turn and river.
+temp6: Pot only prior to turn; 1/2 pot and pot on turn/river; always min-bet
+temp7: Pot only prior to turn; 1/4, 1/2, 3/4, 1x on t/r; always min-bet
+temp6 base 200: Exploitability: 13.60 mbb/g
+temp6->temp7 200: Exploitability: 41.22 mbb/g
+
+Try only expanding on flop, turn and river.
+temp8: Pot only preflop; 1/2 pot and pot postflop; always min-bet
+temp9: Pot only preflop; 1/4, 1/2, 3/4, 1x postflop; always min-bet
+temp8 base 200: Exploitability: 14.88 mbb/g
+temp8->temp9 200: Exploitability: 47.98 mbb/g
+
+Expand only preflop
+temp10 base 200: Exploitability: 8.44 mbb/g
+Before "old" bug fix:
+  temp10->temp11: Exploitability: 25.59 mbb/g
+After "old" bug fix:
+  temp10->temp11: Exploitability: 69.92 mbb/g
+After "facing bet" bug fix:
+  temp10->temp11: Exploitability: 34.17 mbb/g
+
+Like temp10, but get rid of min bets, only expand to 3/4
+temp12: 1/2 pot and pot preflop; pot postflop; no min bets
+temp13: 1/2, 3/4 and pot preflop; pot postflop; no min bets
+temp12: Exploitability: 11.39 mbb/g
+  P0 best response: -0.407383 (-203.69 mbb/g)
+  P1 best response: 0.452956 (226.48 mbb/g)
+Before "facing bet" bug fix
+  temp12->temp13: Exploitability: 60.10 mbb/g
+After "facing bet" bug fix:
+  temp12->temp13: Exploitability: 105.69 mbb/g
+After fixing mapping problems:
+  temp12->temp13: Exploitability: 105.69 mbb/g
+
+Like temp12, but get rid of all-in effects by making stacks super deep
+12a, 13a: deep stacks (no all-ins)
+temp12a 200: Exploitability: 31.68 mbb/g
+temp12a->temp13a 200: Exploitability: 55.88 mbb/g
+
+LIke temp2, but no min bets and only expanding to 3/4
+temp2a: 1/2 pot and pot all streets; no min bets
+temp3a: 1/2, 3/4 and pot all streets; no min bets
+temp2a: Exploitability: 15.72 mbb/g
+After "old" bug fix:
+  temp2a->temp3a: Exploitability: 186.69 mbb/g
+After "facing bet" bug fix:
+  temp2a->temp3a: Exploitability: 200.53 mbb/g
+This is the worst currently.
+Worse than temp2->temp3 despite fewer new bets.
+Try always skipping base all-in nodes in opp-choice:
+  temp2a->temp3a: Exploitability: 200.85 mbb/g
+After fixing mapping problems: Exploitability: 174.19 mbb/g
+
+Like temp2a, but deep stacks
+temp2b: Exploitability: 36.72 mbb/g
+temp2b->temp3b: Exploitability: 153.85 mbb/g
+  This is after fixing mapping problems.
+  
+
+rr
+1/2 pot and full pot opening bets and raises on river
+Before river, just full pot
+Deep stacks
+No min bets
+rr 200:      Exploitability: 63.94 mbb/g
+rr 400:      Exploitability: 22.20 mbb/g
+rrx adds 3/4 open and raise on river
+rr->rrx 200: Exploitability: 91.71 mbb/g                  OLD?
+rr->rrx 400: Exploitability: 58.45 mbb/g                  OLD?
+Not too bad.
+
+rr54
+Like rr, but stack size of 54
+rr54 200:        Exploitability: 24.84 mbb/g
+rr54->rrx54 200: Exploitability: 57.45 mbb/g              OLD?
+I guess getting all-in is a problem mostly when you get all-in on a street
+prior to the river.
+
+trr
+1/2 pot and full pot opening bets and raises on turn and river
+Before turn, just full pot
+Deep stacks
+No min bets
+trr 200:       Exploitability: 112.70 mbb/g
+trr 300:       Exploitability: 57.23 mbb/g
+  P0 best response: -0.853231 (-426.62 mbb/g)
+  P1 best response: 1.082139 (541.07 mbb/g)
+trrx adds 3/4 pot open and raise on turn and river
+trr->trrx 200: Exploitability: 320.54 mbb/g               NEW
+  This is still very bad.  Why?
+
+trrc
+Like trr, but stack size of 200
+trrc 200: Exploitability: 67.08 mbb/g
+trrc->trrcx 200: Exploitability: 184.51 mbb/g             OLD
+
+trr2
+Like trr, but add 3/4 pot bet and set stack size to 200
+trr2 200: Exploitability: 94.68 mbb/g
+trr2 300: Exploitability: 46.95 mbb/g
+trr2 400: Exploitability: 26.91 mbb/g
+Expand to 5/8 and 7/8.
+After fixing mapping problems:
+  trr2->trr2x 200: Exploitability: 118.59 mbb/g           NEW
+  trr2->trr2x 300: Exploitability: 81.51 mbb/g
+  trr2->trr2x 400: Exploitability: 69.53 mbb/g
+Nearest
+  trr2->trr2x 400: Exploitability: 616.35 mbb/g
+  Am I surprised that this is so terrible?
+  
+trr3
+Start with 0.5 and 0.7; expand to 0.6
+Turn and river bet and raise
+trr3 200: Exploitability: 58.59 mbb/g
+  P0 best response: -0.592096 (-296.05 mbb/g)
+  P1 best response: 0.826456 (413.23 mbb/g)
+trr3->trr3x: Exploitability: 82.87 mbb/g                  NEW
+
+tro3
+No raises
+tro3 200:  Exploitability: 27.16 mbb/g
+tro3x 200: Exploitability: 36.26 mbb/g                    NEW
+
+
+
+ftrr
+1/2 pot and full pot opening bets and raises postflop
+Preflop just full pot
+Deep stacks
+No min bets
+9.6g process size
+ftrr 200 (73m): Exploitability: 207.55 mbb/g
+Not enough memory to expand
+
+Lessons:
+
+* Expanding to 0.5 from min/1.0 is a bit harder than expanding to 0.25 and 0.75
+from min/0.5/1.0.  Not surprising.  Perhaps the surprising thing is that the
+gap is not bigger.
+
+* Nested resolving much worse than unnested on river.
+
+* Getting all-in can really mess things up.  Compare temp12->temp13 with
+temp12a->temp13a.  Also compare temp2a->temp3a with temp2b->temp3b.
+Improvement (once we uncap stacks) in each case is about 50 mbb/g.
+
+* Systems with AlwaysMinBet and max one bet are weird.  Enormous advantage
+to P0 as he can make small blocking bets in large pots to see a cheap
+showdown.  This seems to make expansion easier too.
+
+Problems
+
+temp12->temp13 seems like it should be easy but it gets exploitability
+over 100.  Also got worse after "facing bet" bug fix.  A big part of
+this is that we got rid of min bets.  Other results were too optimistic,
+sadly.
+
+temp2a->temp3a similar.  Worst results overall.  Similar story.

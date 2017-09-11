@@ -1,0 +1,568 @@
+ms1f3
+nhs_params (16,000 buckets)
+mb3b2
+
+This is old bucketed CFR+ implementation where we applied regret floor with
+each update to regret.  We get terrible results for base system, at least
+until we add exploration.  Puzzled by why exploration made things so much
+better.
+
+150m for 200 iterations
+200: Exploitability: 7684.421756 mbb/g
+400: Exploitability: 5842.828581 mbb/g
+600: Exploitability: 3985.716336 mbb/g
+800: Exploitability: 4390.573018 mbb/g
+
+Base cfrps, resolve cfrps
+Flop unsafe 600/200: Exploitability: 1663.68 mbb/g
+
+Explore=0.01
+200 (299m):                 Exploitability: 5062.73 mbb/g
+500:                        Exploitability: 1314.62 mbb/g
+1000:                       Exploitability: 305.18 mbb/g
+Flop unsafe 200/200 (228m): Exploitability: 1545.02 mbb/g
+Flop unsafe 500/200:        Exploitability: 530.29 mbb/g
+Flop unsafe 500/500:        Exploitability: 520.35 mbb/g
+  Resolving for 500 iterations hardly helps.
+Flop unsafe 1000/200:       Exploitability: 119.46 mbb/g
+
+Exploration is helping a lot.  But still very far from replicating
+Noam's results.
+
+nhs0.5bc1 (21,787 flop buckets)
+Explore=0.01
+200:         Exploitability: 2717.44 mbb/g
+  Much better
+500 (+457m):  Exploitability: 304.42 mbb/g
+1000 (+755m): Exploitability: 191.06 mbb/g
+Flop unsafe 500/200: Exploitability: 158.52 mbb/g
+  Much better
+Flop unsafe 1000/200: Exploitability: 249.37 mbb/g
+  Worse?!?  Ugh.
+Flop unsafe 1000/500: Exploitability: 47.23 mbb/g
+
+CFR-D
+build_prbrs CVs: 0.302311, 0.044860
+Flop CFR-D 1000/200 in 436m
+Flop CFR-D 1000/200: Exploitability: 82.83 mbb/g
+
+TCFR
+hs0.7bc2 (15,642 buckets)
+100m in 2m6s: Exploitability: 1086.43 mbb/g
+1b in 17m:    Exploitability: 554.34 mbb/g
+5b in +62m:   Exploitability: 358.05 mbb/g
+10b in +89m:  Exploitability: 325.45 mbb/g
+
+Flop unsafe 10b/500: Exploitability: 48.25 mbb/g
+
+
+
+---------------------------------------------------------
+
+nhs/mb1b1
+Must have been soft warmup.  Matches below.
+100: Exploitability: 344.213050 mbb/g
+150: Exploitability: 97.223593 mbb/g
+200: Exploitability: 60.358318 mbb/g
+300: Exploitability: 35.969595 mbb/g
+400: Exploitability: 29.640004 mbb/g
+500: Exploitability: 27.824792 mbb/g
+1000: Exploitability: 34.053569 mbb/g
+
+nhs/mb1b1, cfrps
+200: Exploitability: 60.36 mbb/g
+
+Resolve all flop games (base cfrps, resolve cfrps)
+Flop unsafe 200/200: Exploitability: 14.71 mbb/g
+
+nhs/mb1b1, explore=0.01
+200: Exploitability: 38.08 mbb/g
+Resolve all flop games (base explore=0.01, resolve cfrps)
+Flop unsafe 200/200: Exploitability: 4.23 mbb/g
+
+---------------------------------------------------------
+
+nhs/mb2b1
+nhs/mb2b1, explore=0.01
+200: Exploitability: 117.59 mbb/g
+Resolve all flop games (base explore=0.01, resolve cfrps)
+Flop unsafe 200/200: Exploitability: 21.23 mbb/g
+
+---------------------------------------------------------
+
+mb1b2
+
+nhs/mb1b2
+nhs/mb1b2, explore=0.01
+200:  Exploitability: 211.75 mbb/g
+  Pretty bad, although not as bad as mb2b2.
+300:  Exploitability: 103.57 mbb/g
+400:  Exploitability: 68.23 mbb/g
+500:  Exploitability: 50.15 mbb/g
+1000: Exploitability: 33.10 mbb/g
+Resolve all flop games (base explore=0.01, resolve cfrps)
+Flop unsafe 200/200: Exploitability: 77.81 mbb/g
+  Pretty bad, although not as bad as mb2b2.
+Flop unsafe 300/200:  Exploitability: 35.90 mbb/g
+Flop unsafe 300/300:  Exploitability: 35.31 mbb/g
+Flop unsafe 400/200:  Exploitability: 19.73 mbb/g
+Flop unsafe 500/200:  Exploitability: 13.26 mbb/g
+Flop unsafe 1000/200: Exploitability: 4.88 mbb/g
+
+mb1b2 starts out bad but gets much better when we run CFR for base for
+longer.
+
+---------------------------------------------------------
+
+mb2b2
+
+nhs/mb2b2: 16,468 flop buckets
+nhs/mb2b2, explore=0.01
+200:  Exploitability: 1314.60 mbb/g
+  So much worse than mb2b1!  Why?  If we run CFR for longer, will things
+  get better?
+300:  Exploitability: 645.83 mbb/g
+500:  Exploitability: 212.02 mbb/g
+1000: Exploitability: 137.29 mbb/g
+
+Resolve all flop games (base explore=0.01, resolve cfrps)
+Flop unsafe 200/200:  Exploitability: 354.74 mbb/g
+Flop unsafe 300/200:  Exploitability: 243.17 mbb/g
+Flop unsafe 1000/200: Exploitability: 31.24 mbb/g
+
+nhs0.5bc1/mb2b2: 21,787 flop buckets
+nhs0.5bc1/mb2b2, explore=0.01
+200: Exploitability: 661.09 mbb/g
+  Much better than nhs, much worse than nhsbc1
+Resolve all flop games (base explore=0.01, resolve cfrps)
+Flop unsafe 200/200:  Exploitability: 221.21 mbb/g
+  Much better than nhs, much worse than nhsbc1
+
+nhsbc1/mb2b2: 39,629 flop buckets
+nhsbc1/mb2b2, explore=0.01
+200:  Exploitability: 201.13 mbb/g
+500:  Exploitability: 135.04 mbb/g
+1000: Exploitability: 137.99 mbb/g
+  Much better than nhs initially, but after 1000 we equal out
+Resolve all flop games (base explore=0.01, resolve cfrps)
+Flop unsafe 200/200:  Exploitability: 90.51 mbb/g
+Flop unsafe 500/200:  Exploitability: 24.14 mbb/g
+Flop unsafe 1000/200: Exploitability: 19.52 mbb/g
+  Better than nhs, especially initially
+
+
+none/mb2b2
+none/mb2b2, ints, explore=0.01
+200: Exploitability: 32.88 mbb/g
+none/mb2b2, doubles, explore=0.01
+200: Exploitability: 34.11 mbb/g
+Resolve all flop games (base explore=0.01, resolve cfrps)
+Flop unsafe 200/200: Exploitability: 10.76 mbb/g
+
+---------------------------------------------------------
+
+hs/mb1b1
+Soft warmup
+100:  Exploitability: 485.040669 mbb/g
+200:  Exploitability: 420.097021 mbb/g
+300:  Exploitability: 395.161111 mbb/g
+400:  Exploitability: 354.886116 mbb/g
+500:  Exploitability: 310.322082 mbb/g
+1000: Exploitability: 218.854756 mbb/g
+2000: Exploitability: 127.058232 mbb/g
+3000: Exploitability: 116.814483 mbb/g
+4000: Exploitability: 114.571617 mbb/g
+
+Hard warmup
+100:  Exploitability: 1587.405629 mbb/g
+200:  Exploitability: 419.615851 mbb/g
+300:  Exploitability: 394.557233 mbb/g
+400:  Exploitability: 355.143210 mbb/g
+500:  Exploitability: 310.190866 mbb/g
+1000: Exploitability: 218.829123 mbb/g
+
+
+null/mb1b1
+100: Exploitability: 26.103343 mbb/g
+150: Exploitability: 2.876679 mbb/g
+200: Exploitability: 1.431931 mbb/g
+
+----------------------------------------------------
+
+One pot size bet preflop; no limp
+Two pot size bets on flop
+
+CFR+
+20: Exploitability: 221.33 mbb/g
+  P1 best response: 0.792507 (396.25 mbb/g)
+  P2 best response: 0.092806 (46.40 mbb/g)
+200: Exploitability: 2.33 mbb/g
+
+Vanilla CFR
+Normal
+  20: Exploitability: 178.38 mbb/g
+    P1 best response: 0.695411 (347.71 mbb/g)
+    P2 best response: 0.018113 (9.06 mbb/g)
+Using uniform probs in RegretsToProbs()
+  20: Exploitability: 226.70 mbb/g
+    P1 best response: 0.705790 (352.89 mbb/g)
+    P2 best response: 0.201005 (100.50 mbb/g)
+
+------
+
+Using hss0.2hs bucketing on flop
+Null preflop
+
+Vanilla CFR
+Using uniform probs in RegretsToProbs()
+  20: Exploitability: 207.11 mbb/g
+    P1 best response: 0.733702 (366.85 mbb/g)
+    P2 best response: 0.094730 (47.37 mbb/g)
+  80: Exploitability: 131.46 mbb/g
+    P1 best response: 0.611093 (305.55 mbb/g)
+    P2 best response: -0.085263 (-42.63 mbb/g)
+  100: Exploitability: 126.18 mbb/g
+    P1 best response: 0.592903 (296.45 mbb/g)
+    P2 best response: -0.088171 (-44.09 mbb/g)
+  160: Exploitability: 127.91 mbb/g
+    P1 best response: 0.589612 (294.81 mbb/g)
+    P2 best response: -0.077964 (-38.98 mbb/g)
+  200: Exploitability: 131.71 mbb/g
+    P1 best response: 0.595322 (297.66 mbb/g)
+    P2 best response: -0.068476 (-34.24 mbb/g)
+
+--------------------------------------------------------------------
+
+New vcfr2 implementation for CFR+ with card abstraction.
+"After" pass to floor regrets.
+Current strategy computed in "before" pass.
+ms1f3, noam1_params
+Uniform probs when sum-regrets zero
+CFR+, warmup of 1 (cfrp2s1_params)
+  50: Exploitability: 125.07 mbb/g
+    P1 best response: 0.610679 (305.34 mbb/g)
+    P2 best response: -0.110397 (-55.20 mbb/g)
+  60: Exploitability: 120.83 mbb/g
+    P1 best response: 0.605984 (302.99 mbb/g)
+    P2 best response: -0.122655 (-61.33 mbb/g)
+  70: Exploitability: 123.46 mbb/g
+    P1 best response: 0.614845 (307.42 mbb/g)
+    P2 best response: -0.121021 (-60.51 mbb/g)
+  80: Exploitability: 128.32 mbb/g
+    P1 best response: 0.627080 (313.54 mbb/g)
+    P2 best response: -0.113816 (-56.91 mbb/g)
+CFR+, warmup of 50
+  80: Exploitability: 149.19 mbb/g
+    P1 best response: 0.673213 (336.61 mbb/g)
+    P2 best response: -0.076467 (-38.23 mbb/g)
+CFR+, warmup of 100
+  200: Exploitability: 183.63 mbb/g
+    P1 best response: 0.730854 (365.43 mbb/g)
+    P2 best response: 0.003672 (1.84 mbb/g)
+
+hss0.6hss0.55_params
+CFR+, warmup of 1
+  40: Exploitability: 68.30 mbb/g
+    P1 best response: 0.465803 (232.90 mbb/g)
+    P2 best response: -0.192585 (-96.29 mbb/g)
+  50: Exploitability: 67.40 mbb/g
+    P1 best response: 0.465104 (232.55 mbb/g)
+    P2 best response: -0.195490 (-97.74 mbb/g)
+    Gap: 0.269614
+  60: Exploitability: 67.67 mbb/g
+    P1 best response: 0.462948 (231.47 mbb/g)
+    P2 best response: -0.192277 (-96.14 mbb/g)
+    Gap: 0.270671
+CFR+, warmup of 50
+  60:  Exploitability: 73.12 mbb/g
+  70:  Exploitability: 70.82 mbb/g
+  80:  Exploitability: 74.39 mbb/g
+  100: Exploitability: 77.85 mbb/g
+
+
+------
+
+Resolve all flop games with no card abstraction.
+../bin/solve_all_endgames ms1f3_params hss0.6hss0.55_params none_params noam1_params noam1_params cfrp2s1_params cfrps_params 1 1 50 200 unsafe
+50/200: Exploitability: 5.24 mbb/g
+
+-----------------------------------------------
+
+nhs_params
+mb3b2_params
+cfrp2s1_params
+10 in 9m: Exploitability: 1322.08 mbb/g
+10-50 in 37m: Exploitability: 199.77 mbb/g
+50-60 in 9m:  Exploitability: 181.30 mbb/g
+60-70 in 10m: Exploitability: 174.31 mbb/g
+70-80 in 9m:  Exploitability: 170.51 mbb/g
+80-90 in 9m:  Exploitability: 168.26 mbb/g
+90-100 in 9m: Exploitability: 168.44 mbb/g
+
+cfrp2s50_params
+60: Exploitability: 225.29 mbb/g
+70: Exploitability: 192.82 mbb/g
+80: Exploitability: 192.60 mbb/g
+
+
+cfrp2s_params (warmup 100)
+110: Exploitability: 199.72 mbb/g
+120: Exploitability: 185.02 mbb/g
+
+Using cfrp2s1/90
+solve_all_endgames in 224m
+90/200: Exploitability: 41.62 mbb/g
+  P1 best response: 0.157645 (78.82 mbb/g)
+  P2 best response: 0.008846 (4.42 mbb/g)
+  Gap: 0.166491
+
+vcfr2_params
+10: Exploitability: 2127.22 mbb/g
+50: Exploitability: 580.17 mbb/g
+100: Exploitability: 347.94 mbb/g
+150: Exploitability: 288.25 mbb/g
+200: Exploitability: 262.95 mbb/g
+250: Exploitability: 251.11 mbb/g
+300: Exploitability: 237.67 mbb/g
+400: Exploitability: 226.91 mbb/g
+500: Exploitability: 220.08 mbb/g
+600: Exploitability: 217.41 mbb/g
+700: Exploitability: 216.66 mbb/g
+
+
+cfrp2sde01_params
+Add explore of 0.01
+Use doubles for regrets and sumprobs
+50 in 45m: Exploitability: 239.35 mbb/g
+60 in 9m:  Exploitability: 230.88 mbb/g
+70 in 9m:  Exploitability: 230.47 mbb/g
+80 in 10m: Exploitability: 233.01 mbb/g
+
+solve_all_endgames in 223m
+70/200: Exploitability: 43.08 mbb/g
+  P1 best response: 0.176823 (88.41 mbb/g)
+  P2 best response: -0.004488 (-2.24 mbb/g)
+  Gap: 0.172335
+Slightly worse than with no exploration.
+
+cfrp2sd_params
+Use doubles for regrets and sumprobs
+10: Exploitability: 1209.40 mbb/g
+50: Exploitability: 198.24 mbb/g
+60: Exploitability: 180.29 mbb/g
+70: Exploitability: 172.45 mbb/g
+80: Exploitability: 168.80 mbb/g
+90: Exploitability: 167.99 mbb/g
+100: Exploitability: 168.11 mbb/g
+
+Above we assign uniform probabilities to actions if sum-regrets is zero
+Below using standard method of call succ getting entire probability weight
+if sum-regrets is zero.
+nhs_params
+mb3b2_params
+cfrp2s1_params
+10: Exploitability: 1305.72 mbb/g
+50: Exploitability: 214.75 mbb/g
+60: Exploitability: 194.14 mbb/g
+70: Exploitability: 181.67 mbb/g
+80: Exploitability: 174.49 mbb/g
+90: Exploitability: 171.65 mbb/g
+100: Exploitability: 170.88 mbb/g
+110: Exploitability: 170.93 mbb/g
+Hmm, a bit worse actually.
+
+----------------------------------------------
+
+noam2_params
+Should be identical to Noam's "small flop" game whose results are reported
+in the paper.
+hss0.6hss0.55_params: ~2000 flop buckets
+40: Exploitability: 247.53 mbb/g
+50: Exploitability: 233.06 mbb/g
+60: Exploitability: 224.15 mbb/g
+70: Exploitability: 222.05 mbb/g
+80: Exploitability: 224.16 mbb/g
+
+solve_all_endgames in 13m
+70/200: Exploitability: 30.79 mbb/g
+  Compare Noam's results at 38.
+
+doubles, explore=0.01
+40: Exploitability: 278.03 mbb/g
+50: Exploitability: 273.42 mbb/g
+60: Exploitability: 277.51 mbb/g
+70: Exploitability: 284.51 mbb/g
+solve_all_endgames in 13m
+60/200: Exploitability: 40.63 mbb/g
+
+CFR-D
+build_cbrs (EV: 0.398454, EV: 0.489753)
+build_prbrs (EV: 0.002577, EV: 0.162116)
+I think I need to be using build_prbrs.
+solve_all_endgames in 26m
+70/200: Exploitability: 155.60 mbb/g
+  Compare Noam's results at 178
+Redoing after fixing bug in CFR-D
+70/200: Exploitability: 51.17 mbb/g
+  Compare Noam's results at 178
+  Compare unsafe at 31
+
+Use ~30,000 bucket abstraction to compare to Noam's card abstraction of that
+size.
+nullhss0.6bc1: 28,824 buckets
+Soft warmup of 1
+110: Exploitability: 121.61 mbb/g
+Compare Noam at 91.28
+Soft warmup of 10
+110: Exploitability: 124.53 mbb/g
+hss0.5hss0.6bc2: 28,898 buckets
+Soft warmup of 1
+100: Exploitability: 111.24 mbb/g
+200: Exploitability: 105.54 mbb/g ***
+250: Exploitability: 105.54 mbb/g
+Soft warmup of 100
+200: Exploitability: 111.49 mbb/g
+
+solve_all_endgames in 13m
+nullhss0.6bc1: 28,824 buckets
+Unsafe 200/200: Exploitability: 16.53 mbb/g
+Unsafe 200/300: Exploitability: 15.76 mbb/g
+  Compare Noam at 5.5
+
+Solve game with no card abstraction
+200: Exploitability: 5.08 mbb/g
+solve_all_endgames in 13m
+Unsafe 200/200: Exploitability: 4.17 mbb/g
+
+Solve base and endgames with doubles
+hss0.5hss0.6bc2: 28,898 buckets
+100: Exploitability: 111.13 mbb/g
+200: Exploitability: 105.38 mbb/g
+250: Exploitability: 105.21 mbb/g
+Unsafe 200/200: Exploitability: 16.53 mbb/g
+  Doubles for base and endgames
+  Compare ints at 16.53 (no change at all?)
+Use soft warmup of 1 in endgame solving
+Unsafe 200/200: Exploitability: 16.69 mbb/g
+Unsafe 200/300: Exploitability: 15.80 mbb/g
+Unsafe 200/400: Exploitability: 15.41 mbb/g
+
+
+
+CFR-D
+hss0.5hss0.6bc2: 28,898 buckets
+build_prbrs (-0.041001, 0.074612)
+solve_all_endgames in 27m
+CFR-D 200/200: Exploitability: 22.07 mbb/g
+  Compare Noam at 54
+
+----------------------------------------------
+
+noam3_params
+Was meant to be identical to Noam's "large flop" game whose results are
+reported in the paper.  But I think I allowed too many bets.
+hss0.6hss0.55_params: ~2000 flop buckets
+10: Exploitability: 1052.57 mbb/g
+20: Exploitability: 481.05 mbb/g
+30: Exploitability: 305.32 mbb/g
+40: Exploitability: 248.29 mbb/g
+50: Exploitability: 230.10 mbb/g
+60: Exploitability: 219.79 mbb/g
+70: Exploitability: 215.38 mbb/g
+80: Exploitability: 211.71 mbb/g
+90: Exploitability: 206.67 mbb/g
+100: Exploitability: 206.87 mbb/g
+Compare Noam at 165.2
+
+solve_all_endgames in 111m
+90/200: Exploitability: 59.98 mbb/g
+Compare Noam at 38
+
+Try again.
+Unified cfrp implementation.
+Uniform probs when sum-regrets zero
+10:  Exploitability: 1054.93 mbb/g
+20:  Exploitability: 396.87 mbb/g
+80:  Exploitability: 228.06 mbb/g
+90:  Exploitability: 226.47 mbb/g
+100: Exploitability: 226.32 mbb/g
+110: Exploitability: 227.39 mbb/g
+
+Try again but with all prob mass going to default succ when sum-regrets 0.
+10:  Exploitability: 1052.97 mbb/g
+20:  Exploitability: 481.04 mbb/g
+30:  Exploitability: 305.33 mbb/g
+40:  Exploitability: 248.29 mbb/g
+50:  Exploitability: 230.10 mbb/g
+60:  Exploitability: 219.79 mbb/g
+70:  Exploitability: 215.39 mbb/g
+80:  Exploitability: 211.71 mbb/g
+90:  Exploitability: 206.67 mbb/g
+100: Exploitability: 206.87 mbb/g
+
+Hmm, numbers are very slightly different from those above, not sure why.
+They're so close, though, that I probably shouldn't worry.
+
+----------------------------------------------
+
+noam4_params
+Should be identical to Noam's "large flop" game whose results are reported
+in the paper.
+Default succ gets all prob mass when sum-regrets 0
+hss0.6hss0.55_params: ~2000 flop buckets
+10:  Exploitability: 964.20 mbb/g
+20:  Exploitability: 416.00 mbb/g
+30:  Exploitability: 289.07 mbb/g
+40:  Exploitability: 244.86 mbb/g
+50:  Exploitability: 233.31 mbb/g
+60:  Exploitability: 224.39 mbb/g
+70:  Exploitability: 218.84 mbb/g
+80:  Exploitability: 215.93 mbb/g
+90:  Exploitability: 214.79 mbb/g
+100: Exploitability: 215.63 mbb/g
+Compare Noam at 165.2
+
+solve_all_endgames in 55m
+90/200: Exploitability: 59.62 mbb/g
+90/300: Exploitability: 58.58 mbb/g
+Compare Noam at 38
+
+Use doubles for regrets and sumprobs
+10: Exploitability: 1024.03 mbb/g
+20: Exploitability: 427.14 mbb/g
+30: Exploitability: 288.68 mbb/g
+40: Exploitability: 243.82 mbb/g
+50: Exploitability: 235.17 mbb/g
+60: Exploitability: 220.98 mbb/g
+70: Exploitability: 216.06 mbb/g
+80: Exploitability: 213.11 mbb/g
+90: Exploitability: 214.93 mbb/g
+
+Worse at first, later varies.
+
+Use doubles for regrets and sumprobs; explore=0.01
+10:  Exploitability: 963.13 mbb/g
+20:  Exploitability: 514.66 mbb/g
+30:  Exploitability: 352.92 mbb/g
+40:  Exploitability: 301.15 mbb/g
+50:  Exploitability: 284.83 mbb/g
+60:  Exploitability: 284.95 mbb/g
+70:  Exploitability: 284.61 mbb/g
+80:  Exploitability: 285.63 mbb/g
+90:  Exploitability: 286.03 mbb/g
+
+solve_all_endgames in 56m
+70/200: Exploitability: 77.23 mbb/g
+
+hss0.5hss0.6bc2: 28,898 buckets
+50:  Exploitability: 179.48 mbb/g
+100: Exploitability: 125.19 mbb/g
+150: Exploitability: 116.77 mbb/g
+200: Exploitability: 115.06 mbb/g
+Unsafe 200/200: Exploitability: 29.57 mbb/g
+  Compare Noam at 396.8
+CFR-D 200/200: Exploitability: 31.42 mbb/g
+  build_prbrs: 0.118065, -0.063858
+  Compare Noam at 23.11
+  solve_all_endgames in 117m
+  

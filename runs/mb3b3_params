@@ -1,0 +1,8 @@
+BettingAbstractionName mb3b3
+Limit false
+StackSize 400
+Asymmetric false
+NoLimitTreeType 1
+MinBet 2
+AlwaysAllIn false
+BetSizes 0.5,1.0,2.0;0.5,1.0,2.0;0.5,1.0,2.0|0.5,1.0,2.0;0.5,1.0,2.0;0.5,1.0,2.0|0.5,1.0,2.0;0.5,1.0,2.0;0.5,1.0,2.0|0.5,1.0,2.0;0.5,1.0,2.0;0.5,1.0,2.0

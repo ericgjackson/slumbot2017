@@ -1,0 +1,589 @@
+mb1b2
+Max of one bet per street
+Half-pot and pot-size bets
+
+mb1b3
+Max of one bet per street
+Half-pot, three-quarter and pot-size bets
+
+-------------------------------------
+
+ms0
+mb1b2
+Base 200:     Exploitability: 1.006209 mbb/g
+mb1b3
+Base 200:     Exploitability: 0.976248 mbb/g
+Expanded 200: Exploitability: 1.988089 mbb/g
+
+-------------------------------------
+
+ms1f1
+
+mb1b2:    Exploitability: 1.770181 mbb/g
+mb1b3:    Exploitability: 2.651549 mbb/g
+Expanded: Exploitability: 4.802699 mbb/g
+
+-------------------------------------
+
+ms2f1t1
+
+1/2 pot and full pot; interpolate to 3/4 pot
+
+mb1b2:    Exploitability: 9.497982 mbb/g
+mb1b3:    Exploitability: 14.255582 mbb/g
+Expanded: Exploitability: 12.537912 mbb/g
+
+Better than actual system!
+
+-------------------------------------
+
+ms2f1t1
+
+1/4 pot and full pot; interpolate to 1/2 pot
+Exception: first bet preflop is 1/2 pot.
+
+mb1b2 (6m39s):  Exploitability: 6.673232 mbb/g
+mb1b3 (13m24s): Exploitability: 7.943714 mbb/g
+Expanded:       Exploitability: 38.577363 mbb/g
+
+Bad.
+Conclusion: 1/2 pot bet is important.  Can't get it through interpolation.
+
+-------------------------------------
+
+Evaluate expansion to small bets by simply deterministically translating
+to smallest bet in abstraction.
+
+ms2f1t1
+
+Try expanding mb1b2_params (1/2 pot and 1x pot) to mb1b3b
+(1/4 pot, 1/2 pot and 1x pot).  Will copy 1/2 pot strategy to 1/4 pot.
+Expanded: Exploitability: 511.465530 mbb/g
+Bad as expected.
+
+Try expanding mb1b3b (1/4, 1/2, 1x) to mb1b14 (1/8, 1/4, 1/2/ 1x).
+1/4 pot strategy will get copied to 1/8.
+Expanded: Exploitability: 137.980648 mbb/g
+
+Doesn't work well.
+
+Translate 1/8 bet between 0 and 1/4 bet.  What this means is that we
+prevent folding if we map the 1/8 bet down to 0.  But otherwise we map
+the 1/8 bet to a 1/4 bet.
+
+mb1b3b->mb1b4: Exploitability: 86.418386 mbb/g  (0.09, 0.025)
+mb1b4:         Exploitability: 5.274229 mbb/g   (-0.06, 0.08)
+
+Better, but still not that good.  Should verify no bug.  Might have hoped
+this would work better.  We have no raises in this game.  What if I do it
+only on the turn?  Compare testa->testb and testb.
+
+testa (10m45s): Exploitability: 7.955196 mbb/g
+testb (12m54s): Exploitability: 8.102387 mbb/g
+testa->testb:   Exploitability: 86.485082 mbb/g
+
+I suspect a bug.
+
+Try ms0 with big blind of 10.
+testc: Only one bet size of 0.1
+200: Exploitability: 0.903497 mbb/g
+testd: Bet sizes of 0.1 and 0.2
+200: Exploitability: 0.852906 mbb/g
+testc->testd: Exploitability: 1.883960 mbb/g
+Hmm, not that bad.
+
+Why can't P1 open bet in this game?  Can't make bet that is smaller than
+last bet.  Last bet is difference between big blind and small blind.
+
+Try ms1 with big blind of 10
+testc: Exploitability: 1.768071 mbb/g
+testd: Exploitability: 1.490777 mbb/g
+testc->testd: Exploitability: 198.690985 mbb/g
+
+Try teste with 0.1 and 0.2 only on flop.
+teste: Exploitability: 2.047401 mbb/g
+testc->teste: Exploitability: 117.690420 mbb/g
+
+Doesn't seem to be a bug.  It's just bad.
+
+testf: 1/2 and 1 preflop and flop; 1/8, 1/2 and 1 on turn
+testg: 1/2 and 1 preflop and flop; 1/16, 1/8, 1/2 and 1 on turn
+testf: Exploitability: 7.712279 mbb/g
+testg: Exploitability: 6.995797 mbb/g
+testf->testg: Exploitability: 21.030181 mbb/g
+
+testh: 1/2 and 1 preflop and flop; 1/8, 1/4, 1/2 and 1 on turn
+testh: Exploitability: 8.102387 mbb/g
+testf->testh: Exploitability: 19.541107 mbb/g
+
+
+ms3f1t1r1h8
+testi: pot till river, 1/8 and 1x on river
+testj: pot till river, 1/16, 1/8 and 1x on river
+testi: Exploitability: 25.234885 mbb/g
+testj: Exploitability: 20.385866 mbb/g
+testi->testj: Exploitability: 120.947017 mbb/g
+
+testk: pot till river, 0.06 and 1x on river
+testl: pot till river, 0.03, 0.06 and 1x on river
+testk: Exploitability: 21.464862 mbb/g
+testl: Exploitability: 20.182203 mbb/g
+testk->testl: Exploitability: 41.714412 mbb/g
+
+Still not 100% convinced there's no bug.
+
+---------------------------------------------
+
+mb1b1aa_params
+mb1b2aa_params
+See if we can interpolate to 2x pot bet.
+Got bad results in holdem5.  Expect bad results here as well.
+
+ms0_params
+200:  Exploitability: 79.430080 mbb/g
+400:  Exploitability: 37.554283 mbb/g
+600:  Exploitability: 26.243130 mbb/g
+800:  Exploitability: 19.199010 mbb/g
+1000: Exploitability: 14.631428 mbb/g
+2000: Exploitability: 6.324013 mbb/g
+
+Expanded to mb1b2aa
+200:  Exploitability: 102.033534 mbb/g
+400:  Exploitability: 71.732845 mbb/g
+2000: Exploitability: 48.741064 mbb/g
+
+Make mb1b2aa_params the base now
+1000: Exploitability: 15.841523 mbb/g
+2000: Exploitability: 7.013404 mbb/g
+
+mb1b3aa
+2000: Exploitability: 16.013826 mbb/g
+
+Weird.  This failed miserably for holdem4 on a four street game, but seems
+OK here.
+
+-----
+
+ms1f1
+mb1b1aa
+200:  Exploitability: 148.639219 mbb/g
+1000: Exploitability: 31.569302 mbb/g
+2000: Exploitability: 10.663608 mbb/g
+
+Expand to mb1b2aa
+2000: Exploitability: 130.428961 mbb/g
+Bad, and much worse than ms0 game.
+
+Make mb1b2aa_params the base now
+1000: Exploitability: 34.785263 mbb/g
+2000: Exploitability: 13.647131 mbb/g
+
+Expand to mb1b3aa
+2000: Exploitability: 23.187767 mbb/g
+
+Hmm, still not very bad.
+
+-----
+
+ms2f1t1
+mb1b1aa
+200 (3m6s): Exploitability: 226.281424 mbb/g
+400 (3m2s): Exploitability: 132.731252 mbb/g
+1000 (9m):  Exploitability: 42.203819 mbb/g
+
+Expand to mb1b2aa
+1000: Exploitability: 220.724270 mbb/g
+Bad, and worse than ms1 game.
+
+Make mb1b2aa_params the base now
+200 (11m):   Exploitability: 223.643556 mbb/g
+400 (10.5m): Exploitability: 129.916479 mbb/g
+
+Expand to mb1b3aa
+200: Exploitability: 231.337056 mbb/g
+400: Exploitability: 140.451469 mbb/g
+
+-----
+
+mb2b2aa and mb2b3aa experiments
+Note: two bets per street allowed
+
+ms0
+mb2b2aa
+200:  Exploitability: 131.230875 mbb/g
+400:  Exploitability: 44.129292 mbb/g
+1000: Exploitability: 13.394684 mbb/g
+2000: Exploitability: 6.728268 mbb/g
+
+Expand mb2b2aa to mb2b3aa
+400:  Exploitability: 114.325421 mbb/g
+1000: Exploitability: 75.260982 mbb/g
+2000: Exploitability: 83.436099 mbb/g
+
+Now results are much worse.  Just like holdem4 experiments.
+
+Run CFR on mb2b3aa directly
+2000: Exploitability: 6.132463 mbb/g
+
+Expand mb2b3aa to mb2b4aa
+2000: Exploitability: 47.052294 mbb/g
+Lesser gap than before.
+
+Run CFR on mb2b4aa directly
+2000: Exploitability: 5.890236 mbb/g
+
+Expand mb2b4aa to mb2b5aa
+2000: Exploitability: 7.930440 mbb/g
+
+Run CFR on mb2b5aa directly
+2000: Exploitability: 6.423755 mbb/g
+
+Finally have the gap down to a reasonable size.
+
+-----
+
+mb3b4aa and mb3b5aa experiments
+
+ms0
+mb3b4aa
+2000: Exploitability: 7.054446 mbb/g
+
+Expand to mb3b5aa
+2000: Exploitability: 7.054446 mbb/g
+
+Surprising that there is no difference!  I guess opponent never has
+motivation to use the 10x bet.
+
+-----
+
+mb3b3a->mb3b5a experiment
+Using bets of 1x, 2x and 10x
+
+ms0
+mb3b3aa
+2000: Exploitability: 6.845936 mbb/g
+
+mb3b3aa->mb3b5aa
+2000: Exploitability: 59.360101 mbb/g
+
+Now using bets of 1x, 2x and 5x
+2000: Exploitability: 7.360426 mbb/g
+mb3b3aa->mb3b5aa
+2000: Exploitability: 34.766077 mbb/g
+Better, but still not good enough.
+
+-----------------------------------
+
+mb3b9aa_params
+9 bets: 1.0,1.5,2.0,2.5,3.0,4.0,5.0,10.0,20.0
+
+ms0
+b9@2000:          Exploitability: 7.810271 mbb/g
+mb3b4aa->mb3b9aa: Exploitability: 63.298394 mbb/g
+Hmm, much worse.
+mb3b5aa->mb3b9aa: Exploitability: 63.298394 mbb/g
+No improvment.
+
+mb3b6: 1.0,1.5,2.0,3.0,5.0,10.0
+2000: Exploitability: 7.855473 mbb/g
+mb3b6->mb3b9:
+2000: Exploitability: 38.149013 mbb/g
+Better, but still not good enough.
+
+mb3b7: 1.0,1.5,2.0,2.5,3.0,5.0,10.0
+2000: Exploitability: 6.385162 mbb/g
+mb3b7->mb3b9:
+2000: Exploitability: 23.900821 mbb/g
+Closer, but I would like to be even better.
+
+mb3b8: 1.0,1.5,2.0,2.5,3.0,4.0,5.0,10.0
+2000: Exploitability: 8.049642 mbb/g
+mb3b8->mb3b9:
+2000: Exploitability: 8.049642 mbb/g
+
+mb3b7: 1.0,1.5,2.0,2.5,3.0,4.0,5.0
+Note: changed from before
+2000: Exploitability: 8.072670 mbb/g
+mb3b7->mb3b9:
+2000: Exploitability: 38.363921 mbb/g
+
+----------------------------------------------
+
+ms1f1_params
+mb3b8aa_params
+8 bets: 1.0,1.5,2.0,2.5,3.0,4.0,5.0,10.0
+19858 betting sequences
+200 its in 14m
+200: Exploitability: 323.611183 mbb/g
+400: Exploitability: 146.373187 mbb/g
+
+----------------------------------------------
+
+ms1f1_params
+mb4b8aa_params
+8 bets: 0.25,0.5,1.0,1.5,2.0,2.5,3.0,5.0
+200:  Exploitability: 313.584511 mbb/g
+400:  Exploitability: 165.520556 mbb/g
+600:  Exploitability: 100.734174 mbb/g
+800:  Exploitability: 71.734207 mbb/g
+1000: Exploitability: 56.989934 mbb/g
+2000: Exploitability: 29.894614 mbb/g
+460m for last 1000 iterations
+
+------------------------------------------------------------
+
+Redo 5/28/2017
+ms0
+mb3b9aa (nothing smaller than 1x)
+cfrps
+200:  Exploitability: 173.43 mbb/g
+1000: Exploitability: 16.12 mbb/g
+2000: Exploitability: 7.81 mbb/g
+  Matches
+
+mb3b4aa
+cfrps
+2000: Exploitability: 7.58 mbb/g
+  Close enough
+
+mb3b4aa->mb3b9aa
+2000: Exploitability: 69.43 mbb/g
+  Close enough
+
+mb3b3bigaa (x1, 2x, 5x)
+2000: Exploitability: 7.37 mbb/g
+
+mb3b3bigaa->mb3b9aa
+2000: Exploitability: 61.50 mbb/g
+After changes to expand_strategy:
+  Exploitability: 109.22 mbb/g
+  Meant to fix pot size issues.
+
+-----
+
+ms1f1
+mb4b8aa_params
+8 bets, 7 raises: 0.25,0.5,1.0,1.5,2.0,2.5,3.0,5.0 (no 0.25 raise)
+200 (111m):   Exploitability: 316.66 mbb/g
+400 (+110m):  Exploitability: 165.78 mbb/g
+2000 (+786m): Exploitability: 29.90 mbb/g
+
+mb4b3aa_params
+3 bets, 3 raises (1/4, 1x, 5x and 1/2, 1x, 5x)
+200 (5m):    Exploitability: 252.77 mbb/g
+400 (+5m):   Exploitability: 127.56 mbb/g
+1000 (+14m): Exploitability: 46.14 mbb/g
+2000 (+23m): Exploitability: 17.98 mbb/g
+
+mb4b3aa->mb4b8aa@200:  Exploitability: 493.11 mbb/g
+mb4b3aa->mb4b8aa@400:  Exploitability: 651.07 mbb/g
+
+----------------------------------------------------
+
+ms1f1
+mb4b2aa
+0.5/1.0
+200:  Exploitability: 258.69 mbb/g
+400:  Exploitability: 137.07 mbb/g
+1000: Exploitability: 51.90 mbb/g
+mb4b2aa->mb4b8aa@200:  Exploitability: 2073.94 mbb/g
+mb4b2aa->mb4b8aa@400:  Exploitability: 1898.90 mbb/g
+mb4b2aa->mb4b8aa@2000: Exploitability: 2220.46 mbb/g
+
+mb4b3aa
+0.5/1.0/2.0
+200:  Exploitability: 284.39 mbb/g
+400:  Exploitability: 142.74 mbb/g
+1000: Exploitability: 50.41 mbb/g
+mb4b3aa->mb4b8aa@200: Exploitability: 934.17 mbb/g
+mb4b3aa->mb4b8aa@400: Exploitability: 869.14 mbb/g
+
+
+mb4b4aa
+0.5/1.0/2.0/5.0
+200:  Exploitability: 284.53 mbb/g
+400:  Exploitability: 144.03 mbb/g
+1000: Exploitability: 50.83 mbb/g
+2000: Exploitability: 25.37 mbb/g
+mb4b4aa->mb4b8aa@200:  Exploitability: 305.98 mbb/g
+mb4b4aa->mb4b8aa@400:  Exploitability: 209.50 mbb/g
+mb4b4aa->mb4b8aa@1000: Exploitability: 147.41 mbb/g
+mb4b4aa->mb4b8aa@2000: Exploitability: 158.94 mbb/g (compare ~30)
+
+mb4b5aa
+0.25/0.5/1.0/2.0/5.0
+0.25 is only opening bet and only postflop
+200:  Exploitability: 284.21 mbb/g
+400:  Exploitability: 147.79 mbb/g
+1000: Exploitability: 52.11 mbb/g
+2000: Exploitability: 26.29 mbb/g
+mb4b5aa->mb4b8aa@200:  Exploitability: 299.75 mbb/g
+mb4b5aa->mb4b8aa@400:  Exploitability: 204.65 mbb/g
+mb4b5aa->mb4b8aa@1000: Exploitability: 128.53 mbb/g
+mb4b5aa->mb4b8aa@2000: Exploitability: 133.94 mbb/g
+
+mb4b6aa
+0.25/0.5/1.0/2.0/3.0/5.0
+0.25 is only opening bet and only postflop
+200: Exploitability: 289.31 mbb/g
+400: Exploitability: 148.01 mbb/g
+1000: Exploitability: 54.82 mbb/g
+2000: Exploitability: 27.34 mbb/g
+mb4b6aa->mb4b8aa@200:  Exploitability: 291.76 mbb/g
+mb4b6aa->mb4b8aa@400:  Exploitability: 154.88 mbb/g
+mb4b6aa->mb4b8aa@1000: Exploitability: 88.60 mbb/g
+mb4b6aa->mb4b8aa@2000: Exploitability: 86.34 mbb/g
+
+mb4b7aa
+0.25/0.5/1.0/1.5/2.0/3.0/5.0
+0.25 is only opening bet and only postflop
+200:  Exploitability: 299.81 mbb/g
+400:  Exploitability: 157.83 mbb/g
+1000: Exploitability: 55.04 mbb/g
+2000: Exploitability: 28.75 mbb/g
+mb4b7aa->mb4b8aa@200:  Exploitability: 299.91 mbb/g
+mb4b7aa->mb4b8aa@400:  Exploitability: 157.97 mbb/g
+mb4b7aa->mb4b8aa@1000: Exploitability: 55.58 mbb/g
+mb4b7aa->mb4b8aa@2000: Exploitability: 30.85 mbb/g
+
+Seems like I don't really need the 2.5x bet.
+
+-----
+
+Debug problems.  Simple tests with mb1b2 and mb1b3 showed no problems,
+on one, two and three street games.
+
+ms0
+mb2b2
+200: Exploitability: 2.40 mbb/g
+mb2b3
+200: Exploitability: 3.09 mbb/g
+mb2b2->mb2b3@200: Exploitability: 3.74 mbb/g
+
+mb3b2
+200: Exploitability: 4.40 mbb/g
+mb3b3b
+200: Exploitability: 6.10 mbb/g
+mb3b2->mb3b3b@200: Exploitability: 5.64 mbb/g
+
+mb1b2aa:
+200:  Exploitability: 81.07 mbb/g
+2000: Exploitability: 8.48 mbb/g
+mb1b3aa:
+200: Exploitability: 82.44 mbb/g
+2000: Exploitability: 9.26 mbb/g
+mb1b2aa->mb1b3aa@200:  Exploitability: 81.51 mbb/g
+mb1b2aa->mb1b3aa@2000: Exploitability: 8.88 mbb/g
+
+ms1f1
+mb1b2aa
+200:  Exploitability: 147.40 mbb/g
+2000: Exploitability: 18.47 mbb/g
+mb1b3aa
+2000: Exploitability: 20.91 mbb/g
+mb1b2aa->mb1b3aa@2000: Exploitability: 19.23 mbb/g
+
+mb4b2aa
+200: Exploitability: 204.70 mbb/g
+400: Exploitability: 112.80 mbb/g
+mb4b3aa
+200: Exploitability: 247.71 mbb/g
+400: Exploitability: 133.20 mbb/g
+mb4b2aa->mb4b8aa@200:
+mb4b2aa->mb4b3aa@200: Exploitability: 652.32 mbb/g
+mb4b2aa->mb4b3aa@400: Exploitability: 644.10 mbb/g
+
+Some of this is an artifact of the preflop opening 1/4 pot bet getting
+deleted (too small).  Fixed.
+
+------------------------------------------------------------
+
+holdem5
+mb1b1aa base 200: Exploitability: 277.36 mbb/g
+             400: Exploitability: 124.76 mbb/g
+  Why is this worse than mb1b5aar after 200 its?  Weird.
+Process size 5.5g
+
+Expand to 2x on river only (mb1b2aar):
+  200: Exploitability: 334.20 mbb/g
+Expand to 1/2 on river only (mb1b2baar):
+  200: Exploitability: 642.21 mbb/g
+  So terrible.  A bug?
+
+mb1b5aar (1/4x, 1/2x, 1x, 2x, 5x)
+12.3g process size
+200:  Exploitability: 257.05 mbb/g
+1000: Exploitability: 24.19 mbb/g
+Expand to 3/4x:  1000: Exploitability: 29.62 mbb/g
+Expand to 1.5x:  1000: Exploitability: 29.71 mbb/g
+Expand to 3x:    1000: Exploitability: 26.55 mbb/g
+Expand to 10x:   1000: Exploitability: 24.47 mbb/g
+Expand to 0.35x: 1000: Exploitability: 27.32 mbb/g
+Expand to 0.2x:  1000: Exploitability: 118.36 mbb/g
+Expand to 0.24x: 1000: Exploitability: 34.68 mbb/g
+
+Investigate 0.2x.  mb1b6faar_params.
+
+mb1b6aar (1/8x, 1/4x, 1/2x, 1x, 2x, 5x)
+14.2g process size
+200 (124m): Exploitability: 220.82 mbb/g
+Expand to 0.05: Exploitability: 288.89 mbb/g
+Expand to 0.18: Exploitability: 220.96 mbb/g
+Expand to 0.35: Exploitability: 221.53 mbb/g
+Expand to 0.75: Exploitability: 222.30 mbb/g
+Expand to 1.5:  Exploitability: 222.03 mbb/g
+Expand to 3.0:  Exploitability: 221.15 mbb/g
+Expand to 10.0: Exploitability: 221.38 mbb/g
+
+mb1b4aar (1/8x, 1/2x, 1x, 5x)
+10.4g process size
+200 (95m): Exploitability: 221.33 mbb/g
+Expand to 0.3: Exploitability: 224.88 mbb/g
+Expand to 3.0: Exploitability: 225.61 mbb/g
+
+mb1b4baar (0.05x, 1/2x, 1x, 5x)
+200 (91m): Exploitability: 200.06 mbb/g
+Expand to 0.025: Exploitability: 205.56 mbb/g
+Expand to 0.25x: Exploitability: 224.92 mbb/g
+1000: Exploitability: 21.58 mbb/g
+Expand to 0.025: Exploitability: 34.09 mbb/g
+Expand to 0.25x: Exploitability: 57.92 mbb/g
+
+mb1b4caar (0.05x, 1/4x, 1x, 5x)
+200 (87m): Exploitability: 202.66 mbb/g
+Expand to 0.5x:   Exploitability: 212.81 mbb/g
+Expand to 0.125x: Exploitability: 209.52 mbb/g
+
+mb1b1aabmr4asym
+200 (91m): Exploitability: 463.87 mbb/g
+  P0 best response: 0.864805 (432.40 mbb/g)
+  P1 best response: 0.990667 (495.33 mbb/g)
+Why so bad?  Because opponent has more bet sizes?
+Expand to mb1b1aabrm2asym:
+200: Exploitability: 489.04 mbb/g
+  P0 best response: 0.901432 (450.72 mbb/g)
+  P1 best response: 1.054713 (527.36 mbb/g)
+
+
+
+mb1b1aabmr2sym
+18.7g process size
+mb1b1aabrm4sym
+11g process size
+200 (99m):   Exploitability: 193.91 mbb/g
+400 (+114m): Exploitability: 79.34 mbb/g
+Expand to mb1b1aabrm2sym:
+200: Exploitability: 204.73 mbb/g
+400: Exploitability: 92.67 mbb/g
+
+mb1b1aarmr4sym
+One opening bet size (pot) on river
+Multiplier of four raise sizes
+200 (160m):  Exploitability: 286.92 mbb/g
+Expand to mb1b1aarmr2sym
+200: Exploitability: 289.26 mbb/g
+
+mb1b1aarmr4asym
+200 (135m): Exploitability: 286.52 mbb/g
+Expand to mb1b1aarmr2asym
+200: Exploitability: 288.84 mbb/g

@@ -1,0 +1,541 @@
+ms1f1
+mb1b3casym_params
+0.5, 1x and sometimes 2x pot bets
+Opponent has a 2x pot bet; target player does not
+
+Asymmetric
+1000
+P0 best response: -0.164803 (-82.40 mbb/g)
+P1 best response: 0.204181 (102.09 mbb/g)
+Gap: 0.039378
+Exploitability: 9.84 mbb/g
+2000
+P0 best response: -0.165079 (-82.54 mbb/g)
+P1 best response: 0.203513 (101.76 mbb/g)
+Gap: 0.038434
+Exploitability: 9.61 mbb/g
+
+Symmetric
+1000
+P0 best response: -0.182832 (-91.42 mbb/g)
+P1 best response: 0.185126 (92.56 mbb/g)
+Gap: 0.002293
+Exploitability: 0.57 mbb/g
+
+Does the asymmetric system converge to exploitability zero?  Or does
+the remaining gap indicate the advantage of the additional betting options
+to the opponent?  I think there will be a remaining gap that indicates the
+advantage of the additional betting options.
+
+mb1b8
+200
+P0 best response: 0.028103 (14.05 mbb/g)
+P1 best response: 0.106006 (53.00 mbb/g)
+Gap: 0.134109
+Exploitability: 33.53 mbb/g
+1000
+P0 best response: -0.055065 (-27.53 mbb/g)
+P1 best response: 0.072937 (36.47 mbb/g)
+Gap: 0.017871
+Exploitability: 4.47 mbb/g
+2000
+P0 best response: -0.061862 (-30.93 mbb/g)
+P1 best response: 0.069255 (34.63 mbb/g)
+Gap: 0.007393
+Exploitability: 1.85 mbb/g
+
+mb1b8a
+No 5x pot bet for us
+200
+P0 best response: 0.012890 (6.44 mbb/g)
+P1 best response: 0.101599 (50.80 mbb/g)
+Gap: 0.114488
+Exploitability: 28.62 mbb/g
+1000
+P0 best response: -0.057380 (-28.69 mbb/g)
+P1 best response: 0.072535 (36.27 mbb/g)
+Gap: 0.015155
+Exploitability: 3.79 mbb/g
+
+mb1b8b
+No 3x pot bet for us
+1000
+P0 best response: -0.054980 (-27.49 mbb/g)
+P1 best response: 0.073459 (36.73 mbb/g)
+Gap: 0.018478
+Exploitability: 4.62 mbb/g
+
+mb1b8c
+No 2x pot bet for us
+1000
+P0 best response: -0.054994 (-27.50 mbb/g)
+P1 best response: 0.073458 (36.73 mbb/g)
+Gap: 0.018464
+Exploitability: 4.62 mbb/g
+
+mb1b8d
+No 1.5x pot bet for us
+1000
+P0 best response: -0.054981 (-27.49 mbb/g)
+P1 best response: 0.074154 (37.08 mbb/g)
+Gap: 0.019173
+Exploitability: 4.79 mbb/g
+
+mb1b8e
+No 1x pot bet for us
+1000
+P0 best response: -0.055425 (-27.71 mbb/g)
+P1 best response: 0.073392 (36.70 mbb/g)
+Gap: 0.017967
+Exploitability: 4.49 mbb/g
+
+mb1b8f
+No 3/4x pot bet for us
+1000
+P0 best response: -0.047535 (-23.77 mbb/g)
+P1 best response: 0.073450 (36.73 mbb/g)
+Gap: 0.025916
+Exploitability: 6.48 mbb/g
+
+mb1b8g
+No 1/2x pot bet for us
+1000
+P0 best response: -0.008674 (-4.34 mbb/g)
+P1 best response: 0.078531 (39.27 mbb/g)
+Gap: 0.069857
+Exploitability: 17.46 mbb/g
+
+mb1b8h
+No 1/4x pot bet for us
+1000
+P0 best response: -0.052920 (-26.46 mbb/g)
+P1 best response: 0.186386 (93.19 mbb/g)
+Gap: 0.133466
+Exploitability: 33.37 mbb/g
+
+mb1b8i
+Only three bets for us (1/2, 3/4, 1x preflop; 1/4, 1/2, 3/4 postflop)
+1000
+P0 best response: -0.061557 (-30.78 mbb/g)
+P1 best response: 0.115080 (57.54 mbb/g)
+Gap: 0.053523
+Exploitability: 13.38 mbb/g
+
+mb1b8j
+Only bets <= 1x for us (1/2, 3/4, 1x preflop; 1/4, 1/2, 3/4, 1x postflop)
+1000
+P0 best response: -0.058939 (-29.47 mbb/g)
+P1 best response: 0.096911 (48.46 mbb/g)
+Gap: 0.037972
+Exploitability: 9.49 mbb/g
+
+mb1b8k
+Only bets <= 1.5x for us (four bets preflop, five bets postflop)
+1000
+P0 best response: -0.063679 (-31.84 mbb/g)
+P1 best response: 0.081655 (40.83 mbb/g)
+Gap: 0.017977
+Exploitability: 4.49 mbb/g
+
+mb1b8l
+0.5/0.75/1.5 preflop; 0.25/0.5/0.75/1.5 postflop
+Like mb1b8j but 1.5x instead of 1x
+1000
+P0 best response: -0.059840 (-29.92 mbb/g)
+P1 best response: 0.082066 (41.03 mbb/g)
+Gap: 0.022226
+Exploitability: 5.56 mbb/g
+
+mb1b8m
+0.5/0.75/1.5 preflop; 0.25/0.5/1.5 postflop
+Like mb1b8l, but no 3/4x postflop
+1000
+P0 best response: -0.063381 (-31.69 mbb/g)
+P1 best response: 0.086409 (43.20 mbb/g)
+Gap: 0.023028
+Exploitability: 5.76 mbb/g
+
+mb1b8n
+0.5/1.0 preflop; 0.25/0.5/1.5 postflop
+Like mb1b8m, but different and smaller preflop
+1000
+P0 best response: -0.052783 (-26.39 mbb/g)
+P1 best response: 0.086409 (43.20 mbb/g)
+Gap: 0.033626
+Exploitability: 8.41 mbb/g
+
+mb1b8o
+0.5/1.5 preflop; 0.25/0.5/1.5 postflop
+Like mb1b8m, but no 3/4 preflop
+1000
+P0 best response: -0.056951 (-28.48 mbb/g)
+P1 best response: 0.086409 (43.20 mbb/g)
+Gap: 0.029457
+Exploitability: 7.36 mbb/g
+
+mb1b8p
+0.5/0.75/1.0 preflop; 0.25/0.5/1.5 postflop
+Like mb1b8m, but 1.0 instead of 1.5 preflop
+1000
+P0 best response: -0.063956 (-31.98 mbb/g)
+P1 best response: 0.086409 (43.20 mbb/g)
+Gap: 0.022452
+Exploitability: 5.61 mbb/g
+2000
+P0 best response: -0.064822 (-32.41 mbb/g)
+P1 best response: 0.083548 (41.77 mbb/g)
+Gap: 0.018726
+Exploitability: 4.68 mbb/g
+
+mb1b8q
+0.5/1.0 preflop; 0.25/1.5 postflop
+1000
+P0 best response: -0.052792 (-26.40 mbb/g)
+P1 best response: 0.103062 (51.53 mbb/g)
+Gap: 0.050270
+Exploitability: 12.57 mbb/g
+
+mb1b8r
+0.5/1.0 preflop; 0.25/1.0 postflop
+1000
+P0 best response: -0.052792 (-26.40 mbb/g)
+P1 best response: 0.105869 (52.93 mbb/g)
+Gap: 0.053077
+Exploitability: 13.27 mbb/g
+
+mb1b8s
+0.5/1.0 preflop; 0.5/1.5 postflop
+1000
+P0 best response: -0.052595 (-26.30 mbb/g)
+P1 best response: 0.203171 (101.59 mbb/g)
+Gap: 0.150576
+Exploitability: 37.64 mbb/g
+
+mb1b8t
+0.5/1.0 preflop; 0.25/0.5 postflop
+1000
+P0 best response: -0.051648 (-25.82 mbb/g)
+P1 best response: 0.147448 (73.72 mbb/g)
+Gap: 0.095800
+Exploitability: 23.95 mbb/g
+
+mb1b8u
+0.5/1.0 preflop; 0.25/2.0 postflop
+1000
+Exploitability: 12.88 mbb/g
+
+mb1b8v
+0.5/0.75 preflop; 0.25/1.5 postflop
+1000
+P0 best response: -0.062441 (-31.22 mbb/g)
+P1 best response: 0.103062 (51.53 mbb/g)
+Gap: 0.040621
+Exploitability: 10.16 mbb/g
+2000
+P0 best response: -0.063449 (-31.72 mbb/g)
+P1 best response: 0.100568 (50.28 mbb/g)
+Gap: 0.037119
+Exploitability: 9.28 mbb/g
+
+
+mb1b8w
+0.5/0.75/1.0 preflop; 0.25/1.5 postflop
+1000
+P0 best response: -0.062652 (-31.33 mbb/g)
+P1 best response: 0.103062 (51.53 mbb/g)
+Gap: 0.040410
+Exploitability: 10.10 mbb/g
+2000
+P0 best response: -0.063539 (-31.77 mbb/g)
+P1 best response: 0.100568 (50.28 mbb/g)
+Gap: 0.037029
+Exploitability: 9.26 mbb/g
+
+mb1b8x
+0.5/0.75 preflop; 0.25/0.5/1.5 postflop
+1000
+P0 best response: -0.063756 (-31.88 mbb/g)
+P1 best response: 0.086409 (43.20 mbb/g)
+Gap: 0.022653
+Exploitability: 5.66 mbb/g
+2000
+P0 best response: -0.064724 (-32.36 mbb/g)
+P1 best response: 0.083548 (41.77 mbb/g)
+Gap: 0.018824
+Exploitability: 4.71 mbb/g
+
+mb1b8y
+0.5 preflop; 0.25/0.5/1.5 postflop
+1000
+P0 best response: -0.045909 (-22.95 mbb/g)
+P1 best response: 0.086409 (43.20 mbb/g)
+Gap: 0.040500
+Exploitability: 10.13 mbb/g
+2000
+P0 best response: -0.046572 (-23.29 mbb/g)
+P1 best response: 0.083548 (41.77 mbb/g)
+Gap: 0.036976
+Exploitability: 9.24 mbb/g
+
+mb1b8z
+0.75 preflop; 0.25/0.5/1.5 postflop
+1000
+P0 best response: -0.020510 (-10.25 mbb/g)
+P1 best response: 0.086409 (43.20 mbb/g)
+Gap: 0.065899
+Exploitability: 16.47 mbb/g
+
+Conclusions:
+* Using all bets but one, all large bets could be removed without cost.
+  But 3/4x hurt a little, 1/2x hurt some, and 1/4x hurt a lot.
+* With three bets preflop and postflop, mb1b8p was best
+    0.5/0.75/1.0 preflop; 0.25/0.5/1.5 postflop
+  Exploitability@2000: 4.68 mbb/g
+* With two bets preflop and postflop, mb1b8v was best
+    0.5/0.75 preflop and 0.25/1.5 postflop
+  Exploitability@2000: 9.28 mbb/g
+* With three bets preflop and two postflop, mb1b8w is presumably best
+    0.5/0.75/1.0 preflop and 0.25/1.5 postflop
+  Exploitability@2000: 9.26 mbb/g
+  No value to adding that 1.0x preflop bet
+* With two bets preflop and three bets postflop, mb1b8x is presumably best
+    0.5/0.75 preflop; 0.25/0.5/1.5 postflop
+  Exploitability@2000: 4.71 mbb/g
+  More confirmation that adding that 1.0x preflop bet is useless
+  OTOH, adding that 0.5x postflop bet does help
+* With one bet preflop and three bets post flop, mb1b8y presumably best
+    0.5 preflop; 0.25/0.5/1.5 postflop
+  Exploitability@2000: 9.24 mbb/g
+  Real cost to removing the second preflop bet
+
+---------------------------------------------------------------------
+
+ms1f1
+mb2b8
+Symmetric
+200:  Exploitability: 157.69 mbb/g
+500:  Exploitability: 48.04 mbb/g
+1000: Exploitability: 19.84 mbb/g
+2000: Exploitability: 8.18 mbb/g
+
+
+mb2b8x
+Asymmetric
+  Preflop opens: 0.5,0.75
+  Preflop raises: 0.5,1.0
+  Flop opens: 0.25,0.5,1.5
+  Flop raises: 0.5,1.0,1.5
+200:  Exploitability: 65.29 mbb/g
+500:  Exploitability: 20.28 mbb/g
+1000: Exploitability: 11.92 mbb/g
+2000: Exploitability: 6.68 mbb/g
+3000: Exploitability: 5.18 mbb/g
+
+Surprisingly low.  Does this not do what I think it does?
+
+---------------------------------------------------------------------
+
+ms2f1t1
+holdem10
+mb1b8
+Symmetric
+200: Exploitability: 202.28 mbb/g
+400: Exploitability: 67.99 mbb/g
+
+
+mb1b8x
+200:  Exploitability: 54.87 mbb/g
+400:  Exploitability: 25.76 mbb/g
+1000: Exploitability: 11.84 mbb/g
+2000: Exploitability: 7.75 mbb/g
+
+---------------------------------------------------------------------
+
+ms3f1t1r1
+holdem5
+mb1b8x
+1000: Exploitability: 59.35 mbb/g
+1200: Exploitability: 54.21 mbb/g
+1500: Exploitability: 49.21 mbb/g
+2000: Exploitability: 44.02 mbb/g
+3500: Exploitability: 37.34 mbb/g
+
+This isn't quite as good as I'd hoped.
+
+mb1b8a
+Preflop: 0.5,0.75,1.0
+Flop: 0.25,0.5,0.75,1.0.1.5
+27.3g for one player.  Trying again with compression, subgames.
+10: Exploitability: 28709.36 mbb/g
+P0 11-200 in 304m
+P1 11-200 in 361m
+200: Exploitability: 355.26 mbb/g
+P1 201-400 in 579m
+400: 
+
+---------------------------------------------------------------------
+
+ms3f1t1r1
+holdem5
+mb2b2s100 with and without open limping
+No need to train P0 system - it is identical to the symmetric system.
+mb2b2s100
+200:  Exploitability: 65.61 mbb/g
+500:  Exploitability: 13.72 mbb/g
+1000: Exploitability: 5.52 mbb/g
+1500: Exploitability: 3.73 mbb/g
+mb2b2s100nola
+200:  Exploitability: 76.02 mbb/g
+500:  Exploitability: 27.60 mbb/g
+1000: Exploitability: 20.06 mbb/g
+1500: Exploitability: 18.34 mbb/g
+
+---------------------------------------------------------------------
+
+ms3f1t1r1
+holdem5
+mb1b4
+Preflop:  1/2, 3/4, 1x.
+Postflop: 1/4, 1/2, 1x and 1.5x.
+200: Exploitability: 120.70 mbb/g
+
+mb1b4a
+Like mb1b4, but no pot size bet on flop
+1000: Exploitability: 12.09 mbb/g
+
+---------------------------------------------------------------------
+
+ms3f1t1r1
+holdem5
+These systems all start with an mb2b2s100aai base.
+See if we can resort to only all-ins once the pot size is 1/2 of the
+stack size.  The all-in then is 1.5x the pot size.
+oai50asym
+200 (69m):  Exploitability: 108.58 mbb/g
+oai50op25asym
+200 (54m):   Exploitability: 111.86 mbb/g
+400 (+52m):  Exploitability: 49.96 mbb/g
+600 (+51m):  Exploitability: 33.04 mbb/g
+800 (+56m):  Exploitability: 24.70 mbb/g
+1000 (+56m): Exploitability: 20.40 mbb/g
+1200 (+57m): Exploitability: 18.02 mbb/g
+
+mb2b2s100aai
+200 (151m): Exploitability: 109.49 mbb/g
+
+oai50op25mb2b3asym
+Similar to oai50op25asym, but mb2b3 default betting options
+600 (255m):   Exploitability: 36.26 mbb/g
+2000 (+512m): Exploitability: 14.99 mbb/g
+
+Geo 1 vs. geo 2
+Second category starts at 0.2 * all-in-pot-size
+400 (106m):   Exploitability: 40.73 mbb/g
+600 (+53m):   Exploitability: 23.53 mbb/g
+1000 (+100m): Exploitability: 11.28 mbb/g
+
+---------------------------------------------------------------------
+
+ms3f1t1r1h5
+vs45
+
+See if we can allow only four bets for ourselves preflop, but five
+bets for opponent.
+Didn't specify always-all-in-correctly.
+
+200: Exploitability: 63.69 mbb/g
+300: Exploitability: 37.99 mbb/g
+400: Exploitability: 23.39 mbb/g
+500: Exploitability: 15.77 mbb/g
+  P0 best response: -0.522521 (-261.26 mbb/g)
+  P1 best response: 0.585590 (292.80 mbb/g)
+1000: Exploitability: 5.19 mbb/g
+  P0 best response: -0.547161 (-273.58 mbb/g)
+  P1 best response: 0.567912 (283.96 mbb/g)
+
+vs34
+See if we can allow only three bets for ourselves preflop, but four
+bets for opponent.
+Didn't specify always-all-in-correctly.
+
+200:  Exploitability: 59.19 mbb/g
+1000: Exploitability: 4.67 mbb/g
+
+vs23
+See if we can allow only two bets for ourselves preflop, but three
+bets for opponent.
+Didn't specify always-all-in-correctly.
+
+200:  Exploitability: 56.99 mbb/g
+1000: Exploitability: 4.57 mbb/g
+
+vs12
+See if we can allow only one bet for ourselves preflop, but two bets for
+opponent.  Always all in for both players.
+
+200: Exploitability: 357.47 mbb/g
+1000: Exploitability: 48.45 mbb/g
+1200: Exploitability: 39.79 mbb/g
+2000: Exploitability: 25.06 mbb/g
+3000: Exploitability: 19.40 mbb/g
+4000: Exploitability: 16.96 mbb/g
+5000: Exploitability: 15.65 mbb/g
+
+Takes longer to converge because of the all-ins.
+
+vs12r
+Two bets for opponent on river, one bet for us.
+One bet for both players elsewhere.
+All-in always allowed
+200:  Exploitability: 393.19 mbb/g
+400:  Exploitability: 220.18 mbb/g
+1000: Exploitability: 120.66 mbb/g
+2000: Exploitability: 97.71 mbb/g
+3000: Exploitability: 92.12 mbb/g
+4000: Exploitability: 89.90 mbb/g
+
+vs12pf
+Two bets for opponent on preflop and flop, one bet for us.
+One bet for both players elsewhere.
+All-in always allowed
+200:  Exploitability: 411.39 mbb/g
+1000: Exploitability: 142.23 mbb/g
+2000: Exploitability: 124.06 mbb/g
+3000: Exploitability: 118.95 mbb/g
+
+Experiments below use holdem6
+
+vs1223
+Two bets for opponent on preflop, one bet for us.
+Three bets for opponent on flop, two bets for us.
+200:  Exploitability: 355.88 mbb/g
+1000: Exploitability: 108.72 mbb/g
+2000: Exploitability: 89.87 mbb/g
+
+vs1234
+Two bets for opponent on preflop, one bet for us.
+Three bets for opponent on flop, two bets for us.
+4000: Exploitability: 71.32 mbb/g
+
+vs2233
+Compare to symmetric system.  Does it converge much faster?
+200:  Exploitability: 381.56 mbb/g
+1000: Exploitability: 32.66 mbb/g
+2000: Exploitability: 11.53 mbb/g
+
+
+vs123a3
+Two bets for opponent on preflop, one bet for us.
+Three bets for opponent on flop
+Three bets for us on flop, but last one can only be all-in
+200:  Exploitability: 353.59 mbb/g
+1000: Exploitability: 99.85 mbb/g
+2000: Exploitability: 80.59 mbb/g
+Barely better than vs1223.
+
+
+Conclusions
+* Only allowing one bet for ourselves preflop might be enough
+* Only allowing one bet for ourselves on flop not enough
+* Only allowing two bets for ourselves on flop not enough
+* Only allowing one bet for ourselves on river not enough

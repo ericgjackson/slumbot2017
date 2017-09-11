@@ -1,0 +1,128 @@
+All tests using combined endgame solving, zero-summed, card-level CBR values.
+ms1f1/mb1b1
+
+Old solve_all_endgames
+Flop 200/200: Exploitability: 2.92 mbb/g
+
+New solve_all_endgames2
+Only resolve at flop-initial
+ms1f1/mb1b1: Exploitability: 2.92 mbb/g
+Resolve at flop-initial and all target player choice: Exploitability: 5.24 mbb/g
+Resolve at flop-initial and all internal: Exploitability: 5.22 mbb/g
+
+---------------------------------------------
+
+ms1f1/mb1b1
+nhs1 base (bucketed)
+Base 200: Exploitability: 42.59 mbb/g
+solve_all_endgames
+Flop 200/200: Exploitability: 8.24 mbb/g
+solve_all_endgames2
+Resolve at every flop-initial and target player choice node
+Flop 200/200: Exploitability: 11.06 mbb/g
+Resolve at every flop-initial and internal node
+Flop 200/200: Exploitability: 10.72 mbb/g
+Only flop-initial
+Flop 200/200: Exploitability: 8.24 mbb/g
+
+---------------------------------------------
+
+ms1f1: mb1b1->mb2b2f
+No card abstraction
+solve_all_endgames
+Flop 200/200: Exploitability: 25.10 mbb/g
+solve_all_endgames2
+notnested, notprogressive
+Flop 200/200: Exploitability: 25.10 mbb/g
+
+Resolve at every flop-initial and target player choice node
+  Not progressive: Exploitability: 53.72 mbb/g
+  Progressive: Exploitability: 510.90 mbb/g
+Resolve at every flop-initial and internal node
+  Not progressive: Exploitability: 66.69 mbb/g
+    Surprising that this is worse?
+  Progressive: Exploitability: 158.20 mbb/g
+    Can't run this test any more.  no_limit_tree4.cpp has been changed.
+
+Returned progressive endgame solving to one action only.
+Flop 200/200: Exploitability: 158.20 mbb/g
+
+
+---------------------------------------------
+
+ms2f1t1/mb1b1
+
+Old solve_all_endgames
+Flop 200/200: Exploitability: 10.23 mbb/g
+Turn 200/200: Exploitability: 7.93 mbb/g
+
+New solve_all_endgames2
+Resolve only once at street-initial nodes
+Flop 200/200: Exploitability: 10.23 mbb/g
+Turn 200/200: Exploitability: 7.93 mbb/g
+
+Base
+500: Exploitability: 1.55 mbb/g
+Old solve_all_endgames
+Flop 500/500 (11m19s): Exploitability: 7.69 mbb/g
+
+solve_all_endgames
+  Resolve turn using merged flop system as base
+Exploitability: 11.85 mbb/g
+solve_all_endgames2
+  Resolve at flop-initial nodes, then at turn-initial nodes
+  Nested, not internal, not progressive
+Exploitability: 11.85 mbb/g
+
+---------------------------------------------
+
+ms2f1t1
+mb1b1->mb2b2t
+Resolve flop
+nested, notinternal, progressive
+
+This is equivalent to a nested resolve with solve_all_endgames where we use
+mb1b1 for the flop resolve and mb2b2t for the turn resolve.
+
+Flop 200/200 (57m): Exploitability: 47.70 mbb/g (matches)
+
+Compare nested solve with solve_all_endgames.
+mb1b1->mb1b1 flop 200/200 cfrpsm:   Exploitability: 10.23 mbb/g
+mb1b1->mb2b2t turn 200/200 cfrpsm2: Exploitability: 47.70 mbb/g
+
+---------------------------------------------
+
+ms1f1
+mb1b1->mb1b2f
+solve_all_endgames3
+Exploitability: 38.98 mbb/g
+solve_all_endgames2
+  Not nested, not internal, not progressive
+    Exploitability: 28.13 mbb/g
+  Nested, internal, not progressive
+    Exploitability: 33.18 mbb/g
+
+That's not *too* terrible, but solve_all_endgames2 nested and progressive
+performs better.
+Expect solve_all_endgames2 (unnested) to be better.  It solves the whole flop
+  only once.  It's too optimistic in that it knows the opponent's new bet size
+  prior to seeing it.
+solve_all_endgames2 nested and internal is arguably also too optimistic
+  for the same reason.
+I might need to bring back the old progressive betting tree construction
+  to do a fair comparison.
+
+---------------------------------------------
+
+ms1f1
+mb2b1f->mb2b2f
+Base 200: Exploitability: 4.49 mbb/g
+solve_all_endgames2
+  Nested, internal, not progressive
+  Exploitability: 42.25 mbb/g
+solve_all_endgames3
+  Exploitability: 83.79 mbb/g
+  Ugh, terrible.
+mb1b1->mb2b2f
+  Compare 158.20 for solve_all_endgames2 nested, internal, progressive
+  
