@@ -29,14 +29,17 @@ public:
   static const unsigned int kSplitStreet = 999;
 private:
   
-  void WriteValues(Node *node, unsigned int gbd, bool alt, double *vals);
+  void WriteValues(Node *node, unsigned int gbd, bool alt,
+		   const string &action_sequence, double *vals);
   double *OurChoice(Node *node, unsigned int lbd, double *opp_probs,
-		    double sum_opp_probs, double *total_card_probs);
+		    double sum_opp_probs, double *total_card_probs,
+		    const string &action_sequence);
   double *OppChoice(Node *node, unsigned int lbd, double *opp_probs,
-		    double sum_opp_probs, double *total_card_probs);
+		    double sum_opp_probs, double *total_card_probs,
+		    const string &action_sequence);
   double *Process(Node *node, unsigned int lbd, double *opp_probs,
 		  double sum_opp_probs, double *total_card_probs,
-		  unsigned int last_st);
+		  const string &action_sequence, unsigned int last_st);
   void CardPass(bool first_pass);
 
   double *SecondPassOurChoice(Node *node);

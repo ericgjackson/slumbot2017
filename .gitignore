@@ -3,3 +3,5 @@ bin/*
 lib/*
 obj/*
 changes
+runs/out.*
+notes/debugging

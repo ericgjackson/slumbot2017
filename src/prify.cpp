@@ -86,12 +86,13 @@ int main(int argc, char *argv[]) {
   Reader ir_reader(buf);
   long long int ir_file_size = ir_reader.FileSize();
   bool ir_shorts;
-  if (ir_file_size == 2 * num_hands) {
+  if (ir_file_size == 2 * (long long int)num_hands) {
     ir_shorts = true;
-  } else if (ir_file_size == 4 * num_hands) {
+  } else if (ir_file_size == 4 * (long long int)num_hands) {
     ir_shorts = false;
   } else {
     fprintf(stderr, "Unexpected file size B: %lli\n", ir_file_size);
+    fprintf(stderr, "Num hands %u\n", num_hands);
     fprintf(stderr, "File: %s\n", buf);
     exit(-1);
   }

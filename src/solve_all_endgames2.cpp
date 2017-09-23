@@ -267,7 +267,7 @@ void EndgameSolver2::Walk(Node *node, unsigned int gbd, unsigned int solve_st,
       double *t_vals = dynamic_cbr.Compute(node, reach_probs, gbd, hand_tree,
 					   sumprobs, root_bd_st, root_bd,
 					   buckets, card_abstraction,
-					   cfr_target_p^1, false);
+					   cfr_target_p^1, false, true);
       if (st > root_bd_st) {
 	new_hand_tree = new HandTree(st, gbd, Game::MaxStreet());
       } else {

@@ -1,0 +1,234 @@
+Measure with run_approx_rgbr.
+
+ms3f1t1r1h5/null
+Evaluating at BC
+Batch 0: Exploitability: 207.63 mbb/g
+  P0 avg gap: 0.503918
+  P1 avg gap: 0.450767
+Batch 8: Exploitability: 180.10 mbb/g
+  P0 avg gap: 0.475310
+  P1 avg gap: 0.402480
+Batch 16: Exploitability: 169.97 mbb/g
+  P0 avg gap: 0.463421
+  P1 avg gap: 0.384712
+Batch 24: Exploitability: 163.56 mbb/g
+  P0 avg gap: 0.460693
+  P1 avg gap: 0.376113
+Batch 32: Exploitability: 159.13 mbb/g
+  P0 avg gap: 0.454150
+  P1 avg gap: 0.368076
+
+Exploitability: 17.35 mbb/g
+P0 best response: -0.169853 (-84.93 mbb/g)
+P1 best response: 0.239237 (119.62 mbb/g)
+Exploitability: 11.57 mbb/g
+
+----------------------------------------------------------------------
+
+Use mb1b1nrb betting abstraction.
+River abstraction irrelevant then.
+holdem/hs2bc3hs_params/mb1b1nrb
+941,037 turn buckets
+  (55.2m null buckets; 1.7%)
+9.7g process size
+2b:
+  Est. P0 BR val: -0.244560 (norm 278405064.000000)
+  Est. P1 BR val: 0.633157 (norm 278405064.000001)
+  Est. expl: 97.149197 mbb/g
+
+
+hs9bc4hs_params
+2,651,151 turn buckets
+10.15g process size
+1b:
+  P0 avg gap: 0.326889
+  P1 avg gap: 0.331583
+  Sample prob 0.01:
+    Est. P0 BR val: -0.215082 (norm 278405064.000001)
+    Est. P1 BR val: 0.640363 (norm 278405064.000000)
+    Est. expl: 106.320070 mbb/g
+5b:
+  Est. P0 BR val: -0.251494 (norm 278405064.000000)
+  Est. P1 BR val: 0.628157 (norm 278405064.000000)
+  Est. expl: 94.165603 mbb/g
+11b:
+  Est. P0 BR val: -0.258749 (norm 278405064.000001)
+  Est. P1 BR val: 0.633167 (norm 278405064.000000)
+  Est. expl: 93.604484 mbb/g
+22b:
+  Est. P0 BR val: -0.261919 (norm 278405064.000000)
+  Est. P1 BR val: 0.636866 (norm 278405064.000000)
+  Est. expl: 93.736907 mbb/g
+
+
+hsone0.6hstwo0.6
+148,675 turn buckets
+9.2g process size
+1b:
+  Sample prob 0.01:
+    Est. P0 BR val: -0.259268 (norm 246623664.000000)
+    Est. P1 BR val: 0.676490 (norm 246623663.999999)
+    Est. expl: 104.305446 mbb/g
+2b:
+  Sample prob 0.01:
+    Est. P0 BR val: -0.276176 (norm 297473904.000000)
+    Est. P1 BR val: 0.679236 (norm 297473903.999999)
+    Est. expl: 100.764938 mbb/g
+3b:
+  Sample prob 0.01:
+    Est. P0 BR val: -0.253810 (norm 278405063.999999)
+    Est. P1 BR val: 0.628439 (norm 278405064.000000)
+    Est. expl: 93.657276 mbb/g
+  Sample prob 0.01, again:
+    Est. P0 BR val: -0.272417 (norm 287303855.999999)
+    Est. P1 BR val: 0.659975 (norm 287303856.000000)
+    Est. expl: 96.889569 mbb/g
+  Sample prob 0.01, again:
+    Est. P0 BR val: -0.279884 (norm 282218831.999999)
+    Est. P1 BR val: 0.673555 (norm 282218832.000000)
+    Est. expl: 98.417681 mbb/g
+  Sample prob 0.02:
+    Est. P0 BR val: -0.271353 (norm 593676551.999999)
+    Est. P1 BR val: 0.656864 (norm 593676552.000000)
+    Est. expl: 96.377755 mbb/g
+
+hsone0.5hstwo0.6
+74,970 turn buckets
+1b: 
+  Sample prob 0.01:
+    Est. P0 BR val: -0.223088 (norm 278405064.000000)
+    Est. P1 BR val: 0.659245 (norm 278405064.000001)
+    Est. expl: 109.039056 mbb/g
+2b:
+  Sample prob 0.01:
+    Est. P0 BR val: -0.232485 (norm 278405064.000000)
+    Est. P1 BR val: 0.653631 (norm 278405063.999999)
+    Est. expl: 105.286511 mbb/g
+13b:
+  Sample prob 0.01:
+    Est. P0 BR val: -0.240106 (norm 278405064.000000)
+    Est. P1 BR val: 0.654088 (norm 278405064.000000)
+    Est. expl: 103.495365 mbb/g
+  Sample prob 0.02:
+    Est. P0 BR val: -0.238803 (norm 572065199.999999)
+    Est. P1 BR val: 0.680314 (norm 572065199.999998)
+    Est. expl: 110.377786 mbb/g
+  Sample prob 0.02, again:
+    Est. P0 BR val: -0.247315 (norm 544097568.000000)
+    Est. P1 BR val: 0.685158 (norm 544097567.999999)
+    Est. expl: 109.460877 mbb/g
+  Sample prob 0.02, again:
+    Est. P0 BR val: -0.275210 (norm 505959888.000000)
+    Est. P1 BR val: 0.709648 (norm 505959887.999999)
+    Est. expl: 108.609368 mbb/g
+
+
+
+hstwo0.6
+4,135 turn buckets
+100m:
+  Sample prob 0.01:
+    Est. P0 BR val: -0.097011 (norm 278405064.000000)
+    Est. P1 BR val: 0.836838 (norm 278405064.000000)
+    Est. expl: 184.956777 mbb/g
+200m:
+  Sample prob 0.01:
+    Est. P0 BR val: -0.113755 (norm 278405064.000000)
+    Est. P1 BR val: 0.799238 (norm 278405064.000001)
+    Est. expl: 171.370848 mbb/g
+300m:
+    Est. P0 BR val: -0.118589 (norm 278405064.000000)
+    Est. P1 BR val: 0.788155 (norm 278405064.000001)
+    Est. expl: 167.391615 mbb/g
+
+
+
+ms3f1t1r1h5/null/mb1b1nrb
+cfrps1/15: Exploitability: 168.09 mbb/g
+P0 avg gap: 0.529419
+P1 avg gap: 0.268034
+cfrps1/18: Exploitability: 128.32 mbb/g
+P0 avg gap: 0.357449
+P1 avg gap: 0.231217
+cfrps1/20: Exploitability: 108.78 mbb/g
+P0 avg gap: 0.285745
+P1 avg gap: 0.219129
+cfrps1/30: Exploitability: 65.03 mbb/g
+P0 avg gap: 0.160074
+P1 avg gap: 0.130166
+cfrps1/40: Exploitability: 43.19 mbb/g
+P0 avg gap: 0.109015
+P1 avg gap: 0.088388
+cfrps1/50: Exploitability: 30.14 mbb/g
+P0 avg gap: 0.078475
+P1 avg gap: 0.063359
+cfrps/105: Exploitability: 41.03 mbb/g
+P0 avg gap: 0.113292
+P1 avg gap: 0.095139
+cfrps/110: Exploitability: 30.41 mbb/g
+P0 avg gap: 0.085910
+P1 avg gap: 0.071722
+
+So the margins seen above may correspond to exploitability of around 128.
+Maybe that's pretty bad for a system with no raises and no river betting.
+Pots will be very small.
+
+ms3f1t1r1/null/mb1b1nrb
+cfrps1/10: Exploitability: 562.61 mbb/g
+P0 avg gap: 1.597455
+P1 avg gap: 0.753271
+cfrps1/20: Exploitability: 261.42 mbb/g
+P0 avg gap: 0.753323
+P1 avg gap: 0.315710
+cfrps1/30: Exploitability: 146.66 mbb/g
+P0 avg gap: 0.383492
+P1 avg gap: 0.203113
+
+This suggests margins above may correspond to exploitability of around 147.
+
+Note: ms3f1t1r1 much harder than ms3f1t1r1h5, even for CFR+.
+
+holdem10/null/mb1b1nrb
+19.3g process size
+cfrps1/10: Exploitability: 380.58 mbb/g
+P0 avg gap: 0.919129
+P1 avg gap: 0.557175
+cfrps1/20:
+  Regular:
+    Exploitability: 157.36 mbb/g
+  Flop/turn/river only: 
+    P0 best response: -0.314970 (-157.48 mbb/g)
+    P1 best response: 0.604502 (302.25 mbb/g)
+    Exploitability: 72.38 mbb/g
+  Old run_approx_rgbr
+    P0 avg gap: 0.292751
+    P1 avg gap: 0.198627
+  New run_approx_rgbr (1.0)
+    Est. P0 BR val: -0.314970 (norm 3915147599.999998)
+    Est. P1 BR val: 0.604502 (norm 3915147599.999999)
+    Est. expl: 72.383024 mbb/g
+  New run_approx_rgbr (0.01)
+    Est. P0 BR val: -0.333690 (norm 33286680.000000)
+    Est. P1 BR val: 0.624027 (norm 33286680.000000)
+    Est. expl: 72.584194 mbb/g
+
+This is already better than what we are seeing with our tcfr results
+on holdem.
+
+See if approx RGBR is roughly a constant fraction of real RGBR.  Solve
+a holdem10 game with card abstraction.  After each batch, measure approx
+RGBR and real RGBR.  See if they are in a constant proportion.
+
+Could also compare abstracted systems built with TCFR and with CFR+.
+
+Actually, postflop RGBR can be measured with run_rgbr.
+
+Results
+
+Abstraction      Num turn buckets  Approx RGBR (0.01)  Approx RGBR (0.02)
+-----------      ----------------  ------------------  ------------------
+hs9bc4hs         2,651,151         93.604484
+hs2bc3hs         941,037           97.149197
+hsone0.6hstwo0.6 148,675           96.889569           96.377755
+hsone0.5hstwo0.6 74,970            103.495365          109.460877
+hstwo0.6         4,135             167.391615

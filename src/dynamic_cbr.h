@@ -2,6 +2,7 @@
 #define _DYNAMIC_CBR_H_
 
 class Buckets;
+class CanonicalCards;
 class CardAbstraction;
 class CFRValues;
 class HandTree;
@@ -16,7 +17,7 @@ public:
 		  unsigned int root_bd_st, unsigned int root_bd,
 		  const Buckets &buckets,
 		  const CardAbstraction &card_abstraction,
-		  unsigned int target_p, bool cfrs);
+		  unsigned int target_p, bool cfrs, bool zero_sum);
 private:
   double *OurChoice(Node *node, unsigned int lbd, unsigned int p,
 		    double *opp_probs, double sum_opp_probs,

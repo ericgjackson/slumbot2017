@@ -1,7 +1,9 @@
 #ifndef _BETTING_TREE_H_
 #define _BETTING_TREE_H_
 
+#include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "constants.h"
@@ -16,8 +18,14 @@ class Writer;
 class Node {
 public:
   Node(unsigned int id, unsigned int street, unsigned int player_acting,
+       const shared_ptr<Node> &call_succ, const shared_ptr<Node> &fold_succ,
+       vector< shared_ptr<Node> > *bet_succs, unsigned int player_folding,
+       unsigned int pot_size);
+#if 0
+  Node(unsigned int id, unsigned int street, unsigned int player_acting,
        Node *call_succ, Node *fold_succ, vector<Node *> *bet_succs,
        unsigned int player_folding, unsigned int pot_size);
+#endif
   Node(Node *node);
   Node(unsigned int id, unsigned int pot_size, unsigned int num_succs,
        unsigned short flags, unsigned char player_acting,
@@ -32,7 +40,7 @@ public:
     return (unsigned int)((flags_ & kStreetMask) >> kStreetShift);
   }
   unsigned int NumSuccs(void) const {return num_succs_;}
-  Node *IthSucc(int i) const {return succs_[i];}
+  Node *IthSucc(int i) const {return succs_[i].get();}
   unsigned int PlayerFolding(void) const {return player_folding_;}
   bool Showdown(void) const {return Terminal() && player_folding_ == 255;}
   // bool Special(void) const {return (bool)(flags_ & kSpecialFlag);}
@@ -48,15 +56,14 @@ public:
   unsigned short Flags(void) const {return flags_;}
   void SetTerminalID(unsigned int id) {id_ = id;}
   void SetNonterminalID(unsigned int id) {id_ = id;}
-  void SetSucc(unsigned int i, Node *n) {succs_[i] = n;}
   // void SetSpecial(void) {flags_ |= kSpecialFlag;}
   void SetNumSuccs(unsigned int n) {num_succs_ = n;}
-  void SetIthSucc(unsigned int s, Node *succ) {succs_[s] = succ;}
+  void SetIthSucc(unsigned int s, shared_ptr<Node> succ) {succs_[s] = succ;}
   void SetHasCallSuccFlag(void) {flags_ |= kHasCallSuccFlag;}
   void SetHasFoldSuccFlag(void) {flags_ |= kHasFoldSuccFlag;}
   void ClearHasCallSuccFlag(void) {flags_ &= ~kHasCallSuccFlag;}
   void ClearHasFoldSuccFlag(void) {flags_ &= ~kHasFoldSuccFlag;}
-private:
+
   // Bit 0: has-call-succ
   // Bit 1: has-fold-succ
   // Bit 2: special (not currently used)
@@ -67,7 +74,9 @@ private:
   static const unsigned short kStreetMask = 24;
   static const int kStreetShift = 3;
 
-  Node **succs_;
+ private:
+  // Node **succs_;
+  shared_ptr<Node> *succs_;
   unsigned int id_;
   // Any pending bets are not included in the pot size
   unsigned short pot_size_;
@@ -82,7 +91,7 @@ class BettingTree {
   ~BettingTree(void);
   void Display(void);
   void GetStreetInitialNodes(unsigned int street, vector<Node *> *nodes);
-  Node *Root(void) const {return root_;}
+  Node *Root(void) const {return root_.get();}
   unsigned int NumTerminals(void) const {return num_terminals_;}
   Node *Terminal(unsigned int i) const {return terminals_[i];}
   unsigned int NumNonterminals(unsigned int p, unsigned int st) const {
@@ -107,12 +116,13 @@ class BettingTree {
 			     vector<Node *> *nodes);
   Node *GetNodeFromName(const char *str, Node *node);
   bool GetPathToNamedNode(const char *str, Node *node, vector<Node *> *path);
-  Node *Clone(Node *old_n, unsigned int *num_terminals);
+  shared_ptr<Node> Clone(Node *old_n, unsigned int *num_terminals);
   void Initialize(unsigned int target_player, const BettingAbstraction &ba);
-  Node *Read(Reader *reader);
-  void Delete(Node *node);
+  shared_ptr<Node>
+    Read(Reader *reader,
+	 unordered_map< unsigned int, shared_ptr<Node> > ***maps);
 
-  Node *root_;
+  shared_ptr<Node> root_;
   unsigned int initial_street_;
   unsigned int num_terminals_;
   Node **terminals_;

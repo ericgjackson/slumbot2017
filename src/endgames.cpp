@@ -53,6 +53,15 @@ EndgameSolver::EndgameSolver(unsigned int solve_street,
   BoardTree::BuildBoardCounts();
 
   unsigned int max_street = Game::MaxStreet();
+  unsigned int num_players = Game::NumPlayers();
+  num_nonterminals_ = new unsigned int *[num_players];
+  for (unsigned int p = 0; p < num_players; ++p) {
+    num_nonterminals_[p] = new unsigned int[max_street + 1];
+    for (unsigned int st = 0; st <= max_street; ++st) {
+      num_nonterminals_[p][st] = betting_tree_->NumNonterminals(p, st);
+    }
+  }
+  
   unique_ptr<bool []> streets(new bool[max_street + 1]);
   for (unsigned int st = 0; st <= max_street; ++st) {
     streets[st] = st < solve_street_;
@@ -78,8 +87,7 @@ EndgameSolver::EndgameSolver(unsigned int solve_street,
   sumprobs_.reset(new CFRValues(nullptr, true, streets.get(),
 				betting_tree_, 0, 0, card_abstraction_,
 				buckets_, compressed_streets_));
-  sumprobs_->Read(dir, base_it_, betting_tree_->Root(),
-		  betting_tree_->Root()->NonterminalID(), kMaxUInt);
+  sumprobs_->Read(dir, base_it_, betting_tree_->Root(), "x", kMaxUInt);
 
   if (endgame_cc.Algorithm() == "cfrp") {
     eg_cfr_ = new EGCFR(endgame_ca, base_ca, endgame_ba, base_ba, endgame_cc,
@@ -115,6 +123,7 @@ EndgameSolver::EndgameSolver(unsigned int solve_street,
       }
     }
   }
+  fflush(stdout);
 #if 0
   p0_br_cum_ = 0;
   p1_br_cum_ = 0;
@@ -127,10 +136,10 @@ EndgameSolver::~EndgameSolver(void) {
   delete eg_cfr_;
   // Need to delete br_vals_.
   unsigned int num_boards = BoardTree::NumBoards(solve_street_);
-  for (unsigned int pr = 0; pr <= 1; ++pr) {
-    for (unsigned int pa = 0; pa <= 1; ++pa) {
-      unsigned int num_nt =
-	betting_tree_->NumNonterminals(pa, solve_street_);
+  unsigned int num_players = Game::NumPlayers();
+  for (unsigned int pr = 0; pr < num_players; ++pr) {
+    for (unsigned int pa = 0; pa < num_players; ++pa) {
+      unsigned int num_nt = num_nonterminals_[pa][solve_street_];
       for (unsigned int i = 0; i < num_nt; ++i) {
 	for (unsigned int bd = 0; bd < num_boards; ++bd) {
 	  // These should already have been deleted, but in case not
@@ -138,11 +147,18 @@ EndgameSolver::~EndgameSolver(void) {
 	}
 	delete [] br_vals_[pr][pa][i];
       }
+      fflush(stdout);
       delete [] br_vals_[pr][pa];
     }
+    fflush(stdout);
     delete [] br_vals_[pr];
   }
   delete [] br_vals_;
+  
+  for (unsigned int p = 0; p < num_players; ++p) {
+    delete [] num_nonterminals_[p];
+  }
+  delete [] num_nonterminals_;
 }
 
 void EndgameSolver::BRGo(double *p0_br, double *p1_br) {
@@ -235,7 +251,7 @@ double *EndgameSolver::Process(Node *node, unsigned int lbd, double *opp_probs,
     return vals;
   } else {
     return VCFR::Process(node, lbd, opp_probs, sum_opp_probs, total_card_probs,
-			 last_st);
+			 "", last_st);
   }
 }
 
@@ -295,15 +311,6 @@ void EndgameSolver::GetReachProbs(const vector<Node *> *base_path,
 	  fprintf(stderr, "Base prob > 1\n");
 	  exit(-1);
 	}
-#if 0
-	// Temporary
-	extern unsigned int g_nt, g_bd;
-	if (g_nt == 0 && g_bd == 10) {
-	  OutputCard(board[0]);
-	  printf(" p %u hi %u lo %u nt %u s %u prob %f\n", p, hi, lo, nt, s,
-		 prob);
-	}
-#endif
 	reach_probs[p][enc] *= prob;
       }
     }
@@ -318,8 +325,7 @@ void EndgameSolver::GetReachProbs(const vector<Node *> *base_path,
 // from the base betting tree.
 void EndgameSolver::SolveSafe(Node *solve_root, Node *target_root,
 			      unsigned int solve_bd, unsigned int target_bd,
-			      unsigned int base_solve_nt,
-			      unsigned int base_target_nt,
+			      const string &action_sequence,
 			      const vector<Node *> *base_path, 
 			      unsigned int num_its, bool p0, bool p1) {
   unsigned int street = solve_root->Street();
@@ -356,42 +362,22 @@ void EndgameSolver::SolveSafe(Node *solve_root, Node *target_root,
 
   const CanonicalCards *hands = hand_tree->Hands(solve_street_, 0);
   if (p0) {
-    double *opp_cvs = eg_cfr_->LoadOppCVs(solve_root, base_solve_nt, solve_bd,
-					  0, base_it_, reach_probs, hands,
-					  card_level_);
-#if 0
-    unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(street);
-    for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
-      printf("opp_cvs[%u] %f\n", i, opp_cvs[i]);
-    }
-#endif
+    double *opp_cvs = eg_cfr_->LoadOppCVs(solve_root, action_sequence,
+					  solve_bd, 0, base_it_, reach_probs,
+					  hands, card_level_);
     eg_cfr_->SolveSubgame(subtree, solve_bd, reach_probs, hand_tree, opp_cvs,
 			  0, false, num_its);
-    eg_cfr_->Write(subtree, solve_root, target_root, base_target_nt, num_its,
+    eg_cfr_->Write(subtree, solve_root, target_root, action_sequence, num_its,
 		   target_bd);
     delete [] opp_cvs;
-#if 0
-    // Temporary
-    if (solve_bd == 0 && solve_root->NonterminalID() == 0) {
-      const CFRValues *sumprobs = eg_cfr_->Sumprobs();
-      double *d_values;
-      sumprobs->Values(0, 2, 0, &d_values);
-      unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(2);
-      unsigned int lbd = BoardTree::LocalIndex(1, 0, 2, 1);
-      unsigned int num_succs = 2;
-      unsigned int offset = lbd * num_hole_card_pairs * num_succs;
-      fprintf(stderr, "sps %f %f\n", d_values[offset], d_values[offset+1]);
-      exit(0);
-    }
-#endif
   }
   if (p1) {
-    double *opp_cvs = eg_cfr_->LoadOppCVs(solve_root, base_solve_nt, solve_bd,
-					  1, base_it_, reach_probs, hands,
-					  card_level_);
+    double *opp_cvs = eg_cfr_->LoadOppCVs(solve_root, action_sequence,
+					  solve_bd, 1, base_it_, reach_probs,
+					  hands, card_level_);
     eg_cfr_->SolveSubgame(subtree, solve_bd, reach_probs, hand_tree, opp_cvs,
 			  1, false, num_its);
-    eg_cfr_->Write(subtree, solve_root, target_root, base_target_nt, num_its,
+    eg_cfr_->Write(subtree, solve_root, target_root, action_sequence, num_its,
 		   target_bd);
     delete [] opp_cvs;
   }
@@ -408,8 +394,8 @@ void EndgameSolver::SolveSafe(Node *solve_root, Node *target_root,
 // along the path.
 void EndgameSolver::SolveUnsafe(Node *solve_root, Node *target_root,
 				unsigned int solve_bd, unsigned int target_bd,
-				unsigned int base_solve_nt,
 				unsigned int base_target_nt,
+				const string &action_sequence,
 				const vector<Node *> *base_path,
 				unsigned int num_its) {
   unsigned int street = solve_root->Street();
@@ -445,16 +431,16 @@ void EndgameSolver::SolveUnsafe(Node *solve_root, Node *target_root,
   eg_cfr_->SolveSubgame(subtree, solve_bd, reach_probs, hand_tree, nullptr, 1,
 			false, num_its);
 
-  eg_cfr_->Write(subtree, solve_root, target_root, base_target_nt, num_its,
+  eg_cfr_->Write(subtree, solve_root, target_root, action_sequence, num_its,
 		 target_bd);
   
   // Two calls for P1 and P0?
-  eg_cfr_->Read(subtree, base_solve_nt, solve_bd, target_root->Street(),
-		num_its);
+  eg_cfr_->Read(subtree, action_sequence, solve_bd, target_root->Street(),
+		true, num_its);
   unsigned int pa = solve_root->PlayerActing();
-  br_vals_[0][pa][base_solve_nt][solve_bd] =
+  br_vals_[0][pa][base_target_nt][solve_bd] =
     eg_cfr_->BRGo(subtree, 0, reach_probs, hand_tree);
-  br_vals_[1][pa][base_solve_nt][solve_bd] =
+  br_vals_[1][pa][base_target_nt][solve_bd] =
     eg_cfr_->BRGo(subtree, 1, reach_probs, hand_tree);
   delete subtree;
 
@@ -488,18 +474,18 @@ void EndgameSolver::SolveUnsafe(Node *solve_root, Node *target_root,
 
 void EndgameSolver::Solve(Node *solve_root, Node *target_root,
 			  unsigned int solve_bd, unsigned int target_bd,
-			  unsigned int base_solve_nt,
+			  const string &action_sequence,
 			  unsigned int base_target_nt,
 			  const vector<Node *> *base_path,
 			  unsigned int num_its, bool p0, bool p1) {
   if (method_ == ResolvingMethod::CFRD ||
       method_ == ResolvingMethod::MAXMARGIN ||
       method_ == ResolvingMethod::COMBINED) {
-    SolveSafe(solve_root, target_root, solve_bd, target_bd, base_solve_nt,
-	      base_target_nt, base_path, num_its, p0, p1);
+    SolveSafe(solve_root, target_root, solve_bd, target_bd, action_sequence,
+	      base_path, num_its, p0, p1);
   } else {
-    SolveUnsafe(solve_root, target_root, solve_bd, target_bd, base_solve_nt,
-		base_target_nt, base_path, num_its);
+    SolveUnsafe(solve_root, target_root, solve_bd, target_bd, 
+		base_target_nt, action_sequence, base_path, num_its);
   }
 }
 
@@ -510,8 +496,10 @@ bool EndgameSolver::GetPath(Node *base_node, Node *endgame_node,
   if (base_node->Terminal()) return false;
   if (base_node == base_target) {
     if (endgame_node != endgame_target) {
-      fprintf(stderr, "endgame_node != endgame_target?!?\n");
-      exit(-1);
+      // fprintf(stderr, "endgame_node != endgame_target?!?\n");
+      // exit(-1);
+      // This can happen now in case of reentrant base trees.
+      return false;
     }
     rev_base_path->push_back(base_node);
     return true;
@@ -531,7 +519,8 @@ bool EndgameSolver::GetPath(Node *base_node, Node *endgame_node,
 }
 
 void EndgameSolver::Solve(Node *solve_root, Node *target_root,
-			  Node *base_solve_root, unsigned int solve_bd,
+			  Node *base_solve_root, const string &action_sequence,
+			  unsigned int solve_bd,
 			  unsigned int target_bd, unsigned int base_target_nt,
 			  unsigned int num_its,
 			  BettingTree *endgame_betting_tree) {
@@ -545,7 +534,6 @@ void EndgameSolver::Solve(Node *solve_root, Node *target_root,
   for (int i = ((int)path_len) - 1; i >= 0; --i) {
     base_path.push_back(rev_base_path[i]);
   }
-  unsigned int base_solve_nt = base_solve_root->NonterminalID();
-  Solve(solve_root, target_root, solve_bd, target_bd, base_solve_nt,
+  Solve(solve_root, target_root, solve_bd, target_bd, action_sequence,
 	base_target_nt, &base_path, num_its, true, true);
 }

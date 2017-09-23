@@ -5,8 +5,9 @@ class CanonicalCards;
 class CFRConfig;
 class Node;
 
-double *Showdown(Node *node, const CanonicalCards *hands, double *opp_probs,
-		 double sum_opp_probs, double *total_card_probs);
+double *Showdown(Node *node, const CanonicalCards *hands,
+		 double *opp_probs, double sum_opp_probs,
+		 double *total_card_probs);
 double *Fold(Node *node, unsigned int p, const CanonicalCards *hands,
 	     double *opp_probs, double sum_opp_probs,
 	     double *total_card_probs);

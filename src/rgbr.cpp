@@ -32,10 +32,12 @@ using namespace std;
 RGBR::RGBR(const CardAbstraction &ca, const BettingAbstraction &ba,
 	   const CFRConfig &cc, const Buckets &buckets,
 	   const BettingTree *betting_tree, bool current,
-	   unsigned int num_threads, const bool *streets) :
+	   unsigned int num_threads, const bool *streets,
+	   bool always_call_preflop) :
   VCFR(ca, ba, cc, buckets, betting_tree, num_threads) {
   br_current_ = current;
   value_calculation_ = true;
+  always_call_preflop_ = always_call_preflop;
 
   unsigned int max_street = Game::MaxStreet();
   if (streets) {
@@ -78,7 +80,7 @@ double *RGBR::Process(Node *node, unsigned int lbd, double *opp_probs,
     sumprobs_->Read(dir, it_, node, node->NonterminalID(), kMaxUInt);
   }
   return VCFR::Process(node, lbd, opp_probs, sum_opp_probs, total_card_probs,
-		       last_st);
+		       "", last_st);
 }
 #endif
 
@@ -124,15 +126,13 @@ double RGBR::Go(unsigned int it, unsigned int p) {
     regrets_.reset(new CFRValues(players.get(), false, streets, betting_tree_,
 				 0, 0, card_abstraction_, buckets_,
 				 compressed_streets_));
-    regrets_->Read(dir, it_, betting_tree_->Root(),
-		   betting_tree_->Root()->NonterminalID(), kMaxUInt);
+    regrets_->Read(dir, it_, betting_tree_->Root(), "x", kMaxUInt);
     sumprobs_.reset(nullptr);
   } else {
     sumprobs_.reset(new CFRValues(players.get(), true, streets, betting_tree_,
 				  0, 0, card_abstraction_, buckets_,
 				  compressed_streets_));
-    sumprobs_->Read(dir, it_, betting_tree_->Root(),
-		    betting_tree_->Root()->NonterminalID(), kMaxUInt);
+    sumprobs_->Read(dir, it_, betting_tree_->Root(), "x", kMaxUInt);
     regrets_.reset(nullptr);
   }
 
@@ -190,13 +190,13 @@ double RGBR::Go(unsigned int it, unsigned int p) {
 
   if (subgame_street_ <= max_street) pre_phase_ = true;
   double *vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-			 total_card_probs, 0);
+			 total_card_probs, "", 0);
   if (subgame_street_ <= max_street) {
     delete [] vals;
     WaitForFinalSubgames();
     pre_phase_ = false;
     vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-		   total_card_probs, 0);
+		   total_card_probs, "", 0);
   }
   
   delete [] total_card_probs;

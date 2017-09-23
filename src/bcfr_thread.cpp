@@ -103,8 +103,7 @@ BCFRThread::BCFRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
       else           strcat(dir, ".p2");
     }
 #endif
-    sumprobs_->Read(dir, it_, betting_tree_->Root(),
-		    betting_tree_->Root()->NonterminalID(), kMaxUInt);
+    sumprobs_->Read(dir, it_, betting_tree_->Root(), "x", kMaxUInt);
 
     unique_ptr<bool []> bucketed_streets(new bool[max_street + 1]);
     bucketed_ = false;
@@ -141,17 +140,17 @@ BCFRThread::~BCFRThread(void) {
   // deleted in AfterSplit().
 }
 
-void BCFRThread::WriteValues(Node *node, unsigned int gbd, double *vals) {
+void BCFRThread::WriteValues(Node *node, unsigned int gbd,
+			     const string &action_sequence, double *vals) {
   char dir[500], buf[500];
-  unsigned int nonterminal_id = node->NonterminalID();
   unsigned int street = node->Street();
-  sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s/bcfrs.%u.p%u/%u.%u.%u",
+  sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s/bcfrs.%u.p%u/%s",
 	  Files::NewCFRBase(), Game::GameName().c_str(),
 	  card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	  Game::NumSuits(), Game::MaxStreet(),
 	  betting_abstraction_.BettingAbstractionName().c_str(), 
 	  cfr_config_.CFRConfigName().c_str(), it_, p_,
-	  nonterminal_id, street, node->PlayerActing());
+	  action_sequence.c_str());
   Mkdir(dir);  
   sprintf(buf, "%s/vals.%u", dir, gbd);
   Writer writer(buf);
@@ -162,14 +161,15 @@ void BCFRThread::WriteValues(Node *node, unsigned int gbd, double *vals) {
 }
 
 double *BCFRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
-			      double sum_opp_probs, double *total_card_probs) {
+			      double sum_opp_probs, double *total_card_probs,
+			      const string &action_sequence) {
   unsigned int st = node->Street();
   
   double *vals = VCFR::OurChoice(node, lbd, opp_probs, sum_opp_probs,
-				 total_card_probs);
+				 total_card_probs, action_sequence);
   unsigned int gbd = 0;
   if (st > 0) gbd = BoardTree::GlobalIndex(root_bd_st_, root_bd_, st, lbd);
-  WriteValues(node, gbd, vals);
+  WriteValues(node, gbd, action_sequence, vals);
   
   return vals;
 }
@@ -177,14 +177,15 @@ double *BCFRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
 // Can't skip succ even if succ_sum_opp_probs is zero.  I need to write
 // out values at every node.
 double *BCFRThread::OppChoice(Node *node, unsigned int lbd, double *opp_probs,
-			      double sum_opp_probs, double *total_card_probs) {
+			      double sum_opp_probs, double *total_card_probs,
+			      const string &action_sequence) {
   double *vals = VCFR::OppChoice(node, lbd, opp_probs, sum_opp_probs,
-				 total_card_probs);
+				 total_card_probs, action_sequence);
 
   unsigned int st = node->Street();
   unsigned int gbd = 0;
   if (st > 0) gbd = BoardTree::GlobalIndex(root_bd_st_, root_bd_, st, lbd);
-  WriteValues(node, gbd, vals);
+  WriteValues(node, gbd, action_sequence, vals);
 
   return vals;
 }
@@ -208,7 +209,7 @@ void BCFRThread::Go(void) {
   CommonBetResponseCalcs(0, hands, opp_probs, &sum_opp_probs,
 			 total_card_probs);
   double *vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-			 total_card_probs, 0);
+			 total_card_probs, "", 0);
   delete [] total_card_probs;
 
   // EVs for our hands are summed over all opponent hole card pairs.  To

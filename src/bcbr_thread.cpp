@@ -117,8 +117,7 @@ BCBRThread::BCBRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
       else           strcat(dir, ".p2");
     }
 #endif
-    sumprobs_->Read(dir, it_, betting_tree_->Root(),
-		    betting_tree_->Root()->NonterminalID(), kMaxUInt);
+    sumprobs_->Read(dir, it_, betting_tree_->Root(), "x", kMaxUInt);
 
     unique_ptr<bool []> bucketed_streets(new bool[max_street + 1]);
     bucketed_ = false;
@@ -216,17 +215,16 @@ BCBRThread::~BCBRThread(void) {
 }
 
 void BCBRThread::WriteValues(Node *node, unsigned int gbd, bool alt,
-			     double *vals) {
+			     const string &action_sequence, double *vals) {
   char dir[500], buf[500];
-  unsigned int nonterminal_id = node->NonterminalID();
   unsigned int street = node->Street();
-  sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s/bcbrs.%u.p%u/%u.%u.%u",
+  sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s/bcbrs.%u.p%u/%s",
 	  Files::NewCFRBase(), Game::GameName().c_str(),
 	  card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	  Game::NumSuits(), Game::MaxStreet(),
 	  betting_abstraction_.BettingAbstractionName().c_str(), 
 	  cfr_config_.CFRConfigName().c_str(), it_, p_,
-	  nonterminal_id, street, node->PlayerActing());
+	  action_sequence.c_str());
   Mkdir(dir);  
   sprintf(buf, "%s/%s.%u", dir, alt ? "alt_vals" : "vals", gbd);
   Writer writer(buf);
@@ -240,20 +238,22 @@ static unsigned int g_bcbr_limp_count = 0;
 static unsigned int g_bcbr_nolimp_count = 0;
 
 double *BCBRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
-			      double sum_opp_probs, double *total_card_probs) {
+			      double sum_opp_probs, double *total_card_probs,
+			      const string &action_sequence) {
   unsigned int st = node->Street();
   double *vals;
   
   if (first_pass_ || st < target_st_) {
     vals = VCFR::OurChoice(node, lbd, opp_probs, sum_opp_probs,
-			   total_card_probs);
+			   total_card_probs, action_sequence);
   } else {
     unsigned int nt = node->NonterminalID();
     unsigned int num_succs = node->NumSuccs();
     double **succ_card_vals = new double *[num_succs];
     for (unsigned int s = 0; s < num_succs; ++s) {
       succ_card_vals[s] = Process(node->IthSucc(s), lbd, opp_probs,
-				  sum_opp_probs, total_card_probs, st);
+				  sum_opp_probs, total_card_probs,
+				  action_sequence, st);
     }
     
     unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
@@ -293,8 +293,8 @@ double *BCBRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
     if (st == target_st_) {
       unsigned int gbd = 0;
       if (st > 0) gbd = BoardTree::GlobalIndex(root_bd_st_, root_bd_, st, lbd);
-      WriteValues(node, gbd, false, vals);
-      WriteValues(node, gbd, true, alt_vals);
+      WriteValues(node, gbd, false, action_sequence, vals);
+      WriteValues(node, gbd, true, action_sequence, alt_vals);
     }
   }
   
@@ -304,15 +304,16 @@ double *BCBRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
 // Can't skip succ even if succ_sum_opp_probs is zero.  I need to write
 // out BCBR values at every node.
 double *BCBRThread::OppChoice(Node *node, unsigned int lbd, double *opp_probs,
-			      double sum_opp_probs, double *total_card_probs) {
+			      double sum_opp_probs, double *total_card_probs,
+			      const string &action_sequence) {
   double *vals = VCFR::OppChoice(node, lbd, opp_probs, sum_opp_probs,
-				 total_card_probs);
+				 total_card_probs, action_sequence);
 
   unsigned int st = node->Street();
   if (! first_pass_ && st == target_st_) {
     unsigned int gbd = 0;
     if (st > 0) gbd = BoardTree::GlobalIndex(root_bd_st_, root_bd_, st, lbd);
-    WriteValues(node, gbd, false, vals);
+    WriteValues(node, gbd, false, action_sequence, vals);
   }
 
   return vals;
@@ -320,10 +321,11 @@ double *BCBRThread::OppChoice(Node *node, unsigned int lbd, double *opp_probs,
 
 double *BCBRThread::Process(Node *node, unsigned int lbd, double *opp_probs,
 			    double sum_opp_probs, double *total_card_probs,
+			    const string &action_sequence,
 			    unsigned int last_st) {
   unsigned int st = node->Street();
   double *vals = VCFR::Process(node, lbd, opp_probs, sum_opp_probs,
-			       total_card_probs, last_st);
+			       total_card_probs, action_sequence, last_st);
   if (first_pass_) {
     if (node->Terminal()) {
       unsigned int tid = node->TerminalID();
@@ -464,7 +466,7 @@ void BCBRThread::CardPass(bool first_pass) {
 			 total_card_probs);
   first_pass_ = first_pass;
   double *vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-			 total_card_probs, 0);
+			 total_card_probs, "", 0);
   delete [] total_card_probs;
 
   if (! first_pass) {

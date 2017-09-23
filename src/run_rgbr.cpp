@@ -82,13 +82,17 @@ int main(int argc, char *argv[]) {
       betting_tree.reset(BettingTree::BuildAsymmetricTree(*betting_abstraction,
 							  target_p));
       RGBR rgbr(*card_abstraction, *betting_abstraction, *cfr_config, buckets,
-		betting_tree.get(), current, num_threads, streets.get());
+		betting_tree.get(), current, num_threads, streets.get(),
+		false);
       evs[target_p^1] = rgbr.Go(it, target_p^1);
     }
   } else {
     betting_tree.reset(BettingTree::BuildTree(*betting_abstraction));
+    // fprintf(stderr, "Temporarily setting always_call_preflop to true\n");
+    bool always_call_preflop = false;
     RGBR rgbr(*card_abstraction, *betting_abstraction, *cfr_config, buckets,
-	      betting_tree.get(), current, num_threads, streets.get());
+	      betting_tree.get(), current, num_threads, streets.get(),
+	      always_call_preflop);
     for (unsigned int p = 0; p <= 1; ++p) {
       evs[p] = rgbr.Go(it, p);
     }

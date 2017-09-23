@@ -1,0 +1,18 @@
+# Minimum bet size of 1/4 pot.  Implies only all-ins once pot size is 16.
+# Doesn't allow a bet of 2 chips into a pot of 10.  Oh well.
+BettingAbstractionName psbb6c
+Limit false
+StackSize 12
+Asymmetric false
+NoLimitTreeType 1
+MinBet 2
+AlwaysAllIn true
+# CloseToAllInFrac 0.5
+MaxBets 5,5,5,5
+# Possible bet sizes:
+# Pot size 4: 0.25=1,0.5=2,0.75=3,1.0=4,1.5=6,2.0=8
+# Pot size 8: 0.25=2,0.375=3,0.5=4,0.75=6,1.0=8,1.5=12
+# Pot size 10: 0.25=3?,0.375=4,0.5=5
+# Pot size 12: 0.25=3,0.375=5,0.5=6
+# Pot size 14: 0.25=4,0.375=5
+BetSizes 0.25,0.375,0.5,1.0,1.5,2.0;0.25,0.375,0.5,1.0,1.5,2.0;1.0;1.0;1.0|0.25,0.375,0.5,1.0,1.5,2.0;0.25,0.375,0.5,1.0,1.5,2.0;1.0;1.0;1.0|0.25,0.375,0.5,1.0,1.5,2.0;0.25,0.375,0.5,1.0,1.5,2.0;1.0;1.0;1.0|0.25,0.375,0.5,1.0,1.5,2.0;0.25,0.375,0.5,1.0,1.5,2.0;1.0;1.0;1.0

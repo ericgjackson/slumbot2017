@@ -1,0 +1,93 @@
+ms3f1t1r1h5
+mb1b1
+tcfr
+null
+
+1b:  Exploitability: 210.06 mbb/g
+2b:  Exploitability: 181.04 mbb/g
+3b:  Exploitability: 171.72 mbb/g
+4b:  Exploitability: 164.27 mbb/g
+5b:  Exploitability: 159.75 mbb/g
+6b:  Exploitability: 156.65 mbb/g
+10b: Exploitability: 149.42 mbb/g
+21b: Exploitability: 142.52 mbb/g
+
+mb1b1rft
+
+1b:  Exploitability: 151.16 mbb/g  OLD
+2b:  Exploitability: 141.14 mbb/g
+14b: Exploitability: 128.92 mbb/g
+15b: Exploitability: 128.25 mbb/g
+16b: Exploitability: 127.86 mbb/g
+17b: Exploitability: 127.96 mbb/g
+
+ms3f1t1r1h5
+nhs3
+mb1b1
+3b:  Exploitability: 202.28 mbb/g
+13b: Exploitability: 191.35 mbb/g
+Resolve rivers:
+  1b/200: Exploitability: 60.99 mbb/g
+  3b/200: Exploitability: 57.79 mbb/g
+mb1b1rft
+1b:  Exploitability: 300.51 mbb/g
+2b:  Exploitability: 288.02 mbb/g
+Resolve rivers
+  2b/200: Exploitability: 96.12 mbb/g
+    EVs: 0.049153, 1.102914
+mb1b1rft54
+1b: Exploitability: 288.03 mbb/g
+2b: Exploitability: 274.18 mbb/g
+3b: Exploitability: 271.24 mbb/g
+Resolve rivers
+  3b/200: Exploitability: 88.35 mbb/g
+
+
+ms3f1t1r1h5
+hshshshsbc3
+mb2b2
+1b:  Exploitability: 1027.48 mbb/g
+12b: Exploitability: 611.22 mbb/g
+Resolve rivers:
+  12b/200 (~800m): Exploitability: 238.71 mbb/g
+mb2b2rft
+1b:  Exploitability: 1334.53 mbb/g
+2b:  Exploitability: 1181.94 mbb/g
+16b: Exploitability: 980.08 mbb/g
+17b: Exploitability: 975.44 mbb/g
+Resolve rivers
+  17b/200 (872m): Exploitability: 317.87 mbb/g
+
+
+cfrps
+mb1b1
+200: Exploitability: 32.21 mbb/g
+400: Exploitability: 10.70 mbb/g
+mb1b1rft
+100: Exploitability: 292.43 mbb/g  OLD
+110: Exploitability: 277.06 mbb/g
+120: Exploitability: 287.86 mbb/g
+200: Exploitability: 325.72 mbb/g
+
+cfrps1
+mb1b1rft
+90: Exploitability: 267.52 mbb/g  OLD
+
+Why is CFR+ much worse than tcfr on reentrant trees?  Is it a bug?
+Or does CFR+ overfit much more?
+If we reduce amount of reentrancy, results should improve, right?
+
+mb1b1rft54
+Only reentrant when pot size >= 54
+cfrps/none
+200: Exploitability: 275.96 mbb/g  OLD
+cfrps1/none
+100: Exploitability: 225.27 mbb/g  OLD
+Still very bad.  Although slightly better.
+cfrps1/null
+100: Exploitability: 202.88 mbb/g  OLD
+Better but still very bad.
+
+I suppose we shouldn't be flooring regrets after each node traversal.
+If we use null abstraction instead of none, we'll get the desired behavior.
+This didn't help much.

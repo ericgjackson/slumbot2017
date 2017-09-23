@@ -1,0 +1,10 @@
+BettingAbstractionName psbb6
+Limit false
+StackSize 12
+Asymmetric false
+NoLimitTreeType 1
+MinBet 2
+AlwaysAllIn true
+# CloseToAllInFrac 0.5
+MaxBets 4,4,4,4
+BetSizes 0.5,1.0,2.0;0.5,1.0,2.0;0.5,1.0,2.0;0.5,1.0,2.0|0.25,0.5,1.0,2.0;0.5,1.0,2.0;0.5,1.0,2.0;0.5,1.0,2.0|0.25,0.5,1.0,2.0;0.5,1.0,2.0;0.5,1.0,2.0;0.5,1.0,2.0|0.25,0.5,1.0,2.0;0.5,1.0,2.0;0.5,1.0,2.0;0.5,1.0,2.0

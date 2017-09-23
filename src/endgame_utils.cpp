@@ -78,7 +78,7 @@ CFRValues *ReadBaseEndgameStrategy(const CardAbstraction &
   }
 
   sumprobs->ReadSubtreeFromFull(dir, base_it, base_betting_tree->Root(),
-				base_node, subtree->Root(),
+				base_node, subtree->Root(), action_sequence,
 				num_full_holdings.get(), kMaxUInt);
   
   return sumprobs;
@@ -210,7 +210,7 @@ void WriteEndgame(Node *node, const string &action_sequence,
     return;
   }
   unsigned int num_succs = node->NumSuccs();
-  if (node->PlayerActing() == cfr_target_p) {
+  if (node->PlayerActing() == cfr_target_p && num_succs > 1) {
     if (below_action_sequence.size() <= action_sequence.size() &&
 	std::equal(below_action_sequence.begin(), below_action_sequence.end(),
 		   action_sequence.begin())) {
@@ -290,7 +290,7 @@ static void ReadEndgame(Node *node, const string &action_sequence,
     return;
   }
   unsigned int num_succs = node->NumSuccs();
-  if (node->PlayerActing() == cfr_target_p) {
+  if (node->PlayerActing() == cfr_target_p && num_succs > 1) {
     char dir[500], dir2[500], dir3[500], filename[500];
     sprintf(dir, "%s/%s.%s.%u.%u.%u.%s.%s", Files::NewCFRBase(),
 	    Game::GameName().c_str(),

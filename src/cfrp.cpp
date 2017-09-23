@@ -122,7 +122,7 @@ void CFRP::FloorRegrets(Node *node) {
   if (node->Terminal()) return;
   unsigned int st = node->Street();
   unsigned int num_succs = node->NumSuccs();
-  if (node->PlayerActing() == p_ && ! buckets_.None(st)) {
+  if (node->PlayerActing() == p_ && ! buckets_.None(st) && num_succs > 1) {
     unsigned int nt = node->NonterminalID();
     unsigned int num_buckets = buckets_.NumBuckets(st);
     unsigned int num_values = num_buckets * num_succs;
@@ -184,13 +184,13 @@ void CFRP::HalfIteration(unsigned int p) {
 
   if (subgame_street_ <= Game::MaxStreet()) pre_phase_ = true;
   double *vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-			 total_card_probs, 0);
+			 total_card_probs, "", 0);
   if (subgame_street_ <= Game::MaxStreet()) {
     delete [] vals;
     WaitForFinalSubgames();
     pre_phase_ = false;
     vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-		   total_card_probs, 0);
+		   total_card_probs, "", 0);
   }
 #if 0
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(0);
@@ -233,10 +233,8 @@ void CFRP::Checkpoint(unsigned int it) {
     strcat(dir, buf);
   }
   Mkdir(dir);
-  regrets_->Write(dir, it, betting_tree_->Root(),
-		  betting_tree_->Root()->NonterminalID(), kMaxUInt);
-  sumprobs_->Write(dir, it, betting_tree_->Root(),
-		   betting_tree_->Root()->NonterminalID(), kMaxUInt);
+  regrets_->Write(dir, it, betting_tree_->Root(), "x", kMaxUInt);
+  sumprobs_->Write(dir, it, betting_tree_->Root(), "x", kMaxUInt);
 }
 
 void CFRP::ReadFromCheckpoint(unsigned int it) {
@@ -252,10 +250,8 @@ void CFRP::ReadFromCheckpoint(unsigned int it) {
     sprintf(buf, ".p%u", target_p_);
     strcat(dir, buf);
   }
-  regrets_->Read(dir, it, betting_tree_->Root(),
-		 betting_tree_->Root()->NonterminalID(), kMaxUInt);
-  sumprobs_->Read(dir, it, betting_tree_->Root(),
-		  betting_tree_->Root()->NonterminalID(), kMaxUInt);
+  regrets_->Read(dir, it, betting_tree_->Root(), "x", kMaxUInt);
+  sumprobs_->Read(dir, it, betting_tree_->Root(), "x", kMaxUInt);
 }
 
 void CFRP::Run(unsigned int start_it, unsigned int end_it) {

@@ -242,3 +242,16 @@ of bet sizes.  We will always resolve the river.  Still an open question
 whether we can resolve the turn.  Probably would only be for very large
 pots.
 
+Plan:
+* At least five bets for each player pre-river
+* At least three bets for each player on river
+* Very coarse river abstraction (plan to resolve)
+* Coarsish turn abstraction (results so far indicate not much difference
+    between 100k and 1m buckets).
+* Many bet sizes for opponent (1/4, 1/2, 3/4, 1x, some larger, all-in)
+* One to three bet sizes for ourselves
+* Maybe only one bet for ourselves preflop!
+* Only all-in for ourselves once pot gets large enough.
+
+Challenge: seems like we might need lots and lots of bets for low
+exploitability.  For example, need 5/8: 1/2 and 3/4 not sufficient.

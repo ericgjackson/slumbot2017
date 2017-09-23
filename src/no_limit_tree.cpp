@@ -31,6 +31,25 @@ void BettingTreeBuilder::GetAllNewPotSizes(int old_pot_size,
   }
 }
 
+// Produces the new possible pot sizes.  Assumes any even size bet is allowed
+// by the abstraction (i.e., even multiples of the small blind).
+// This function does not rule out certain illegal bet sizes; we do not check
+// that a raise is at least as big as the previous bet.  These restrictions
+// are enforced in HandleBet().
+// If there is a pending bet, old_pot_size reflects the size of the pot
+// including that bet *and* a call of that bet.
+void BettingTreeBuilder::GetAllNewEvenPotSizes(int old_pot_size,
+					       vector<int> *new_pot_sizes) {
+  int all_in_pot_size = 2 * betting_abstraction_.StackSize();
+  // Already all-in; no bets possible
+  if (old_pot_size == all_in_pot_size) return;
+  int one_player_committed = old_pot_size / 2;
+  int remaining = betting_abstraction_.StackSize() - one_player_committed;
+  for (int bet_size = 2; bet_size <= remaining; bet_size += 2) {
+    new_pot_sizes->push_back(old_pot_size + 2 * bet_size);
+  }
+}
+
 // Add one bet size if pot size is >= 1/9 of all-in
 bool BettingTreeBuilder::AddGeometric1Bet(int old_pot_size,
 					  bool *pot_size_seen) {
@@ -197,7 +216,7 @@ void BettingTreeBuilder::HandleBet(unsigned int street,
 				   unsigned int player_acting,
 				   unsigned int target_player,
 				   unsigned int *terminal_id,
-				   vector<Node *> *bet_succs) {
+				   vector< shared_ptr<Node> > *bet_succs) {
   // Obviously pot size can't go down after additional bet
   if (new_after_call_pot_size <= old_after_call_pot_size) return;
 
@@ -223,28 +242,29 @@ void BettingTreeBuilder::HandleBet(unsigned int street,
   }
 
   // For bets we pass in the pot size without the pending bet included
-  Node *bet = CreateNoLimitSubtree(street, old_after_call_pot_size,
-				   new_bet_size, num_street_bets + 1,
-				   player_acting^1, target_player,
-				   terminal_id);
+  shared_ptr<Node> bet =
+    CreateNoLimitSubtree(street, old_after_call_pot_size, new_bet_size,
+			 num_street_bets + 1, player_acting^1, target_player,
+			 terminal_id);
   bet_succs->push_back(bet);
 }
 
 // May return NULL
-Node *BettingTreeBuilder::CreateCallSucc(unsigned int street,
-					 unsigned int last_pot_size,
-					 unsigned int last_bet_size,
-					 unsigned int num_street_bets,
-					 unsigned int player_acting,
-					 unsigned int target_player,
-					 unsigned int *terminal_id) {
+shared_ptr<Node>
+BettingTreeBuilder::CreateCallSucc(unsigned int street,
+				   unsigned int last_pot_size,
+				   unsigned int last_bet_size,
+				   unsigned int num_street_bets,
+				   unsigned int player_acting,
+				   unsigned int target_player,
+				   unsigned int *terminal_id) {
   unsigned int after_call_pot_size = last_pot_size + 2 * last_bet_size;
   // We advance the street if we are calling a bet
   // Note that a call on the final street is considered to advance the street
   bool advance_street = num_street_bets > 0;
   // This assumes heads-up
   advance_street |= (Game::FirstToAct(street) != player_acting);
-  Node *call_succ;
+  shared_ptr<Node> call_succ;
   unsigned int max_street = Game::MaxStreet();
   if (street < max_street && advance_street) {
     // Assumes player 0 first to act postflop
@@ -257,19 +277,21 @@ Node *BettingTreeBuilder::CreateCallSucc(unsigned int street,
 				     terminal_id);
   } else {
     // This is a call on the final street
-    call_succ = new Node((*terminal_id)++, street, 255, nullptr, nullptr,
-			 nullptr, 255, after_call_pot_size);
+    call_succ.reset(new Node((*terminal_id)++, street, 255, nullptr, nullptr,
+			     nullptr, 255, after_call_pot_size));
 
   }
   return call_succ;
 }
 
-Node *BettingTreeBuilder::CreateFoldSucc(unsigned int street,
-					 unsigned int last_pot_size,
-					 unsigned int player_acting,
-					 unsigned int *terminal_id) {
-  Node *fold_succ = new Node((*terminal_id)++, street, 255, nullptr,
-			     nullptr, nullptr, player_acting, last_pot_size);
+shared_ptr<Node>
+BettingTreeBuilder::CreateFoldSucc(unsigned int street,
+				   unsigned int last_pot_size,
+				   unsigned int player_acting,
+				   unsigned int *terminal_id) {
+  shared_ptr<Node> fold_succ;
+  fold_succ.reset(new Node((*terminal_id)++, street, 255, nullptr,
+			   nullptr, nullptr, player_acting, last_pot_size));
   return fold_succ;
 }
 
@@ -286,10 +308,12 @@ void BettingTreeBuilder::CreateNoLimitSuccs(unsigned int street,
 					    unsigned int player_acting,
 					    unsigned int target_player,
 					    unsigned int *terminal_id,
-					    Node **call_succ, Node **fold_succ,
-					    vector<Node *> *bet_succs) {
-  *fold_succ = NULL;
-  *call_succ = NULL;
+					    shared_ptr<Node> *call_succ,
+					    shared_ptr<Node> *fold_succ,
+					    vector< shared_ptr<Node> > *
+					    bet_succs) {
+  // *fold_succ = NULL;
+  // *call_succ = NULL;
   bet_succs->clear();
   bool no_open_limp = 
     ((! betting_abstraction_.Asymmetric() &&
@@ -315,7 +339,13 @@ void BettingTreeBuilder::CreateNoLimitSuccs(unsigned int street,
   unsigned int current_pot_size = last_pot_size + 2 * last_bet_size;
   vector<int> new_pot_sizes;
   if (betting_abstraction_.AllBetSizeStreet(street)) {
-    GetAllNewPotSizes(current_pot_size, &new_pot_sizes);
+    if (num_street_bets < betting_abstraction_.MaxBets(street, our_bet)) {
+      GetAllNewPotSizes(current_pot_size, &new_pot_sizes);
+    }
+  } else if (betting_abstraction_.AllEvenBetSizeStreet(street)) {
+    if (num_street_bets < betting_abstraction_.MaxBets(street, our_bet)) {
+      GetAllNewEvenPotSizes(current_pot_size, &new_pot_sizes);
+    }
   } else {
     int all_in_pot_size = 2 * betting_abstraction_.StackSize();
     bool *pot_size_seen = new bool[all_in_pot_size + 1];
@@ -435,15 +465,17 @@ void BettingTreeBuilder::CreateNoLimitSuccs(unsigned int street,
   }
 }
 
-Node *BettingTreeBuilder::CreateNoLimitSubtree(unsigned int street,
-					       unsigned int pot_size,
-					       unsigned int last_bet_size,
-					       unsigned int num_street_bets,
-					       unsigned int player_acting,
-					       unsigned int target_player,
-					       unsigned int *terminal_id) {
-  Node *call_succ = NULL, *fold_succ = NULL;
-  vector<Node *> bet_succs;
+shared_ptr<Node>
+BettingTreeBuilder::CreateNoLimitSubtree(unsigned int street,
+					 unsigned int pot_size,
+					 unsigned int last_bet_size,
+					 unsigned int num_street_bets,
+					 unsigned int player_acting,
+					 unsigned int target_player,
+					 unsigned int *terminal_id) {
+  shared_ptr<Node> call_succ(nullptr);
+  shared_ptr<Node> fold_succ(nullptr);
+  vector< shared_ptr<Node> > bet_succs;
   CreateNoLimitSuccs(street, pot_size, last_bet_size, num_street_bets,
 		     player_acting, target_player, terminal_id, &call_succ,
 		     &fold_succ, &bet_succs);
@@ -452,20 +484,21 @@ Node *BettingTreeBuilder::CreateNoLimitSubtree(unsigned int street,
     fprintf(stderr, "This will cause problems\n");
     exit(-1);
   }
-  // Assign nonterminal ID of zero for now.  Will get updated at runtime
-  // after tree is read from disk.
-  Node *node = new Node(0, street, player_acting, call_succ, fold_succ,
-			&bet_succs, 255, pot_size);
+  // Assign nonterminal ID of kMaxUInt for now.
+  shared_ptr<Node> node;
+  node.reset(new Node(kMaxUInt, street, player_acting, call_succ, fold_succ,
+		      &bet_succs, 255, pot_size));
   return node;
 }
 
-Node *BettingTreeBuilder::CreateNoLimitTree1(unsigned int street,
-					     unsigned int pot_size,
-					     unsigned int last_bet_size,
-					     unsigned int num_street_bets,
-					     unsigned int player_acting,
-					     unsigned int target_player,
-					     unsigned int *terminal_id) {
+shared_ptr<Node>
+BettingTreeBuilder::CreateNoLimitTree1(unsigned int street,
+				       unsigned int pot_size,
+				       unsigned int last_bet_size,
+				       unsigned int num_street_bets,
+				       unsigned int player_acting,
+				       unsigned int target_player,
+				       unsigned int *terminal_id) {
   return CreateNoLimitSubtree(street, pot_size, last_bet_size, num_street_bets,
 			      player_acting, target_player, terminal_id);
 }

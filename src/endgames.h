@@ -1,6 +1,7 @@
 #ifndef _ENDGAMES_H_
 #define _ENDGAMES_H_
 
+#include <string>
 #include <vector>
 
 #include "cards.h"
@@ -12,7 +13,6 @@ class BettingAbstraction;
 class BettingTree;
 class Buckets;
 class CardAbstraction;
-class CFR;
 class CFRConfig;
 class CFRValues;
 class HandTree;
@@ -31,21 +31,21 @@ public:
 		bool zero_sum, unsigned int num_threads);
   ~EndgameSolver(void);
   void SolveSafe(Node *solve_root, Node *target_root, unsigned int solve_bd,
-		 unsigned int target_bd, unsigned int base_solve_nt,
-		 unsigned int base_target_nt, const vector<Node *> *base_path,
-		 unsigned int num_its, bool p0, bool p1);
+		 unsigned int target_bd, const string &action_sequence,
+		 const vector<Node *> *base_path, unsigned int num_its,
+		 bool p0, bool p1);
   void SolveUnsafe(Node *solve_root, Node *target_root, unsigned int solve_bd,
-		   unsigned int target_bd, unsigned int base_solve_nt,
-		   unsigned int base_target_nt,
+		   unsigned int target_bd, unsigned int base_target_nt,
+		   const string &action_sequence,
 		   const vector<Node *> *base_path, unsigned int num_its);
   void Solve(Node *solve_root, Node *target_root, unsigned int solve_bd,
-	     unsigned int target_bd, unsigned int base_solve_nt,
+	     unsigned int target_bd, const string &action_sequence,
 	     unsigned int base_target_nt, const vector<Node *> *base_path,
 	     unsigned int num_its, bool p0, bool p1);
   void Solve(Node *solve_root, Node *target_root, Node *base_solve_root,
-	     unsigned int solve_bd, unsigned int target_bd,
-	     unsigned int base_target_nt, unsigned int num_its,
-	     BettingTree *endgame_betting_tree);
+	     const string &action_sequence, unsigned int solve_bd,
+	     unsigned int target_bd, unsigned int base_target_nt,
+	     unsigned int num_its, BettingTree *endgame_betting_tree);
   bool GetPath(Node *base_node, Node *endgame_node, Node *base_target,
 	       Node *endgame_target, vector<Node *> *rev_base_path);
   void BRGo(double *p0_br, double *p1_br);
@@ -60,10 +60,11 @@ private:
   ResolvingMethod method_;
   unsigned int base_it_;
   unsigned int num_hole_card_pairs_;
-  CFR *eg_cfr_;
+  EGCFR *eg_cfr_;
   // Indexed by responder, player acting, nt, bd and hcp index
   double *****br_vals_;
   bool card_level_;
+  unsigned int **num_nonterminals_;
 };
 
 #endif

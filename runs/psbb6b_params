@@ -1,0 +1,11 @@
+BettingAbstractionName psbb6b
+Limit false
+StackSize 12
+Asymmetric false
+NoLimitTreeType 1
+MinBet 2
+AlwaysAllIn true
+# CloseToAllInFrac 0.5
+AllEvenBetSizeStreets 0,1,2,3
+# In theory could have five bets, but we will cap at 4.
+MaxBets 5,5,5,5

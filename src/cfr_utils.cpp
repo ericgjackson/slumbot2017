@@ -17,17 +17,13 @@
 #include "io.h"
 #include "split.h"
 
-// bool g_debug = false;
-
 double *Showdown(Node *node, const CanonicalCards *hands, double *opp_probs,
 		 double sum_opp_probs, double *total_card_probs) {
-  unsigned int st = node->Street();
   unsigned int max_card1 = Game::MaxCard() + 1;
-
   double cum_prob = 0;
   double cum_card_probs[52];
   for (Card c = 0; c < max_card1; ++c) cum_card_probs[c] = 0;
-  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
+  unsigned int num_hole_card_pairs = hands->NumRaw();
   double *win_probs = new double[num_hole_card_pairs];
   double half_pot = (node->PotSize() / 2);
   double *vals = new double[num_hole_card_pairs];
@@ -69,12 +65,6 @@ double *Showdown(Node *node, const CanonicalCards *hands, double *opp_probs,
       double lose_prob = (sum_opp_probs - cum_prob) -
 	better_hi_prob - better_lo_prob;
       vals[k] = (win_probs[k] - lose_prob) * half_pot;
-#if 0
-      if (g_debug && k == 18) {
-	printf("BC/BC/BC/BC i 18 val %f sop %f wp %f lp %f\n",
-	       vals[k], sum_opp_probs, win_probs[k], lose_prob);
-      }
-#endif
     }
   }
 
@@ -86,14 +76,12 @@ double *Showdown(Node *node, const CanonicalCards *hands, double *opp_probs,
 double *Fold(Node *node, unsigned int p, const CanonicalCards *hands,
 	     double *opp_probs, double sum_opp_probs,
 	     double *total_card_probs) {
-  unsigned int st = node->Street();
   unsigned int max_card1 = Game::MaxCard() + 1;
-
   double half_pot = (node->PotSize() / 2);
   bool we_fold = (p == node->PlayerFolding());
   // Sign of half_pot reflects who folds
   if (we_fold) half_pot = -half_pot;
-  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
+  unsigned int num_hole_card_pairs = hands->NumRaw();
   double *vals = new double[num_hole_card_pairs];
 
   for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
@@ -105,13 +93,6 @@ double *Fold(Node *node, unsigned int p, const CanonicalCards *hands,
     vals[i] = half_pot *
       (sum_opp_probs + opp_prob -
        (total_card_probs[hi] + total_card_probs[lo]));
-#if 0
-    if (g_debug && i == 18) {
-      printf("BC/BC/BC/BF i 18 val %f sop %f op %f tcph %f tcpl %f\n",
-	     vals[i], sum_opp_probs, opp_prob, total_card_probs[hi],
-	     total_card_probs[lo]);
-    }
-#endif
   }
 
   return vals;
@@ -162,13 +143,13 @@ void DeleteOldFiles(const CardAbstraction &ca, const BettingAbstraction &ba,
       string filename(full_path, j + 1, full_path_len - (j + 1));
       vector<string> comps;
       Split(filename.c_str(), '.', false, &comps);
-      if (comps.size() != 9) {
+      if (comps.size() != 8) {
 	fprintf(stderr, "File \"%s\" has wrong number of components\n",
 		full_path.c_str());
 	exit(-1);
       }
       unsigned int file_it;
-      if (sscanf(comps[6].c_str(), "%u", &file_it) != 1) {
+      if (sscanf(comps[5].c_str(), "%u", &file_it) != 1) {
 	fprintf(stderr, "Couldn't extract iteration from file \"%s\"\n",
 		full_path.c_str());
 	exit(-1);

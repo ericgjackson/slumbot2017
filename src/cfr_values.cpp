@@ -174,25 +174,30 @@ void CFRValues::AllocateAndClear(Node *node, bool ints, unsigned int only_p) {
   unsigned int num_succs = node->NumSuccs();
   unsigned int st = node->Street();
   unsigned int p = node->PlayerActing();
-  if (streets_[st] && players_[p] && (only_p == kMaxUInt || p == only_p)) {
+  if (streets_[st] && players_[p] && (only_p == kMaxUInt || p == only_p) &&
+      num_succs > 1) {
     unsigned int nt = node->NonterminalID();
-    bool bucketed = num_bucket_holdings_[p][st] > 0 &&
-      node->PotSize() < bucket_thresholds_[st];
-    unsigned int num_holdings;
-    if (bucketed) {
-      num_holdings = num_bucket_holdings_[p][st];
-    } else {
-      num_holdings = num_card_holdings_[p][st];
-    }
-    unsigned int num_actions = num_holdings * num_succs;
-    if (ints) {
-      int *vals = new int[num_actions];
-      for (unsigned int a = 0; a < num_actions; ++a) vals[a] = 0;
-      i_values_[p][st][nt] = vals;
-    } else {
-      double *vals = new double[num_actions];
-      for (unsigned int a = 0; a < num_actions; ++a) vals[a] = 0;
-      d_values_[p][st][nt] = vals;
+    // Check for reentrant nodes
+    if (! (ints && i_values_[p][st][nt]) &&
+	! (! ints && d_values_[p][st][nt])) {
+      bool bucketed = num_bucket_holdings_[p][st] > 0 &&
+	node->PotSize() < bucket_thresholds_[st];
+      unsigned int num_holdings;
+      if (bucketed) {
+	num_holdings = num_bucket_holdings_[p][st];
+      } else {
+	num_holdings = num_card_holdings_[p][st];
+      }
+      unsigned int num_actions = num_holdings * num_succs;
+      if (ints) {
+	int *vals = new int[num_actions];
+	for (unsigned int a = 0; a < num_actions; ++a) vals[a] = 0;
+	i_values_[p][st][nt] = vals;
+      } else {
+	double *vals = new double[num_actions];
+	for (unsigned int a = 0; a < num_actions; ++a) vals[a] = 0;
+	d_values_[p][st][nt] = vals;
+      }
     }
   }
   for (unsigned int s = 0; s < num_succs; ++s) {
@@ -294,6 +299,7 @@ void CFRValues::WriteNode(Node *node, Writer *writer,
   unsigned int st = node->Street();
   unsigned int nt = node->NonterminalID();
   unsigned int num_succs = node->NumSuccs();
+  if (num_succs <= 1) return;
   if (compressed_streets_[st]) {
     // This code doesn't support num_holdings passed in
     unsigned int num_local_boards =
@@ -351,26 +357,34 @@ void CFRValues::WriteNode(Node *node, Writer *writer,
   }
 }
 
+// Prevent redunant writing with reentrant trees
 void CFRValues::Write(Node *node, Writer ***writers,
-		      void ***compressors) const {
+		      void ***compressors, bool ***seen) const {
   if (node->Terminal()) return;
   unsigned int num_succs = node->NumSuccs();
   unsigned int st = node->Street();
-  unsigned int p = node->PlayerActing();
-  if (streets_[st] && players_[p] && writers[p]) {
-    bool bucketed = num_bucket_holdings_[p][st] > 0 &&
+  unsigned int pa = node->PlayerActing();
+  if (streets_[st] && players_[pa] && writers[pa]) {
+    unsigned int nt = node->NonterminalID();
+    // If we have seen this node, we have also seen all the descendants of it,
+    // so we can just return.
+    if (seen) {
+      if (seen[st][pa][nt]) return;
+      seen[st][pa][nt] = true;
+    }
+    bool bucketed = num_bucket_holdings_[pa][st] > 0 &&
       node->PotSize() < bucket_thresholds_[st];
     unsigned int num_holdings;
     if (bucketed) {
-      num_holdings = num_bucket_holdings_[p][st];
+      num_holdings = num_bucket_holdings_[pa][st];
     } else {
-      num_holdings = num_card_holdings_[p][st];
+      num_holdings = num_card_holdings_[pa][st];
     }
-    WriteNode(node, writers[p][st],
-	      compressors ? compressors[p][st] : nullptr, num_holdings, 0);
+    WriteNode(node, writers[pa][st],
+	      compressors ? compressors[pa][st] : nullptr, num_holdings, 0);
   }
   for (unsigned int s = 0; s < num_succs; ++s) {
-    Write(node->IthSucc(s), writers, compressors);
+    Write(node->IthSucc(s), writers, compressors, seen);
   }
 }
 
@@ -397,9 +411,7 @@ void CFRValues::DeleteWriters(Writer ***writers, void ***compressors) const {
 }
 
 Writer ***CFRValues::InitializeWriters(const char *dir, unsigned int it,
-				       unsigned int root_st,
-				       // unsigned int target_bd,
-				       unsigned int subtree_nt,
+				       const string &action_sequence,
 				       unsigned int only_p,
 				       void ****compressors) const {
   char buf[500];
@@ -422,24 +434,15 @@ Writer ***CFRValues::InitializeWriters(const char *dir, unsigned int it,
     writers[p] = new Writer *[max_street + 1];
     (*compressors)[p] = new void *[max_street + 1];
     for (unsigned int st = 0; st <= max_street; ++st) {
-      if (! streets_[st] || st < root_st) {
-	// st < root_st can happen when we solve endgames and solve_st is
-	// less than target_st
+      if (! streets_[st]) {
 	writers[p][st] = nullptr;
 	(*compressors)[p][st] = nullptr;
 	continue;
       }
       const char *suffix = i_values_ && i_values_[p] && i_values_[p][st] ?
 	"i" : "d";
-#if 0
-      if (target_bd != kMaxUInt) {
-	sprintf(buf, "%s/%s.%u.%u.%u.%u.%u.%u.p%u.%s", dir,
-		sumprobs_ ? "sumprobs" : "regrets", root_st, subtree_nt,
-		root_st, target_bd, st, it, p, suffix);
-      }
-#endif
-      sprintf(buf, "%s/%s.%u.%u.%u.%u.%u.%u.p%u.%s", dir,
-	      sumprobs_ ? "sumprobs" : "regrets", root_st, subtree_nt,
+      sprintf(buf, "%s/%s.%s.%u.%u.%u.%u.p%u.%s", dir,
+	      sumprobs_ ? "sumprobs" : "regrets", action_sequence.c_str(),
 	      root_bd_st_, root_bd_, st, it, p, suffix);
       writers[p][st] = new Writer(buf);
       if (compressed_streets_[st]) {
@@ -471,59 +474,57 @@ Writer ***CFRValues::InitializeWriters(const char *dir, unsigned int it,
 // we read the subtree strategy in, in order to incorporate it into a full
 // tree strategy, we will use this "full tree" nonterminal ID.
 void CFRValues::Write(const char *dir, unsigned int it, Node *root,
-		      unsigned int subtree_nt, unsigned int only_p) const {
-  void ***compressors;
-  Writer ***writers = InitializeWriters(dir, it, root->Street(), subtree_nt,
-					only_p, &compressors);
-  Write(root, writers, compressors);
-  DeleteWriters(writers, compressors);
-}
-
-#if 0
-// Only call this routine in a "backoff" situation.
-// Backoff not currently supported
-void CFRValues::Write(const char *dir, unsigned int it, Node *root,
-		      unsigned int target_bd, unsigned int subtree_nt,
+		      const string &action_sequence,
 		      unsigned int only_p) const {
-  void ***compressors;
-  Writer ***writers = InitializeWriters(dir, it, root->Street(), target_bd,
-					subtree_nt, only_p, &compressors);
-  Write(root, root->Street(), target_bd, writers, compressors);
-  DeleteWriters(writers, compressors);
-}
-#endif
-
-#if 0
-// Get the number of actions for each player on each street
-static void GetStreetNumActions(Node *node, unsigned int **street_num_actions) {
-  if (node->Terminal()) return;
-  unsigned int st = node->Street();
-  unsigned int num_succs = node->NumSuccs();
-  unsigned int p = node->PlayerActing();
-  street_num_actions[p][st] += num_succs;
-  for (unsigned int s = 0; s < num_succs; ++s) {
-    GetStreetNumActions(node->IthSucc(s), street_num_actions);
+  unsigned int max_street = Game::MaxStreet();
+  unsigned int num_players = Game::NumPlayers();
+  bool ***seen = new bool **[max_street + 1];
+  unsigned int root_st = root->Street();
+  unsigned int **num_nonterminals = CountNumNonterminals(root);
+  for (unsigned int st = root_st; st <= max_street; ++st) {
+    seen[st] = new bool *[num_players];
+    for (unsigned int p = 0; p < num_players; ++p) {
+      unsigned int num_nt = num_nonterminals[p][st];
+      seen[st][p] = new bool[num_nt];
+      for (unsigned int i = 0; i < num_nt; ++i) {
+	seen[st][p][i] = false;
+      }
+    }
   }
+  void ***compressors;
+  Writer ***writers = InitializeWriters(dir, it, action_sequence,
+					only_p, &compressors);
+  Write(root, writers, compressors, seen);
+  DeleteWriters(writers, compressors);
+  for (unsigned int st = root_st; st <= max_street; ++st) {
+    for (unsigned int p = 0; p < num_players; ++p) {
+      delete [] seen[st][p];
+    }
+    delete [] seen[st];
+  }
+  delete [] seen;
+  for (unsigned int p = 0; p < num_players; ++p) {
+    delete [] num_nonterminals[p];
+  }
+  delete [] num_nonterminals;
 }
-#endif
 
 Reader *CFRValues::InitializeReader(const char *dir, unsigned int p,
 				    unsigned int st, unsigned int it,
-				    unsigned int subtree_st,
-				    unsigned int subtree_nt,
+				    const string &action_sequence,
 				    unsigned int root_bd_st,
 				    unsigned int root_bd,
 				    bool *int_type) {
   char buf[500];
   
-  sprintf(buf, "%s/%s.%u.%u.%u.%u.%u.%u.p%u.d", dir,
-	  sumprobs_ ? "sumprobs" : "regrets", subtree_st, subtree_nt,
+  sprintf(buf, "%s/%s.%s.%u.%u.%u.%u.p%u.d", dir,
+	  sumprobs_ ? "sumprobs" : "regrets", action_sequence.c_str(),
 	  root_bd_st, root_bd, st, it, p);
   if (FileExists(buf)) {
     *int_type = false;
   } else {
-    sprintf(buf, "%s/%s.%u.%u.%u.%u.%u.%u.p%u.i", dir,
-	    sumprobs_ ? "sumprobs" : "regrets", subtree_st, subtree_nt,
+    sprintf(buf, "%s/%s.%s.%u.%u.%u.%u.p%u.i", dir,
+	    sumprobs_ ? "sumprobs" : "regrets", action_sequence.c_str(),
 	    root_bd_st, root_bd, st, it, p);
     if (FileExists(buf)) {
       *int_type = true;
@@ -579,6 +580,8 @@ Reader *CFRValues::InitializeReader(const char *dir, unsigned int p,
 void CFRValues::InitializeValuesForReading(unsigned int p, unsigned int st,
 					   unsigned int nt, Node *node,
 					   bool ints) {
+  unsigned int num_succs = node->NumSuccs();
+  if (num_succs <= 1) return;
   bool bucketed = num_bucket_holdings_[p][st] > 0 &&
     node->PotSize() < bucket_thresholds_[st];
   unsigned int num_holdings;
@@ -587,7 +590,7 @@ void CFRValues::InitializeValuesForReading(unsigned int p, unsigned int st,
   } else {
     num_holdings = num_card_holdings_[p][st];
   }
-  unsigned int num_actions = num_holdings * node->NumSuccs();
+  unsigned int num_actions = num_holdings * num_succs;
   if (ints) {
     if (i_values_ == nullptr) {
       unsigned int num_players = Game::NumPlayers();
@@ -640,10 +643,19 @@ void CFRValues::InitializeValuesForReading(unsigned int p, unsigned int st,
 void CFRValues::ReadNode(Node *node, Reader *reader, void *decompressor,
 			 unsigned int num_holdings, bool ints,
 			 unsigned int offset) {
-  unsigned int st = node->Street();
   unsigned int num_succs = node->NumSuccs();
+  if (num_succs <= 1) return;
+  unsigned int st = node->Street();
   unsigned int p = node->PlayerActing();
   unsigned int nt = node->NonterminalID();
+  // Assume this is because this node is reentrant.
+  // Does this do the right thing when called from endgame_utils.cpp?
+  if ((ints && i_values_ && i_values_[p] && i_values_[p][st] &&
+       i_values_[p][st][nt]) ||
+      (! ints && d_values_ && d_values_[p] && d_values_[p][st] &&
+       d_values_[p][st][nt])) {
+    return;
+  }
   InitializeValuesForReading(p, st, nt, node, ints);
   unsigned int num_actions = num_holdings * num_succs;
   if (ints) {
@@ -718,23 +730,12 @@ void CFRValues::Read(Node *node, Reader ***readers, void ***decompressors,
 // be the nonterminal ID of the root of the subtree in the entire tree.
 // Because that nonterminal ID forms part of the filename.
 void CFRValues::Read(const char *dir, unsigned int it, Node *root,
-		     unsigned int subtree_nt, unsigned int only_p) {
+		     const string &action_sequence, unsigned int only_p) {
   unsigned int num_players = Game::NumPlayers();
   Reader ***readers = new Reader **[num_players];
   void ***decompressors = new void **[num_players];
   bool **ints = new bool *[num_players];
   unsigned int max_street = Game::MaxStreet();
-
-#if 0
-  unsigned int **street_num_actions = new unsigned int *[num_players];
-  for (unsigned int p = 0; p < num_players; ++p) {
-    street_num_actions[p] = new unsigned int[max_street + 1];
-    for (unsigned int st = 0; st <= max_street; ++st) {
-      street_num_actions[p][st] = 0;
-    }
-  }
-  GetStreetNumActions(root, street_num_actions);
-#endif
 
   for (unsigned int p = 0; p < num_players; ++p) {
     if (only_p != kMaxUInt && p != only_p) {
@@ -758,8 +759,8 @@ void CFRValues::Read(const char *dir, unsigned int it, Node *root,
 	decompressors[p][st] = nullptr;
 	continue;
       }
-      readers[p][st] = InitializeReader(dir, p, st, it, root->Street(),
-					subtree_nt, root_bd_st_, root_bd_,
+      readers[p][st] = InitializeReader(dir, p, st, it, action_sequence,
+					root_bd_st_, root_bd_,
 					&ints[p][st]);
       if (compressed_streets_[st]) {
 #ifdef EJC
@@ -775,13 +776,6 @@ void CFRValues::Read(const char *dir, unsigned int it, Node *root,
     }
   }
 
-#if 0
-  for (unsigned int p = 0; p < num_players; ++p) {
-    delete [] street_num_actions[p];
-  }
-  delete [] street_num_actions;
-#endif
-  
   Read(root, readers, decompressors, ints, only_p);
   
   for (unsigned int p = 0; p < num_players; ++p) {
@@ -798,6 +792,12 @@ void CFRValues::Read(const char *dir, unsigned int it, Node *root,
 #else
       if (decompressors[p][st]) DeleteDecompressor(decompressors[p][st]);
 #endif
+      if (! readers[p][st]->AtEnd()) {
+	fprintf(stderr, "Reader p %u st %u didn't get to end\n", p, st);
+	fprintf(stderr, "Pos: %lli\n", readers[p][st]->BytePos());
+	fprintf(stderr, "File size: %lli\n", readers[p][st]->FileSize());
+	exit(-1);
+      }
       delete readers[p][st];
     }
     delete [] readers[p];
@@ -818,7 +818,7 @@ void CFRValues::MergeInto(Node *full_node, Node *subgame_node,
   if (st > final_st) return;
   unsigned int num_succs = full_node->NumSuccs();
   unsigned int p = full_node->PlayerActing();
-  if (players_[p] && subgame_values.players_[p]) {
+  if (players_[p] && subgame_values.players_[p] && num_succs > 1) {
     bool ints = subgame_values.Ints(p, st);
     if (ints) {
       if (i_values_ == nullptr) {
@@ -1020,10 +1020,11 @@ void CFRValues::MergeInto(const CFRValues &subgame_values,
 }
 
 void CFRValues::SetValues(Node *node, int *i_values) {
+  unsigned int num_succs = node->NumSuccs();
+  if (num_succs <= 1) return;
   unsigned int p = node->PlayerActing();
   unsigned int st = node->Street();
   unsigned int nt = node->NonterminalID();
-  unsigned int num_succs = node->NumSuccs();
   bool bucketed = num_bucket_holdings_[p][st] > 0 &&
     node->PotSize() < bucket_thresholds_[st];
   unsigned int num_holdings;
@@ -1039,10 +1040,11 @@ void CFRValues::SetValues(Node *node, int *i_values) {
 }
 
 void CFRValues::SetValues(Node *node, double *d_values) {
+  unsigned int num_succs = node->NumSuccs();
+  if (num_succs <= 1) return;
   unsigned int p = node->PlayerActing();
   unsigned int st = node->Street();
   unsigned int nt = node->NonterminalID();
-  unsigned int num_succs = node->NumSuccs();
   bool bucketed = num_bucket_holdings_[p][st] > 0 &&
     node->PotSize() < bucket_thresholds_[st];
   unsigned int num_holdings;
@@ -1075,7 +1077,8 @@ void CFRValues::ReadSubtreeFromFull(Node *full_node, Node *full_subtree_root,
   unsigned int st = full_node->Street();
   unsigned int num_succs = full_node->NumSuccs();
   unsigned int p = full_node->PlayerActing();
-  if (streets_[st] && players_[p] && ! (only_p <= 1 && p != only_p)) {
+  if (streets_[st] && players_[p] && ! (only_p <= 1 && p != only_p) &&
+      num_succs > 1) {
     unsigned int snt = kMaxUInt;
     if (in_subtree) {
       snt = subtree_node->NonterminalID();
@@ -1215,6 +1218,7 @@ void CFRValues::ReadSubtreeFromFull(Node *full_node, Node *full_subtree_root,
 void CFRValues::ReadSubtreeFromFull(const char *dir, unsigned int it,
 				    Node *full_root, Node *full_subtree_root,
 				    Node *subtree_root,
+				    const string &action_sequence,
 				    unsigned int *num_full_holdings,
 				    unsigned int only_p) {
   unsigned int num_players = Game::NumPlayers();
@@ -1244,8 +1248,7 @@ void CFRValues::ReadSubtreeFromFull(const char *dir, unsigned int it,
 	decompressors[p][st] = nullptr;
 	continue;
       }
-      readers[p][st] = InitializeReader(dir, p, st, it, full_root->Street(),
-					full_root->NonterminalID(),
+      readers[p][st] = InitializeReader(dir, p, st, it, action_sequence,
 					full_root->Street(), 0,
 					&ints[p][st]);
       if (compressed_streets_[st]) {

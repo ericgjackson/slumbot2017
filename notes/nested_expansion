@@ -66,7 +66,7 @@ Like temp12, but get rid of all-in effects by making stacks super deep
 temp12a 200: Exploitability: 31.68 mbb/g
 temp12a->temp13a 200: Exploitability: 55.88 mbb/g
 
-LIke temp2, but no min bets and only expanding to 3/4
+Like temp2, but no min bets and only expanding to 3/4
 temp2a: 1/2 pot and pot all streets; no min bets
 temp3a: 1/2, 3/4 and pot all streets; no min bets
 temp2a: Exploitability: 15.72 mbb/g
@@ -84,7 +84,75 @@ Like temp2a, but deep stacks
 temp2b: Exploitability: 36.72 mbb/g
 temp2b->temp3b: Exploitability: 153.85 mbb/g
   This is after fixing mapping problems.
-  
+
+Do experiments with lots of nesting, but only a narrow gap between bet
+sizes.
+
+ms3f1t1r1h5
+opennarrow, opennarrows
+One bet per street, like temp2a/temp3a, but narrow the gap between the
+bet sizes.
+Stack size 400
+opennarrow: 3/4, 1x
+opennarrowx: 3/4, 7/8, 1x
+opennarrow 200: Exploitability: 49.54 mbb/g
+opennarrow->opennarrowx 200: Exploitability: 67.12 mbb/g
+Not too bad.
+ornarrow systems:
+  Allow two bets (opens and raises) per street.
+ornarrow100: 3/4 and 1x
+  Stack sizes of 100 (50 BB)
+  4.3g process size
+  200: Exploitability: 66.28 mbb/g
+ornarrow100x: 3 bet sizes (adds 7/8), 2 bets
+  200: Exploitability: 76.78 mbb/g
+ornarrow200: 3/4 and 1x
+  7.7g process size
+  200: Exploitability: 124.93 mbb/g
+  300: Exploitability: 67.61 mbb/g
+ornarrow200x: 3 bet sizes (adds 7/8), 2 bets
+  expand 13.5g process size; run_rgbr 11.7g
+  200: Exploitability: 146.66 mbb/g (degradation 22 mbb/g)
+  300: Exploitability: 95.78 mbb/g (degradation 28 mbb/g)
+ornarrow: Stack sizes of 400 (200 BB)
+  200: Exploitability: 219.60 mbb/g
+  Out of memory in expansion
+ornarrowb100: 1/2 and 3/4
+  200: Exploitability: 58.82 mbb/g
+ornarrowb100x: expand to 5/8
+  200: Exploitability: 132.09 mbb/g
+  Why so much worse?
+ornarrowb100x2: expand to 5/8 (but not preflop)
+  200: Exploitability: 116.98 mbb/g
+  Still pretty bad, but significantly better.
+ornarrowb100x3: expand to 5/8 (but not preflop or flop)
+  200: Exploitability: 77.22 mbb/g
+  Wow, now not bad at all.
+ornarrowb100x4: expand to 5/8 (but not river)
+  200: Exploitability: 130.76 mbb/g
+  Still almost as bad.
+ornarrowb100x5: expand to 5/8 (but not turn or river)
+  200: Exploitability: 124.96 mbb/g
+  Still almost as bad.
+ornarrowb100x5 base
+  200: Exploitability: 73.07 mbb/g
+ornarrowb100x6: expand to 5/8 (but not flop, turn or river)
+  200: Exploitability: 102.58 mbb/g
+  Still pretty bad.
+ornarrowc100: 5/8 and 3/4
+  200: Exploitability: 62.66 mbb/g
+ornarrowc100x: add 0.68x
+  200: Exploitability: 75.28 mbb/g
+ornarrowd100: 1/2 and 5/8
+  200: Exploitability: 69.59 mbb/g
+ornarrowd100x: expand to 0.55
+  200: Exploitability: 78.66 mbb/g
+ornarrowe100: 1/4 and 1/2
+  200: Exploitability: 41.78 mbb/g
+ornarrowe100x1: expand to 3/8 (only preflop)
+  200: Exploitability: 89.04 mbb/g
+ornarrowe100x2: add 3/8 (only preflop and flop)
+  200: Exploitability: 142.91 mbb/g
 
 rr
 1/2 pot and full pot opening bets and raises on river

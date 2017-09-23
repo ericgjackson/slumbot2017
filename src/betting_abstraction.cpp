@@ -87,8 +87,8 @@ static unsigned int *ParseMaxBets(const Params &params, const string &param) {
   vector<unsigned int> v;
   ParseUnsignedInts(pv, &v);
   unsigned int num = v.size();
-  if (num != max_street + 1) {
-    fprintf(stderr, "Expect %u max bets values\n", max_street + 1);
+  if (num < max_street + 1) {
+    fprintf(stderr, "Expect at least %u max bets values\n", max_street + 1);
     exit(-1);
   }
   for (unsigned int st = 0; st <= max_street; ++st) {
@@ -116,6 +116,19 @@ BettingAbstraction::BettingAbstraction(const Params &params) {
       all_bet_sizes_[v[i]] = true;
     }
   }
+  all_even_bet_sizes_ = new bool[max_street + 1];
+  for (unsigned int st = 0; st <= max_street; ++st) {
+    // Default
+    all_even_bet_sizes_[st] = false;
+  }
+  if (params.IsSet("AllEvenBetSizeStreets")) {
+    vector<unsigned int> v;
+    ParseUnsignedInts(params.GetStringValue("AllEvenBetSizeStreets"), &v);
+    unsigned int num = v.size();
+    for (unsigned int i = 0; i < num; ++i) {
+      all_even_bet_sizes_[v[i]] = true;
+    }
+  }
   initial_street_ = params.GetIntValue("InitialStreet");
   asymmetric_ = params.GetBooleanValue("Asymmetric");
 
@@ -133,7 +146,7 @@ BettingAbstraction::BettingAbstraction(const Params &params) {
 
   bool need_bet_sizes = false;
   for (unsigned int st = 0; st <= max_street; ++st) {
-    if (! all_bet_sizes_[st]) {
+    if (! all_bet_sizes_[st] && ! all_even_bet_sizes_[st]) {
       need_bet_sizes = true;
       break;
     }
@@ -143,14 +156,6 @@ BettingAbstraction::BettingAbstraction(const Params &params) {
   our_bet_sizes_ = nullptr;
   opp_bet_sizes_ = nullptr;
   if (no_limit_tree_type_ == 3) {
-  } else if (no_limit_tree_type_ == 2) {
-    ParseBetSizes(params.GetStringValue("OurBetSizes"), &our_bet_sizes_);
-    for (unsigned int st = 0; st <= max_street; ++st) {
-      if ((*our_bet_sizes_)[st]->size() != our_max_bets_[st]) {
-	fprintf(stderr, "Max bets mismatch\n");
-	exit(-1);
-      }
-    }
   } else {
     if (need_bet_sizes) {
       if (asymmetric_) {
@@ -251,6 +256,20 @@ BettingAbstraction::BettingAbstraction(const Params &params) {
   } else {
     opp_bet_size_multipliers_ = nullptr;
   }
+  betting_key_.reset(new bool[max_street + 1]);
+  for (unsigned int st = 0; st <= max_street; ++st) {
+    // Default
+    betting_key_[st] = false;
+  }
+  if (params.IsSet("BettingKeyStreets")) {
+    vector<unsigned int> v;
+    ParseUnsignedInts(params.GetStringValue("BettingKeyStreets"), &v);
+    unsigned int num = v.size();
+    for (unsigned int i = 0; i < num; ++i) {
+      betting_key_[v[i]] = true;
+    }
+  }
+  min_reentrant_pot_ = params.GetIntValue("MinReentrantPot");
 }
 
 BettingAbstraction::~BettingAbstraction(void) {

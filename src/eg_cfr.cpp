@@ -113,7 +113,7 @@ double *EGCFR::HalfIteration(BettingTree *subtree, unsigned int p,
     return vals;
   }
   double *vals = Process(subtree_root, 0, opp_probs, sum_opp_probs,
-			 total_card_probs, subtree_root->Street());
+			 total_card_probs, "", subtree_root->Street());
 
   delete [] total_card_probs;
   return vals;
@@ -590,9 +590,8 @@ void FloorCVs(Node *subtree_root, double *opp_reach_probs,
   
 }
 
-// Note we want to load the opponent's CVs.  So if target_p_ is 1, we
-// load P2's CVs.
-double *EGCFR::LoadCVs(Node *subtree_root, unsigned int base_subtree_nt,
+// Load player p's CVs
+double *EGCFR::LoadCVs(Node *subtree_root, const string &action_sequence,
 		       unsigned int gbd, unsigned int base_it, unsigned int p,
 		       double **reach_probs, const CanonicalCards *hands,
 		       bool card_level) {
@@ -613,15 +612,14 @@ double *EGCFR::LoadCVs(Node *subtree_root, unsigned int base_subtree_nt,
 
   char dir[500], buf[500];
   // This assumes two players
-  sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s/%s.%u.p%u/%u.%u.%u",
+  sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s/%s.%u.p%u/%s",
 	  Files::NewCFRBase(), Game::GameName().c_str(),
 	  base_card_abstraction_.CardAbstractionName().c_str(),
 	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
 	  base_betting_abstraction_.BettingAbstractionName().c_str(), 
 	  base_cfr_config_.CFRConfigName().c_str(),
 	  card_level ? (cfrs_ ? "cfrs" : "cbrs") : (cfrs_ ? "bcfrs" : "bcbrs"),
-	  base_it, p, base_subtree_nt, root_bd_st_,
-	  subtree_root->PlayerActing());
+	  base_it, p, action_sequence.c_str());
   sprintf(buf, "%s/vals.%u", dir, gbd);
 	  
   Reader reader(buf);
@@ -719,14 +717,15 @@ void ZeroSumCVs(double *p0_cvs, double *p1_cvs,
   
 }
 
-double *EGCFR::LoadZeroSumCVs(Node *subtree_root, unsigned int base_subtree_nt,
-			      unsigned int gbd, unsigned int target_p,
-			      unsigned int base_it, double **reach_probs,
+double *EGCFR::LoadZeroSumCVs(Node *subtree_root,
+			      const string &action_sequence, unsigned int gbd,
+			      unsigned int target_p, unsigned int base_it,
+			      double **reach_probs,
 			      const CanonicalCards *hands, bool card_level) {
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(root_bd_st_);
-  double *p0_cvs = LoadCVs(subtree_root, base_subtree_nt, gbd, base_it, 0,
+  double *p0_cvs = LoadCVs(subtree_root, action_sequence, gbd, base_it, 0,
 			   reach_probs, hands, card_level);
-  double *p1_cvs = LoadCVs(subtree_root, base_subtree_nt, gbd, base_it, 1,
+  double *p1_cvs = LoadCVs(subtree_root, action_sequence, gbd, base_it, 1,
 			   reach_probs, hands, card_level);
 
   ZeroSumCVs(p0_cvs, p1_cvs, num_hole_card_pairs, reach_probs, hands);
@@ -759,7 +758,7 @@ static Node *FindCorrespondingNode(Node *node1, Node *node2, Node *target1) {
   return nullptr;
 }
 
-double *EGCFR::LoadOppCVs(Node *solve_root, unsigned int base_solve_nt,
+double *EGCFR::LoadOppCVs(Node *solve_root, const string &action_sequence,
 			  unsigned int bd, unsigned int target_p,
 			  unsigned int base_it, double **reach_probs,
 			  const CanonicalCards *hands, bool card_level) {
@@ -767,10 +766,10 @@ double *EGCFR::LoadOppCVs(Node *solve_root, unsigned int base_solve_nt,
       method_ == ResolvingMethod::MAXMARGIN ||
       method_ == ResolvingMethod::COMBINED) {
     if (zero_sum_) {
-      return LoadZeroSumCVs(solve_root, base_solve_nt, bd, target_p, base_it,
+      return LoadZeroSumCVs(solve_root, action_sequence, bd, target_p, base_it,
 			    reach_probs, hands, card_level);
     } else {
-      return LoadCVs(solve_root, base_solve_nt, bd, base_it,
+      return LoadCVs(solve_root, action_sequence, bd, base_it,
 		     target_p^1, reach_probs, hands, card_level);
     }
   } else {
@@ -801,7 +800,9 @@ void EGCFR::SolveSubgame(BettingTree *subtree, unsigned int solve_bd,
 			       subtree, root_bd_, root_bd_st_,
 			       card_abstraction_, buckets_,
 			       compressed_streets_));
+  
   regrets_->AllocateAndClearDoubles(subtree->Root(), kMaxUInt);
+
   // Should honor sumprobs_streets_
 
   // Unsafe endgame solving always produces sumprobs for both players.
@@ -995,7 +996,7 @@ const char *ResolvingMethodName(ResolvingMethod method) {
 }
 
 void EGCFR::Write(BettingTree *subtree, Node *solve_root, Node *target_root,
-		  unsigned int base_target_nt, unsigned int num_its,
+		  const string &action_sequence, unsigned int num_its,
 		  unsigned int target_bd) {
   // I need the node that corresponds to target node within subtree
   Node *subtree_target = FindCorrespondingNode(solve_root, subtree->Root(),
@@ -1004,11 +1005,11 @@ void EGCFR::Write(BettingTree *subtree, Node *solve_root, Node *target_root,
     fprintf(stderr, "Could not find target node within subtree\n");
     exit(-1);
   }
-  Write(subtree_target, base_target_nt, num_its, target_root->Street(),
+  Write(subtree_target, action_sequence, num_its, target_root->Street(),
 	target_bd);
 }
 
-void EGCFR::Write(Node *target_root, unsigned int base_target_nt,
+void EGCFR::Write(Node *target_root, const string &action_sequence,
 		  unsigned int it, unsigned int target_st,
 		  unsigned int target_bd) {
   char dir[500], dir2[500];
@@ -1031,16 +1032,12 @@ void EGCFR::Write(Node *target_root, unsigned int base_target_nt,
   if (target_st > root_bd_st_) {
     fprintf(stderr, "Stopped supporting target_st > root_bd_st_\n");
     exit(-1);
-#if 0
-    sumprobs_->Write(dir, it, target_root, target_bd, base_target_nt, kMaxUInt);
-#endif
   } else {
-    sumprobs_->Write(dir, it, target_root, base_target_nt, kMaxUInt);
+    sumprobs_->Write(dir, it, target_root, action_sequence, kMaxUInt);
   }
 }
 
-// Should I take a P1 argument?
-void EGCFR::Read(BettingTree *subtree, unsigned int subtree_nt,
+void EGCFR::Read(BettingTree *subtree, const string &action_sequence,
 		 unsigned int subtree_bd, unsigned int target_st,
 		 bool both_players, unsigned int it) {
   unsigned int max_street = Game::MaxStreet();
@@ -1086,7 +1083,7 @@ void EGCFR::Read(BettingTree *subtree, unsigned int subtree_nt,
 	  betting_abstraction_.BettingAbstractionName().c_str(),
 	  cfr_config_.CFRConfigName().c_str(), ResolvingMethodName(method_),
 	  root_bd_st_, target_st);
-  sumprobs_->Read(dir, it, subtree->Root(), subtree_nt, kMaxUInt);
+  sumprobs_->Read(dir, it, subtree->Root(), action_sequence, kMaxUInt);
 }
 
 #if 0
@@ -1152,7 +1149,7 @@ double *EGCFR::BRGo(BettingTree *subtree, unsigned int p,
     for (unsigned int i = 0; i < num_hole_card_pairs; ++i) vals[i] = 0;
   } else {
     vals = Process(subtree_root, 0, opp_probs, sum_opp_probs, total_card_probs,
-		   subtree_root->Street());
+		   "", subtree_root->Street());
   }
   delete [] total_card_probs;
   return vals;

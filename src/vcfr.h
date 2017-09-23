@@ -4,8 +4,7 @@
 #include <semaphore.h>
 
 #include <memory>
-
-#include "cfr.h"
+#include <string>
 
 using namespace std;
 
@@ -20,7 +19,7 @@ class HandTree;
 class Node;
 class VCFRSubgame;
 
-class VCFR : public CFR {
+class VCFR {
  public:
   VCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
        const CFRConfig &cc, const Buckets &buckets,
@@ -46,7 +45,8 @@ class VCFR : public CFR {
   virtual void UpdateRegretsBucketed(Node *node, double *vals,
 				     double **succ_vals, double *regrets);
   virtual double *OurChoice(Node *node, unsigned int lbd, double *opp_probs,
-			    double sum_opp_probs, double *total_card_probs);
+			    double sum_opp_probs, double *total_card_probs,
+			    const string &action_sequence);
   virtual void ProcessOppProbsBucketed(Node *node, const CanonicalCards *hands,
 				       bool nonneg, double *opp_probs,
 				       double **succ_opp_probs,
@@ -68,14 +68,17 @@ class VCFR : public CFR {
 			       double *opp_probs, double **succ_opp_probs,
 			       int *cs_vals, double *sumprobs);
   virtual double *OppChoice(Node *node, unsigned int lbd, double *opp_probs,
-			    double sum_opp_probs, double *total_card_probs);
+			    double sum_opp_probs, double *total_card_probs,
+			    const string &action_sequence);
   virtual double *StreetInitial(Node *node, unsigned int lbd,
-				double *opp_probs);
+				double *opp_probs,
+				const string &action_sequence);
   virtual void WaitForFinalSubgames(void);
-  virtual void SpawnSubgame(Node *node, unsigned int bd, double *opp_probs);
+  virtual void SpawnSubgame(Node *node, unsigned int bd,
+			    const string &action_sequence, double *opp_probs);
   virtual double *Process(Node *node, unsigned int lbd, double *opp_probs,
 			  double sum_opp_probs, double *total_card_probs,
-			  unsigned int last_st);
+			  const string &action_sequence, unsigned int last_st);
   virtual void SetCurrentStrategy(Node *node);
 
   const CardAbstraction &card_abstraction_;
@@ -83,6 +86,9 @@ class VCFR : public CFR {
   const CFRConfig &cfr_config_;
   const Buckets &buckets_;
   const BettingTree *betting_tree_;
+  unique_ptr<CFRValues> regrets_;
+  unique_ptr<CFRValues> sumprobs_;
+  unique_ptr<CFRValues> current_strategy_;
   bool subgame_;
   unsigned int root_bd_st_;
   unsigned int root_bd_;
@@ -95,6 +101,7 @@ class VCFR : public CFR {
   bool value_calculation_;
   bool prune_;
   unsigned int use_avg_for_current_it_;
+  bool always_call_preflop_;
   unsigned int target_p_;
   unsigned int num_players_;
   unsigned int subgame_street_;

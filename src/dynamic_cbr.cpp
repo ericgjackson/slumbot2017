@@ -49,8 +49,7 @@ double *DynamicCBR::OurChoice(Node *node, unsigned int lbd,
   unsigned int st = node->Street();
   unsigned int num_succs = node->NumSuccs();
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
-  double *vals = new double[num_hole_card_pairs];
-  for (unsigned int i = 0; i < num_hole_card_pairs; ++i) vals[i] = 0;
+  double *vals = nullptr;
   double **succ_vals = new double *[num_succs];
   for (unsigned int s = 0; s < num_succs; ++s) {
     succ_vals[s] = Process(node->IthSucc(s), lbd, p, opp_probs,
@@ -58,77 +57,86 @@ double *DynamicCBR::OurChoice(Node *node, unsigned int lbd,
 			   sumprobs, root_bd_st, root_bd, buckets,
 			   card_abstraction, st);
   }
-  
-  if (cfrs_) {
-    // Will need card abstraction and buckets for the endgame strategy.  The
-    // complication is that this could either be a strategy read from the
-    // base or computed by endgame solving.
-    unsigned int nt = node->NonterminalID();
-    bool bucketed = ! buckets.None(st) &&
-      node->PotSize() < card_abstraction.BucketThreshold(st);
-    
-    double *d_sumprobs = nullptr;
-    int *i_sumprobs = nullptr;
-    if (sumprobs->Ints(p, st)) {
-      int *i_all_sumprobs;
-      sumprobs->Values(p, st, nt, &i_all_sumprobs);
-      if (bucketed) {
-	i_sumprobs = i_all_sumprobs;
+
+  if (num_succs == 1) {
+    vals = succ_vals[0];
+    succ_vals[0] = nullptr;
+  } else {
+    vals = new double[num_hole_card_pairs];
+    for (unsigned int i = 0; i < num_hole_card_pairs; ++i) vals[i] = 0;
+    if (cfrs_) {
+      // Will need card abstraction and buckets for the endgame strategy.  The
+      // complication is that this could either be a strategy read from the
+      // base or computed by endgame solving.
+      unsigned int nt = node->NonterminalID();
+      bool bucketed = ! buckets.None(st) &&
+	node->PotSize() < card_abstraction.BucketThreshold(st);
+      
+      double *d_sumprobs = nullptr;
+      int *i_sumprobs = nullptr;
+      if (sumprobs->Ints(p, st)) {
+	int *i_all_sumprobs;
+	sumprobs->Values(p, st, nt, &i_all_sumprobs);
+	if (bucketed) {
+	  i_sumprobs = i_all_sumprobs;
+	} else {
+	  i_sumprobs = i_all_sumprobs + lbd * num_hole_card_pairs * num_succs;
+	}
       } else {
-	i_sumprobs = i_all_sumprobs + lbd * num_hole_card_pairs * num_succs;
+	double *d_all_sumprobs;
+	sumprobs->Values(p, st, nt, &d_all_sumprobs);
+	if (bucketed) {
+	  d_sumprobs = d_all_sumprobs;
+	} else {
+	  d_sumprobs = d_all_sumprobs + lbd * num_hole_card_pairs * num_succs;
+	}
+      }
+
+      unique_ptr<double []> current_probs(new double[num_succs]);
+      unsigned int default_succ_index = node->DefaultSuccIndex();
+      bool nonneg = true;
+    
+      for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
+	if (i_sumprobs) {
+	  int *my_sumprobs;
+	  if (bucketed) {
+	    unsigned int b = street_buckets_[st][i];
+	    my_sumprobs = i_sumprobs + b * num_succs;
+	  } else {
+	    my_sumprobs = i_sumprobs + i * num_succs;
+	  }
+	  RegretsToProbs(my_sumprobs, num_succs, nonneg, false,
+			 default_succ_index, 0, 0, nullptr,
+			 current_probs.get());
+	} else if (d_sumprobs) {
+	  double *my_sumprobs;
+	  if (bucketed) {
+	    unsigned int b = street_buckets_[st][i];
+	    my_sumprobs = d_sumprobs + b * num_succs;
+	  } else {
+	    my_sumprobs = d_sumprobs + i * num_succs;
+	  }
+	  RegretsToProbs(my_sumprobs, num_succs, nonneg, false,
+			 default_succ_index, 0, 0, nullptr,
+			 current_probs.get());
+	} else {
+	  fprintf(stderr, "No sumprobs?!?  st %u p %u nt %u\n", st, p, nt);
+	  exit(-1);
+	}
+	vals[i] = 0;
+	for (unsigned int s = 0; s < num_succs; ++s) {
+	  vals[i] += succ_vals[s][i] * current_probs[s];
+	}
       }
     } else {
-      double *d_all_sumprobs;
-      sumprobs->Values(p, st, nt, &d_all_sumprobs);
-      if (bucketed) {
-	d_sumprobs = d_all_sumprobs;
-      } else {
-	d_sumprobs = d_all_sumprobs + lbd * num_hole_card_pairs * num_succs;
-      }
-    }
-
-    unique_ptr<double []> current_probs(new double[num_succs]);
-    unsigned int default_succ_index = node->DefaultSuccIndex();
-    bool nonneg = true;
-    
-    for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
-      if (i_sumprobs) {
-	int *my_sumprobs;
-	if (bucketed) {
-	  unsigned int b = street_buckets_[st][i];
-	  my_sumprobs = i_sumprobs + b * num_succs;
-	} else {
-	  my_sumprobs = i_sumprobs + i * num_succs;
+      for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
+	double max_val = succ_vals[0][i];
+	for (unsigned int s = 1; s < num_succs; ++s) {
+	  double sv = succ_vals[s][i];
+	  if (sv > max_val) max_val = sv;
 	}
-	RegretsToProbs(my_sumprobs, num_succs, nonneg, false,
-		       default_succ_index, 0, 0, nullptr, current_probs.get());
-      } else if (d_sumprobs) {
-	double *my_sumprobs;
-	if (bucketed) {
-	  unsigned int b = street_buckets_[st][i];
-	  my_sumprobs = d_sumprobs + b * num_succs;
-	} else {
-	  my_sumprobs = d_sumprobs + i * num_succs;
-	}
-	RegretsToProbs(my_sumprobs, num_succs, nonneg, false,
-		       default_succ_index, 0, 0, nullptr, current_probs.get());
-      } else {
-	fprintf(stderr, "No sumprobs?!?  st %u p %u nt %u\n", st, p, nt);
-	exit(-1);
+	vals[i] = max_val;
       }
-      vals[i] = 0;
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	vals[i] += succ_vals[s][i] * current_probs[s];
-      }
-    }
-  } else {
-    for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
-      double max_val = succ_vals[0][i];
-      for (unsigned int s = 1; s < num_succs; ++s) {
-	double sv = succ_vals[s][i];
-	if (sv > max_val) max_val = sv;
-      }
-      vals[i] = max_val;
     }
   }
   
@@ -149,10 +157,9 @@ double *DynamicCBR::OppChoice(Node *node, unsigned int lbd,
 			      unsigned int root_bd,
 			      const Buckets &buckets,
 			      const CardAbstraction &card_abstraction) {
-  unsigned int st = node->Street();
   unsigned int num_succs = node->NumSuccs();
-  unsigned int nt = node->NonterminalID();
-  unsigned int opp = p^1;
+  unsigned int st = node->Street();
+  const CanonicalCards *hands = hand_tree->Hands(st, lbd);
 
   unsigned int num_hole_cards = Game::NumCardsForStreet(0);
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
@@ -161,85 +168,93 @@ double *DynamicCBR::OppChoice(Node *node, unsigned int lbd,
   if (num_hole_cards == 1) num_enc = max_card1;
   else                     num_enc = max_card1 * max_card1;
   double **succ_opp_probs = new double *[num_succs];
-  for (unsigned int s = 0; s < num_succs; ++s) {
-    succ_opp_probs[s] = new double[num_enc];
-    for (unsigned int i = 0; i < num_enc; ++i) succ_opp_probs[s][i] = 0;
-  }
 
-  // Will need card abstraction and buckets for the endgame strategy.  The
-  // complication is that this could either be a strategy read from the
-  // base or computed by endgame solving.
-  bool bucketed = ! buckets.None(st) &&
-    node->PotSize() < card_abstraction.BucketThreshold(st);
-
-  double *d_sumprobs = nullptr;
-  int *i_sumprobs = nullptr;
-  if (sumprobs->Ints(opp, st)) {
-    int *i_all_sumprobs;
-    sumprobs->Values(opp, st, nt, &i_all_sumprobs);
-    if (bucketed) {
-      i_sumprobs = i_all_sumprobs;
-    } else {
-      i_sumprobs = i_all_sumprobs + lbd * num_hole_card_pairs * num_succs;
-    }
+  if (num_succs == 1) {
+    succ_opp_probs[0] = opp_probs;
   } else {
-    double *d_all_sumprobs;
-    sumprobs->Values(opp, st, nt, &d_all_sumprobs);
-    if (bucketed) {
-      d_sumprobs = d_all_sumprobs;
-    } else {
-      d_sumprobs = d_all_sumprobs + lbd * num_hole_card_pairs * num_succs;
+    unsigned int nt = node->NonterminalID();
+    unsigned int opp = p^1;
+    for (unsigned int s = 0; s < num_succs; ++s) {
+      succ_opp_probs[s] = new double[num_enc];
+      for (unsigned int i = 0; i < num_enc; ++i) succ_opp_probs[s][i] = 0;
     }
-  }
 
-  unsigned int default_succ_index = node->DefaultSuccIndex();
-  bool nonneg = true;
-  const CanonicalCards *hands = hand_tree->Hands(st, lbd);
-  unique_ptr<double []> current_probs(new double[num_succs]);
+    // Will need card abstraction and buckets for the endgame strategy.  The
+    // complication is that this could either be a strategy read from the
+    // base or computed by endgame solving.
+    bool bucketed = ! buckets.None(st) &&
+      node->PotSize() < card_abstraction.BucketThreshold(st);
 
-  for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
-    const Card *cards = hands->Cards(i);
-    Card lo, hi = cards[0];
-    unsigned int enc;
-    if (num_hole_cards == 1) {
-      enc = hi;
-    } else {
-      lo = cards[1];
-      enc = hi * max_card1 + lo;
-    }
-    double opp_prob = opp_probs[enc];
-    if (opp_prob == 0) {
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	succ_opp_probs[s][enc] = 0;
-      }
-    } else {
-      if (i_sumprobs) {
-	int *my_sumprobs;
-	if (bucketed) {
-	  unsigned int b = street_buckets_[st][i];
-	  my_sumprobs = i_sumprobs + b * num_succs;
-	} else {
-	  my_sumprobs = i_sumprobs + i * num_succs;
-	}
-	RegretsToProbs(my_sumprobs, num_succs, nonneg, false,
-		       default_succ_index, 0, 0, nullptr, current_probs.get());
-      } else if (d_sumprobs) {
-	double *my_sumprobs;
-	if (bucketed) {
-	  unsigned int b = street_buckets_[st][i];
-	  my_sumprobs = d_sumprobs + b * num_succs;
-	} else {
-	  my_sumprobs = d_sumprobs + i * num_succs;
-	}
-	RegretsToProbs(my_sumprobs, num_succs, nonneg, false,
-		       default_succ_index, 0, 0, nullptr, current_probs.get());
+    double *d_sumprobs = nullptr;
+    int *i_sumprobs = nullptr;
+    if (sumprobs->Ints(opp, st)) {
+      int *i_all_sumprobs;
+      sumprobs->Values(opp, st, nt, &i_all_sumprobs);
+      if (bucketed) {
+	i_sumprobs = i_all_sumprobs;
       } else {
-	fprintf(stderr, "No sumprobs?!?  st %u opp %u nt %u\n", st, opp, nt);
-	exit(-1);
+	i_sumprobs = i_all_sumprobs + lbd * num_hole_card_pairs * num_succs;
       }
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	double succ_opp_prob = opp_prob * current_probs[s];
-	succ_opp_probs[s][enc] = succ_opp_prob;
+    } else {
+      double *d_all_sumprobs;
+      sumprobs->Values(opp, st, nt, &d_all_sumprobs);
+      if (bucketed) {
+	d_sumprobs = d_all_sumprobs;
+      } else {
+	d_sumprobs = d_all_sumprobs + lbd * num_hole_card_pairs * num_succs;
+      }
+    }
+    
+    unsigned int default_succ_index = node->DefaultSuccIndex();
+    bool nonneg = true;
+    unique_ptr<double []> current_probs(new double[num_succs]);
+
+    for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
+      const Card *cards = hands->Cards(i);
+      Card lo, hi = cards[0];
+      unsigned int enc;
+      if (num_hole_cards == 1) {
+	enc = hi;
+      } else {
+	lo = cards[1];
+	enc = hi * max_card1 + lo;
+      }
+      double opp_prob = opp_probs[enc];
+      if (opp_prob == 0) {
+	for (unsigned int s = 0; s < num_succs; ++s) {
+	  succ_opp_probs[s][enc] = 0;
+	}
+      } else {
+	if (i_sumprobs) {
+	  int *my_sumprobs;
+	  if (bucketed) {
+	    unsigned int b = street_buckets_[st][i];
+	    my_sumprobs = i_sumprobs + b * num_succs;
+	  } else {
+	    my_sumprobs = i_sumprobs + i * num_succs;
+	  }
+	  RegretsToProbs(my_sumprobs, num_succs, nonneg, false,
+			 default_succ_index, 0, 0, nullptr,
+			 current_probs.get());
+	} else if (d_sumprobs) {
+	  double *my_sumprobs;
+	  if (bucketed) {
+	    unsigned int b = street_buckets_[st][i];
+	    my_sumprobs = d_sumprobs + b * num_succs;
+	  } else {
+	    my_sumprobs = d_sumprobs + i * num_succs;
+	  }
+	  RegretsToProbs(my_sumprobs, num_succs, nonneg, false,
+			 default_succ_index, 0, 0, nullptr,
+			 current_probs.get());
+	} else {
+	  fprintf(stderr, "No sumprobs?!?  st %u opp %u nt %u\n", st, opp, nt);
+	  exit(-1);
+	}
+	for (unsigned int s = 0; s < num_succs; ++s) {
+	  double succ_opp_prob = opp_prob * current_probs[s];
+	  succ_opp_probs[s][enc] = succ_opp_prob;
+	}
       }
     }
   }
@@ -275,8 +290,10 @@ double *DynamicCBR::OppChoice(Node *node, unsigned int lbd,
     for (unsigned int i = 0; i < num_hole_card_pairs; ++i) vals[i] = 0;
   }
   delete [] succ_total_card_probs;
-  for (unsigned int s = 0; s < num_succs; ++s) {
-    delete [] succ_opp_probs[s];
+  if (num_succs > 1) {
+    for (unsigned int s = 0; s < num_succs; ++s) {
+      delete [] succ_opp_probs[s];
+    }
   }
   delete [] succ_opp_probs;
 
@@ -441,8 +458,10 @@ double *DynamicCBR::Process(Node *node, unsigned int lbd,
   }
 }
 
-// We use a board value of 0.  Recall that we have constructed a subgame
-// that is specific to the current board.  So the local board index is 0.
+// Note that we may be working with sumprobs that are specific to a subgame.
+// If so, they will be for the subgame rooted at root_bd_st and root_bd.
+// So we must map our global board index gbd into a local board index lbd
+// whenever we access hand_tree or the probabilities inside sumprobs.
 double *DynamicCBR::Compute(Node *node, unsigned int p,
 			    double *opp_probs, unsigned int gbd,
 			    HandTree *hand_tree, const CFRValues *sumprobs,
@@ -502,10 +521,10 @@ double *DynamicCBR::Compute(Node *node, double **reach_probs,
 			    unsigned int root_bd_st, unsigned int root_bd,
 			    const Buckets &buckets,
 			    const CardAbstraction &card_abstraction,
-			    unsigned int target_p, bool cfrs) {
+			    unsigned int target_p, bool cfrs, bool zero_sum) {
   cfrs_ = cfrs;
   // For now assume that we always want to zero sum
-  if (! cfrs_) {
+  if (zero_sum) {
     double *p0_cvs = Compute(node, 0, reach_probs[1], gbd, hand_tree,
 			     sumprobs, root_bd_st, root_bd, buckets,
 			     card_abstraction);

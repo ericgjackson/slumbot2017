@@ -17,6 +17,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <string>
+
 #include "betting_abstraction.h"
 #include "betting_abstraction_params.h"
 #include "betting_tree.h"
@@ -37,6 +39,8 @@
 #include "params.h"
 #include "split.h"
 
+using namespace std;
+
 class Assembler {
 public:
   Assembler(BettingTree *base_betting_tree, BettingTree *endgame_betting_tree,
@@ -52,7 +56,8 @@ public:
   ~Assembler(void);
   void Go(void);
 private:
-  void WalkTrunk(Node *base_node, Node *endgame_node);
+  void WalkTrunk(Node *base_node, Node *endgame_node,
+		 const string &action_sequence);
 
   bool asymmetric_;
   BettingTree *base_betting_tree_;
@@ -135,15 +140,14 @@ Assembler::Assembler(BettingTree *base_betting_tree,
 	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
 	  base_ba_.BettingAbstractionName().c_str(),
 	  base_cc_.CFRConfigName().c_str());
-  base_sumprobs.Read(read_dir, base_it, base_betting_tree_->Root(),
-		     base_betting_tree->Root()->NonterminalID(), kMaxUInt);
+  base_sumprobs.Read(read_dir, base_it, base_betting_tree_->Root(), "x",
+		     kMaxUInt);
   sprintf(write_dir, "%s/%s.%s.%u.%u.%u.%s.%s", Files::NewCFRBase(),
 	  Game::GameName().c_str(), merged_ca_.CardAbstractionName().c_str(),
 	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
 	  endgame_ba_.BettingAbstractionName().c_str(),
 	  merged_cc_.CFRConfigName().c_str());
-  base_sumprobs.Write(write_dir, endgame_it_, base_betting_tree_->Root(),
-		      base_betting_tree_->Root()->NonterminalID(),
+  base_sumprobs.Write(write_dir, endgame_it_, base_betting_tree_->Root(), "x",
 		      kMaxUInt);
 
   bool *endgame_streets = new bool[max_street + 1];
@@ -171,21 +175,21 @@ Assembler::Assembler(BettingTree *base_betting_tree,
   delete [] endgame_streets;
 
   // Choosing not to merge preflop into merged_sumprobs_, but we could
-  writers_ = merged_sumprobs_->InitializeWriters(write_dir, endgame_it_, 0,
-						 0, kMaxUInt, &compressors_);
+  writers_ = merged_sumprobs_->InitializeWriters(write_dir, endgame_it_, "x",
+						 kMaxUInt, &compressors_);
 }
 
 Assembler::~Assembler(void) {
   merged_sumprobs_->DeleteWriters(writers_, compressors_);
 }
 
-void Assembler::WalkTrunk(Node *base_node, Node *endgame_node) {
+void Assembler::WalkTrunk(Node *base_node, Node *endgame_node,
+			  const string &action_sequence) {
   if (base_node->Terminal()) return;
   unsigned int st = base_node->Street();
   if (st == target_street_) {
     unsigned int num_boards = BoardTree::NumBoards(st);
-    unsigned int base_subtree_nt = base_node->NonterminalID();
-    fprintf(stderr, "Base subtree NT: %u\n", base_subtree_nt);
+    fprintf(stderr, "%s\n", action_sequence.c_str());
     BettingTree *subtree = BettingTree::BuildSubtree(endgame_node);
     unsigned int max_street = Game::MaxStreet();
     bool *endgame_streets = new bool[max_street + 1];
@@ -219,7 +223,7 @@ void Assembler::WalkTrunk(Node *base_node, Node *endgame_node) {
 				 endgame_ca_, *endgame_buckets_,
 				 endgame_compressed_streets);
       endgame_sumprobs.Read(read_dir, endgame_it_, subtree->Root(),
-			    base_subtree_nt, kMaxUInt);
+			    action_sequence, kMaxUInt);
       merged_sumprobs_->MergeInto(endgame_sumprobs, gbd, endgame_node,
 				  subtree->Root(), *endgame_buckets_,
 				  max_street);
@@ -229,19 +233,21 @@ void Assembler::WalkTrunk(Node *base_node, Node *endgame_node) {
     delete [] endgame_streets;
     delete [] endgame_compressed_streets;
 
-    merged_sumprobs_->Write(endgame_node, writers_, compressors_);
+    merged_sumprobs_->Write(endgame_node, writers_, compressors_, nullptr);
     merged_sumprobs_->DeleteBelow(endgame_node);
     
     return;
   }
   unsigned int num_succs = base_node->NumSuccs();
   for (unsigned int s = 0; s < num_succs; ++s) {
-    WalkTrunk(base_node->IthSucc(s), endgame_node->IthSucc(s));
+    string action = base_node->ActionName(s);
+    WalkTrunk(base_node->IthSucc(s), endgame_node->IthSucc(s),
+	      action_sequence + action);
   }
 }
 
 void Assembler::Go(void) {
-  WalkTrunk(base_betting_tree_->Root(), endgame_betting_tree_->Root());
+  WalkTrunk(base_betting_tree_->Root(), endgame_betting_tree_->Root(), "x");
   // Now we write as we go
   // merged_sumprobs_->Write(endgame_betting_tree_->Root(), writers_);
 }

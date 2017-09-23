@@ -326,8 +326,10 @@ abstraction and get bet sizes from there, no?
 119) Try choosing fold based on blending CFR values of adjacent bet actions.
 DynamicCBR class now supports CFR values.  May need to normalize by sum
 of opponent probs.
-* Getting low on i-nodes.  Delete old directories.  Can we create fewer
-  files in build_cbrs or solve_all_endgames?
+* Could we take a preflop strategy from tcfr and combine it with a postflop
+  strategy from CFR+?  TCFR preflop strategy may converge fast.
+* Version of targeted CFR that pursues best-response path.  Will it lower
+  exploitability faster?
 * Expanding to nearest bet looks terrible, even just expanding to 5/8 and
   7/8.  Bug or not?
 * Support asymmetric endgame solving.
@@ -345,8 +347,44 @@ of opponent probs.
   the opponent can make an additional bet on the turn and one on the river.
   But maybe we will get all-in naturally before this is an issue?
   Maybe OurNoRegularBetThreshold already does what we want.
-* Can I do a quick and dirty real-game best-response?  What if we fix the
-  preflop strategy and only let the best-responder optimize postflop?
-  Then we can sample one or a small number of flops.  I could also look
-  at just one flop subtree.  Should maybe look at gap between EV we
-  achieve with fixed strategies vs. EV we get by best-responding.
+* Can I extend run_approx_rgbr to handle out-of-abstraction betting
+  sequences?  Or do I just run expand_strategy first, and then the
+  existing run_approx_rgbr?  If I want to thoroughly test nested expansion,
+  then I need a lot of memory.
+* Turn abstraction: avg gap at BC of ~0.3 is not that great.  Corresponds to
+  exploitability of around 120-140 mbb/g which is not that great in a game
+  with no river betting and no raises.  What do I see when I allow raises?
+  Even with 1m turn buckets I couldn't get much below 0.3.  If I run CFR for
+  longer, can I?  What about with 10m turn buckets?  What if I try a
+  different abstraction?
+* Experiments to determine what bet sizes I need.  Previous experiments
+  in asymmetric_experiments suggested two or three was optimal.  But if I
+  am willing to sacrifice more (50 mbb?), might be able to go lower.
+  Maybe one bet under some or all circumstances?
+* Can I use current strategy (for turn)?  Since we are resolving river, don't
+  need sumprobs.  What about purification?
+* What if I use the null abstraction for the top X% of turn hands?  If
+  X is 10, that's 7 million buckets.  Hmm.  If X is 1, that's 700,000,
+  but 1% may not be enough.  Well, with 1000 hands possible, the top 1%
+  is ten of them.
+* What if I do experiments where I start with a perfect turn abstraction,
+  and then try different methods for shrinking?  There must be some suit
+  invariants, for example.
+* Why do null abstractions have big gap between full RGBR and postflop RGBR,
+  but regular abstractions do not?  I thought a big gap would indicate a
+  not fully trained preflop strategy; does that make sense?  Can I learn
+  anything about how to train faster from these observations?
+* Do nested expansion tests with three bets on each street.  Probably need
+  to do on Amazon.
+* Build a kmeans abstraction for our turn abstraction experiments.
+* Could I solve a system where we learn to handle bets that are actually
+  a bit deeper than our stack?  This is to facilitate translation later.
+* Do more nested expansion tests.  Why is 0.5/0.75->0.625 so much worse than
+  0.75/1.0->0.875?  0.25/0.5->0.375?  1.0/1.5->1.25?  1.5/2.0->1.75.
+* Imperfect recall of actions?  Especially for river which will get resolved.
+  Why is CFR+ yielding terrible results?  Try reentrancy at earlier streets.
+  Try resolving rivers.  Can't handle base imperfect recall trees currently.
+* Could try expanding imperfect recall tree to perfect recall tree as a
+  sanity test.  RGBR results should not change.
+* Redo imperfect recall tests with fixed betting trees.
+* Try imperfect recall test on mb2b2 with only turn betting as key.

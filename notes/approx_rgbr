@@ -1,0 +1,86 @@
+Want to evaluate approximate real-game best-response.  I'm comfortable that
+the sampling technique we use basically works.  So the real question is
+whether "postflop" RGBR is a good approximation or substitute for "full"
+RGBR.
+
+Certainly hope that postflop RGBR decreases monotonically with full RGBR.
+
+Would be nice if postflop RGBR were always approximately a certain fraction
+of full RGBR.  That doesn't seem to be true in general.  But maybe it will
+turn out to be true under certain conditions?
+
+There are four conditions that we might evaluate:
+(1) CFR+ and no abstraction
+(2) CFR+ and abstraction
+(3) TCFR and no abstraction
+(4) TCFR and abstraction
+One interesting thing is that for (4) I see hardly any gap between the
+full RGBR and the postflop RGBR.  Whereas for the other three conditions I
+currently see a big gap (although (2) is still being evaluated).
+
+Maybe the issue is just that when a system is fully converged, the two RGBRs
+converge?  Should try tcfrt/hstwobc3 for fewer iterations.
+
+
+holdem10/null/mb1b1nrb/cfrps1
+10,385,100 turn buckets
+cfrps1/10
+Full RGBR:      Exploitability: 380.58 mbb/g
+Post-flop RGBR: Exploitability: 168.28 mbb/g (44.2%)
+cfrps1/20
+Full RGBR:      Exploitability: 157.36 mbb/g
+Post-flop RGBR: Exploitability: 72.38 mbb/g  (46%)
+cfrps1/30
+Full RGBR:      Exploitability: 90.39 mbb/g
+Post-flop RGBR: Exploitability: 42.93 mbb/g (47.5)
+  Always call preflop: Exploitability: 50.17 mbb/g
+  
+holdem10/hstwobc3/mb1b1nrb/cfrps1
+cfrps1/10
+Full RGBR:      Exploitability: 372.73 mbb/g
+Post-flop RGBR: Exploitability: 170.42 mbb/g
+cfrps1/20
+Full RGBR:      Exploitability: 191.14 mbb/g
+Post-flop RGBR: Exploitability: 102.32 mbb/g
+cfrps1/30
+Full RGBR:      Exploitability: 149.24 mbb/g
+Post-flop RGBR: Exploitability: 100.00 mbb/g
+cfrps1/40
+Full RGBR:      Exploitability: 136.35 mbb/g
+Post-flop RGBR: Exploitability: 102.01 mbb/g
+cfrps1/50
+Full RGBR:      Exploitability: 130.80 mbb/g
+Post-flop RGBR: Exploitability: 104.34 mbb/g
+  Always call preflop: Exploitability: 69.38 mbb/g
+cfrps1/60
+Full RGBR:      Exploitability: 127.34 mbb/g
+Post-flop RGBR: Exploitability: 106.13 mbb/g
+  Always call preflop: Exploitability: 62.84 mbb/g
+cfrps1/70
+Full RGBR:      Exploitability: 124.58 mbb/g
+Post-flop RGBR: Exploitability: 107.33 mbb/g
+Turn RGBR:      Exploitability: 83.33 mbb/g
+
+holdem10/null/mb1b1nrb/tcfrt
+1b
+Full RGBR:      Exploitability: 193.02 mbb/g
+Post-flop RGBR: Exploitability: 101.37 mbb/g
+2b
+Full RGBR:      Exploitability: 131.65 mbb/g
+Post-flop RGBR: Exploitability: 64.94 mbb/g
+3b
+Full RGBR:      Exploitability: 100.87 mbb/g
+Post-flop RGBR: Exploitability: 49.41 mbb/g
+  Always call preflop: Exploitability: 72.29 mbb/g
+
+holdem10/hstwobc3/mb1b1nrb/tcfrt
+201,644 turn buckets
+  10,385,100 null buckets (2%)
+1b (50m):
+Full RGBR:      Exploitability: 105.16 mbb/g
+Post-flop RGBR: Exploitability: 97.32 mbb/g  (92.5%)
+2b (+48)
+Full RGBR:      Exploitability: 104.69 mbb/g
+Post-flop RGBR: Exploitability: 97.60 mbb/g (93.2%)
+  Always call preflop: Exploitability: 48.29 mbb/g
+Turn RGBR:      Exploitability: 74.70 mbb/g

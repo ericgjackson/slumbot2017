@@ -1,7 +1,11 @@
 #ifndef _VCFR_SUBGAME_H_
 #define _VCFR_SUBGAME_H_
 
+#include <string>
+
 #include "vcfr.h"
+
+using namespace std;
 
 class BettingAbstraction;
 class BettingTree;
@@ -13,7 +17,7 @@ class VCFRSubgame : public VCFR {
 public:
   VCFRSubgame(const CardAbstraction &ca, const BettingAbstraction &ba,
 	      const CFRConfig &cc, const Buckets &buckets, Node *root,
-	      unsigned int root_bd, unsigned int subtree_nt, VCFR *cfr);
+	      unsigned int root_bd, const string &action_sequence, VCFR *cfr);
   ~VCFRSubgame(void);
   void Go(void);
   void SetIt(unsigned int it) {it_ = it;}
@@ -29,7 +33,7 @@ private:
   BettingTree *subtree_;
   VCFR *cfr_;
   bool *subtree_streets_;
-  unsigned int subtree_nt_;
+  const string &action_sequence_;
   double *opp_probs_;
   unsigned int thread_index_;
   double *final_vals_;

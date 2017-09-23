@@ -1,6 +1,7 @@
 #ifndef _BETTING_ABSTRACTION_H_
 #define _BETTING_ABSTRACTION_H_
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -19,6 +20,9 @@ class BettingAbstraction {
   unsigned int StackSize(void) const {return stack_size_;}
   unsigned int MinBet(void) const {return min_bet_;}
   bool AllBetSizeStreet(unsigned int st) const {return all_bet_sizes_[st];}
+  bool AllEvenBetSizeStreet(unsigned int st) const {
+    return all_even_bet_sizes_[st];
+  }
   unsigned int InitialStreet(void) const {return initial_street_;}
   unsigned int MaxBets(unsigned int st, bool our_bet) const {
     if (max_bets_)    return max_bets_[st];
@@ -79,12 +83,17 @@ class BettingAbstraction {
       return 0;
     }
   }
+  bool BettingKey(unsigned int st) const {
+    return betting_key_[st];
+  }
+  unsigned int MinReentrantPot(void) const {return min_reentrant_pot_;}
  private:
   string betting_abstraction_name_;
   bool limit_;
   unsigned int stack_size_;
   unsigned int min_bet_;
   bool *all_bet_sizes_;
+  bool *all_even_bet_sizes_;
   unsigned int initial_street_;
   unsigned int *max_bets_;
   unsigned int *our_max_bets_;
@@ -116,6 +125,8 @@ class BettingAbstraction {
   double close_to_all_in_frac_;
   vector<vector<double> *> *our_bet_size_multipliers_;
   vector<vector<double> *> *opp_bet_size_multipliers_;
+  unique_ptr<bool []> betting_key_;
+  unsigned int min_reentrant_pot_;
 };
 
 #endif

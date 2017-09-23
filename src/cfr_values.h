@@ -40,6 +40,7 @@ public:
   double Prob(unsigned int p, unsigned int st, unsigned int nt,
 	      unsigned int offset, unsigned int s, 
 	      unsigned int num_succs, unsigned int dsi) const {
+    if (num_succs == 1) return 1.0;
     if (i_values_ && i_values_[p] && i_values_[p][st]) {
       double sum = 0;
       for (unsigned int s = 0; s < num_succs; ++s) {
@@ -70,28 +71,24 @@ public:
   void ReadNode(Node *node, Reader *reader, void *decompressor,
 		unsigned int num_holdings, bool ints, unsigned int offset);
   void Read(const char *dir, unsigned int it, Node *root,
-	    unsigned int subtree_nt, unsigned int only_p);
+	    const string &action_sequence, unsigned int only_p);
   void DeleteWriters(Writer ***writers, void ***compressors) const;
   Writer ***InitializeWriters(const char *dir, unsigned int it,
-			      unsigned int root_st, unsigned int subtree_nt,
+			      const string &action_sequence,
 			      unsigned int only_p,
 			      void ****compressors) const;
   void WriteNode(Node *node, Writer *writer, void *compressor,
 		 unsigned int num_holdings, unsigned int offset) const;
-  void Write(Node *node, Writer ***writers, void ***compressors) const;
+  void Write(Node *node, Writer ***writers, void ***compressors,
+	     bool ***seen) const;
   void Write(const char *dir, unsigned int it, Node *root,
-	     unsigned int subtree_nt, unsigned int only_p) const;
-#if 0
-  void Write(const char *dir, unsigned int it, Node *root,
-	     unsigned int target_bd, unsigned int subtree_nt,
-	     unsigned int only_p) const;
-#endif
+	     const string &action_sequence, unsigned int only_p) const;
   void MergeInto(const CFRValues &subgame_values, unsigned int root_bd,
 		 Node *full_root, Node *subgame_root, const Buckets &buckets,
 		 unsigned int final_st);
   void ReadSubtreeFromFull(const char *dir, unsigned int it,
 			   Node *full_root, Node *full_subtree_root,
-			   Node *subtree_root,
+			   Node *subtree_root, const string &action_sequence,
 			   unsigned int *num_full_holdings,
 			   unsigned int only_p);
   bool Players(unsigned int p) const {return players_[p];}
@@ -102,9 +99,9 @@ public:
 protected:
   void AllocateAndClear(Node *node, bool ints, unsigned int only_p);
   Reader *InitializeReader(const char *dir, unsigned int p, unsigned int st,
-			   unsigned int it, unsigned int subtree_st,
-			   unsigned int subtree_nt, unsigned int root_bd_st,
-			   unsigned int root_bd, bool *int_type);
+			   unsigned int it, const string &action_sequence,
+			   unsigned int root_bd_st, unsigned int root_bd,
+			   bool *int_type);
   void InitializeValuesForReading(unsigned int p, unsigned int st,
 				  unsigned int nt, Node *node, bool ints);
   void Read(Node *node, Reader ***readers, void ***decompressors, bool **ints,

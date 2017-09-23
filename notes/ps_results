@@ -1,0 +1,39 @@
+holdem
+onem
+psbb6
+tcfr
+
+Six big blinds
+Up to four bets
+1/2, 1x, 2x bet sizes
+2,090 betting sequences
+25.6g process size
+
+1b (52m):
+  Sample prob 0.001:
+    Est. P0 BR val: -0.052418 (norm 25425120.000000)
+    Est. P1 BR val: 0.110219 (norm 25425120.000000)
+    Est. expl: 14.450306 mbb/g
+2b (+69m):
+  Sample prob 0.001:
+    Est. P0 BR val: -0.056447 (norm 25425120.000000)
+    Est. P1 BR val: 0.108878 (norm 25425120.000000)
+    Est. expl: 13.107683 mbb/g
+3b
+  Sample prob 0.001:
+    Est. P0 BR val: -0.058754 (norm 25425120.000000)
+    Est. P1 BR val: 0.108305 (norm 25425120.000000)
+    Est. expl: 12.387577 mbb/g
+20b
+  Sample prob 0.001 (13m16s):
+    Est. P0 BR val: -0.065202 (norm 25425120.000000)
+    Est. P1 BR val: 0.106428 (norm 25425120.000000)
+    Est. expl: 10.306734 mbb/g
+
+psbb6c
+r400k
+5,994 betting sequences
+  Almost all bet sizes for open and raise; pot-size and all-in after that.
+400k river buckets
+28.5g process size
+

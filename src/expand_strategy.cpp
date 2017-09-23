@@ -70,8 +70,8 @@
 // probs generated in usual way.  When we get to call/fold/raise on "below"
 // node, take entire fold prob and assign to call.  Just need boolean flag.
 //
-// I think I am calculating bet sizes wrong for raises.  The pot size of the
-// bet node does not incorporate the bet.
+// I calculate new_sumprobs even when num_succs is 1.  Doesn't hurt.  In
+// SetValues() I do nothing.
 
 #include <math.h>
 #include <stdio.h>
@@ -373,22 +373,24 @@ void Expander::Process(Node *node, unsigned int pot_size,
       for (unsigned int a = 0; a < num_actions; ++a) {
 	base_probs[i][a] = 0;
       }
-      unsigned int default_succ_index = base_node->DefaultSuccIndex();
-      if (base_sumprobs_->Ints(p_, st)) {
-	int *i_base_sumprobs = nullptr;
-	base_sumprobs_->Values(p_, st, base_nt, &i_base_sumprobs);
-	for (unsigned int j = 0; j < num_holdings; ++j) {
-	  RegretsToProbs(i_base_sumprobs + j * num_base_succs, num_base_succs,
-			 true, false, default_succ_index, 0, 0, nullptr,
-			 &base_probs[i][j * num_base_succs]);
-	}
-      } else {
-	double *d_base_sumprobs = nullptr;
-	base_sumprobs_->Values(p_, st, base_nt, &d_base_sumprobs);
-	for (unsigned int j = 0; j < num_holdings; ++j) {
-	  RegretsToProbs(d_base_sumprobs + j * num_base_succs, num_base_succs,
-			 true, false, default_succ_index, 0, 0, nullptr,
-			 &base_probs[i][j * num_base_succs]);
+      if (num_base_succs > 1) {
+	unsigned int default_succ_index = base_node->DefaultSuccIndex();
+	if (base_sumprobs_->Ints(p_, st)) {
+	  int *i_base_sumprobs = nullptr;
+	  base_sumprobs_->Values(p_, st, base_nt, &i_base_sumprobs);
+	  for (unsigned int j = 0; j < num_holdings; ++j) {
+	    RegretsToProbs(i_base_sumprobs + j * num_base_succs, num_base_succs,
+			   true, false, default_succ_index, 0, 0, nullptr,
+			   &base_probs[i][j * num_base_succs]);
+	  }
+	} else {
+	  double *d_base_sumprobs = nullptr;
+	  base_sumprobs_->Values(p_, st, base_nt, &d_base_sumprobs);
+	  for (unsigned int j = 0; j < num_holdings; ++j) {
+	    RegretsToProbs(d_base_sumprobs + j * num_base_succs, num_base_succs,
+			   true, false, default_succ_index, 0, 0, nullptr,
+			   &base_probs[i][j * num_base_succs]);
+	  }
 	}
       }
     }

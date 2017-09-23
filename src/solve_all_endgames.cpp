@@ -25,10 +25,8 @@
 
 using namespace std;
 
-extern unsigned int g_nt, g_bd;
-
-static void WalkTrunk2(Node *base_node, Node *endgame_node, 
-		       EndgameSolver *solver,
+static void WalkTrunk2(Node *base_node, Node *endgame_node,
+		       const string &action_sequence, EndgameSolver *solver,
 		       BettingTree *endgame_betting_tree,
 		       unsigned int target_st, unsigned int num_its,
 		       Node *base_solve_root, Node *endgame_solve_root,
@@ -53,42 +51,43 @@ static void WalkTrunk2(Node *base_node, Node *endgame_node,
 	      base_target_nt, endgame_node->NonterminalID(), solve_bd,
 	      target_bd);
       solver->Solve(endgame_solve_root, endgame_node, base_solve_root, 
-		    solve_bd, target_bd, base_node->NonterminalID(), num_its,
-		    endgame_betting_tree);
+		    action_sequence, solve_bd, target_bd,
+		    base_node->NonterminalID(), num_its, endgame_betting_tree);
     }
     return;
   }
   unsigned int num_succs = base_node->NumSuccs();
   for (unsigned int s = 0; s < num_succs; ++s) {
-    WalkTrunk2(base_node->IthSucc(s), endgame_node->IthSucc(s), solver,
-	       endgame_betting_tree, target_st, num_its, base_solve_root,
-	       endgame_solve_root, solve_st, solve_bd);
+    string action = base_node->ActionName(s);
+    WalkTrunk2(base_node->IthSucc(s), endgame_node->IthSucc(s),
+	       action_sequence + action, solver, endgame_betting_tree,
+	       target_st, num_its, base_solve_root, endgame_solve_root,
+	       solve_st, solve_bd);
   }
 }
 
 static void WalkTrunk1(Node *base_node, Node *endgame_node,
-		       EndgameSolver *solver, BettingTree *endgame_betting_tree,
+		       const string &action_sequence, EndgameSolver *solver,
+		       BettingTree *endgame_betting_tree,
 		       unsigned int solve_st, unsigned int target_st,
 		       unsigned int num_its) {
   if (base_node->Terminal()) return;
   unsigned int st = base_node->Street();
   if (st == solve_st) {
-#if 0
-    // Temporary
-    // BC/BC in mb1b1
-    if (base_node->NonterminalID() != 16) return;
-#endif
     unsigned int num_solve_boards = BoardTree::NumBoards(st);
     for (unsigned int sbd = 0; sbd < num_solve_boards; ++sbd) {
-      WalkTrunk2(base_node, endgame_node, solver, endgame_betting_tree,
-		 target_st, num_its, base_node, endgame_node, solve_st, sbd);
+      WalkTrunk2(base_node, endgame_node, action_sequence, solver,
+		 endgame_betting_tree, target_st, num_its, base_node,
+		 endgame_node, solve_st, sbd);
     }
     return;
   }
   unsigned int num_succs = base_node->NumSuccs();
   for (unsigned int s = 0; s < num_succs; ++s) {
-    WalkTrunk1(base_node->IthSucc(s), endgame_node->IthSucc(s), solver,
-	       endgame_betting_tree, solve_st, target_st, num_its);
+    string action = base_node->ActionName(s);
+    WalkTrunk1(base_node->IthSucc(s), endgame_node->IthSucc(s),
+	       action_sequence + action, solver, endgame_betting_tree,
+	       solve_st, target_st, num_its);
   }
 }
 
@@ -168,13 +167,15 @@ int main(int argc, char *argv[]) {
     BettingTree::BuildTree(*endgame_betting_abstraction);
 
   unsigned int num_threads = 1;
+  // Endgame solver gets the betting tree, but it is deleted before the
+  // endgame solver's destructor gets called.
   EndgameSolver solver(solve_street, base_it, *base_card_abstraction,
 		       *endgame_card_abstraction, *base_betting_abstraction,
 		       *endgame_betting_abstraction, *base_cfr_config,
 		       *endgame_cfr_config, base_buckets, endgame_buckets,
 		       base_betting_tree, method, cfrs, card_level, zero_sum,
 		       num_threads);
-  WalkTrunk1(base_betting_tree->Root(), endgame_betting_tree->Root(), 
+  WalkTrunk1(base_betting_tree->Root(), endgame_betting_tree->Root(), "x",
 	     &solver, endgame_betting_tree, solve_street,
 	     target_street, num_endgame_its);
   fprintf(stderr, "After WalkTrunk1\n");

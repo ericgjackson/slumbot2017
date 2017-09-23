@@ -26,6 +26,7 @@ HandTree::HandTree(unsigned int root_st, unsigned int root_bd,
   for (unsigned int st = 0; st < root_st_; ++st) {
     hands_[st] = NULL;
   }
+  BoardTree::Create();
   unsigned int max_street = Game::MaxStreet();
   if (final_st == max_street) HandValueTree::Create();
   for (unsigned int st = root_st_; st <= final_st_; ++st) {

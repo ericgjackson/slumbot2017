@@ -47,14 +47,13 @@ using namespace std;
 VCFRSubgame::VCFRSubgame(const CardAbstraction &ca,
 			 const BettingAbstraction &ba, const CFRConfig &cc,
 			 const Buckets &buckets, Node *root,
-			 unsigned int root_bd, unsigned int subtree_nt,
+			 unsigned int root_bd, const string &action_sequence,
 			 VCFR *cfr) :
-  VCFR(ca, ba, cc, buckets, nullptr, 1) {
+  VCFR(ca, ba, cc, buckets, nullptr, 1), action_sequence_(action_sequence) {
   subgame_ = true;
   root_ = root;
   root_bd_ = root_bd;
   root_bd_st_ = root->Street() - 1;
-  subtree_nt_ = subtree_nt;
   cfr_ = cfr;
   
   unsigned int max_street = Game::MaxStreet();
@@ -109,12 +108,12 @@ void VCFRSubgame::DeleteOldFiles(unsigned int it) {
     strcat(dir, buf);
   }
   unsigned int max_street = Game::MaxStreet();
-  unsigned int subtree_st = subtree_->Root()->Street();
   for (unsigned int st = 0; st <= max_street; ++st) {
     if (! subtree_streets_[st]) continue;
     // Remove the regret file created for the current player two iterations ago
-    sprintf(buf, "%s/regrets.%u.%u.%u.%u.%u.%u.p%u.i", dir,
-	    subtree_st, subtree_nt_, root_bd_st_, root_bd_, st, delete_it, p_);
+    sprintf(buf, "%s/regrets.%s.%u.%u.%u.%u.p%u.i", dir,
+	    action_sequence_.c_str(), root_bd_st_, root_bd_, st, delete_it,
+	    p_);
 #if 0
     if (! FileExists(buf)) {
       // It should exist.  Test for debugging purposes.
@@ -139,8 +138,8 @@ void VCFRSubgame::DeleteOldFiles(unsigned int it) {
       last_it = it - 1;
     }
 #endif
-    sprintf(buf, "%s/sumprobs.%u.%u.%u.%u.%u.%u.p%u.i", dir,
-	    subtree_st, subtree_nt_, root_bd_st_, root_bd_, st, delete_it,
+    sprintf(buf, "%s/sumprobs.%s.%u.%u.%u.%u.p%u.i", dir,
+	    action_sequence_.c_str(), root_bd_st_, root_bd_, st, delete_it,
 	    p_^1);
 #if 0
     if (! FileExists(buf)) {
@@ -183,7 +182,7 @@ void VCFRSubgame::Go(void) {
 				  subtree_, root_bd_, root_bd_st_,
 				  card_abstraction_, buckets_,
 				  compressed_streets_));
-    sumprobs_->Read(dir, it_, subtree_->Root(), subtree_nt_, kMaxUInt);
+    sumprobs_->Read(dir, it_, subtree_->Root(), action_sequence_, kMaxUInt);
   } else {
     // Need both players regrets
     regrets_.reset(new CFRValues(nullptr, false, subtree_streets_,
@@ -202,24 +201,26 @@ void VCFRSubgame::Go(void) {
 	regrets_->AllocateAndClearInts(subtree_->Root(), kMaxUInt);
       } else {
 	// It 1 P0 phase: read P1 regrets from disk; initialize P0 regrets
-	regrets_->Read(dir, it_, subtree_->Root(), subtree_nt_, 1);
+	regrets_->Read(dir, it_, subtree_->Root(), action_sequence_, 1);
 	regrets_->AllocateAndClearInts(subtree_->Root(), 0);
       }
     } else {
       if (p_) {
 	// Read regrets for both players from previous iteration
-	regrets_->Read(dir, it_ - 1, subtree_->Root(), subtree_nt_, kMaxUInt);
+	regrets_->Read(dir, it_ - 1, subtree_->Root(), action_sequence_,
+		       kMaxUInt);
       } else {
 	// Read P1 regrets from current iteration
 	// Read P0 regrets from previous iteration
-	regrets_->Read(dir, it_, subtree_->Root(), subtree_nt_, 1);
-	regrets_->Read(dir, it_ - 1, subtree_->Root(), subtree_nt_, 0);
+	regrets_->Read(dir, it_, subtree_->Root(), action_sequence_, 1);
+	regrets_->Read(dir, it_ - 1, subtree_->Root(), action_sequence_, 0);
       }
     }
     if (it_ == 1) {
       sumprobs_->AllocateAndClearInts(subtree_->Root(), kMaxUInt);
     } else {
-      sumprobs_->Read(dir, it_ - 1, subtree_->Root(), subtree_nt_, kMaxUInt);
+      sumprobs_->Read(dir, it_ - 1, subtree_->Root(), action_sequence_,
+		      kMaxUInt);
     }
   }
 
@@ -230,14 +231,14 @@ void VCFRSubgame::Go(void) {
   CommonBetResponseCalcs(root_bd_st_, hands, opp_probs_, &sum_opp_probs,
 			 total_card_probs);
   final_vals_ = Process(subtree_->Root(), 0, opp_probs_, sum_opp_probs,
-			total_card_probs, subtree_st - 1);
+			total_card_probs, "", subtree_st - 1);
 
   delete [] total_card_probs;
 
   if (! value_calculation_) {
     Mkdir(dir);
-    regrets_->Write(dir, it_, subtree_->Root(), subtree_nt_, p_);
-    sumprobs_->Write(dir, it_, subtree_->Root(), subtree_nt_, kMaxUInt);
+    regrets_->Write(dir, it_, subtree_->Root(), action_sequence_, p_);
+    sumprobs_->Write(dir, it_, subtree_->Root(), action_sequence_, kMaxUInt);
   }
 
   // This should delete the regrets and sumprobs, no?

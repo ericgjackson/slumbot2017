@@ -22,6 +22,7 @@ unique_ptr<Params> CreateBettingAbstractionParams(void) {
   params->AddParam("OppBetSizes", P_STRING);
   params->AddParam("MinBet", P_INT);
   params->AddParam("AllBetSizeStreets", P_STRING);
+  params->AddParam("AllEvenBetSizeStreets", P_STRING);
   params->AddParam("NoLimitTreeType", P_INT);
   params->AddParam("InitialStreet", P_INT);
   params->AddParam("Asymmetric", P_BOOLEAN);
@@ -47,6 +48,8 @@ unique_ptr<Params> CreateBettingAbstractionParams(void) {
   params->AddParam("CloseToAllInFrac", P_DOUBLE);
   params->AddParam("OurBetSizeMultipliers", P_STRING);
   params->AddParam("OppBetSizeMultipliers", P_STRING);
+  params->AddParam("BettingKeyStreets", P_STRING);
+  params->AddParam("MinReentrantPot", P_INT);
 
   return params;
 }

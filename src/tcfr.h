@@ -1,11 +1,14 @@
 #ifndef _TCFR_H_
 #define _TCFR_H_
 
+#include <memory>
+
 #include "cfr.h"
 
 using namespace std;
 
 class BettingAbstraction;
+class BettingTree;
 class Buckets;
 class CardAbstraction;
 class CFRConfig;
@@ -25,22 +28,29 @@ public:
   void Run(unsigned int start_batch_base, unsigned int end_batch_base,
 	   unsigned int batch_size, unsigned int save_interval);
 private:
-  void ReadRegrets(unsigned char *ptr, Reader ***readers);
-  void WriteRegrets(unsigned char *ptr, Writer ***writers);
-  void ReadSumprobs(unsigned char *ptr, Reader ***readers);
-  void WriteSumprobs(unsigned char *ptr, Writer ***writers);
+  void ReadRegrets(unsigned char *ptr, Node *node, Reader ***readers,
+		   bool ***seen);
+  void WriteRegrets(unsigned char *ptr, Node *node, Writer ***writers,
+		    bool ***seen);
+  void ReadSumprobs(unsigned char *ptr, Node *node, Reader ***readers,
+		    bool ***seen);
+  void WriteSumprobs(unsigned char *ptr, Node *node, Writer ***writers,
+		     bool ***seen);
   void Read(unsigned int batch_base);
   void Write(unsigned int batch_base);
   void Run(void);
   void RunBatch(unsigned int batch_size);
-  unsigned char *Prepare(unsigned char *ptr, Node *node);
-  void MeasureTree(Node *node, unsigned long long int *allocation_size);
+  unsigned char *Prepare(unsigned char *ptr, Node *node,
+			 unsigned long long int ***offsets);
+  void MeasureTree(Node *node, bool ***seen,
+		   unsigned long long int *allocation_size);
   void Prepare(void);
 
   const CardAbstraction &card_abstraction_;
   const BettingAbstraction &betting_abstraction_;
   const CFRConfig &cfr_config_;
   const Buckets &buckets_;
+  unique_ptr<BettingTree> betting_tree_;
   bool asymmetric_;
   unsigned int target_player_;
   unsigned char *data_;

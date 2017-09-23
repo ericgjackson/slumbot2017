@@ -8,7 +8,7 @@ HEADS =	src/constants.h src/rand.h src/split.h src/files.h \
 	src/betting_abstraction_params.h src/betting_abstraction.h \
 	src/cfr_params.h src/cfr_config.h src/betting_tree.h \
 	src/betting_tree_builder.h src/nonterminal_ids.h \
-	src/cfr_values.h src/cfr_utils.h src/cfr.h \
+	src/cfr_values.h src/cfr_utils.h \
 	src/vcfr.h src/cfrp.h src/rgbr.h src/eg_cfr.h src/endgames.h \
 	src/cbr_thread.h src/cbr_builder.h src/path.h src/sorting.h \
 	src/rollout.h src/univariate_kmeans.h src/buckets.h src/fast_hash.h \
@@ -39,8 +39,8 @@ OBJS =	obj/rand.o obj/split.o obj/files.o obj/cards.o obj/io.o \
 	obj/hand_tree.o obj/card_abstraction_params.o obj/card_abstraction.o \
 	obj/betting_abstraction_params.o obj/betting_abstraction.o \
 	obj/cfr_params.o obj/cfr_config.o obj/betting_tree.o \
-	obj/betting_tree_builder.o obj/no_limit_tree.o obj/no_limit_tree3.o \
-	obj/no_limit_tree4.o obj/no_limit_tree5.o obj/nonterminal_ids.o \
+	obj/betting_tree_builder.o obj/no_limit_tree.o obj/reentrant_tree.o \
+	obj/nonterminal_ids.o \
 	obj/cfr_values.o obj/cfr_utils.o obj/cfr.o obj/vcfr.o obj/cfrp.o \
 	obj/rgbr.o obj/eg_cfr.o obj/endgames.o obj/cbr_thread.o \
 	obj/cbr_builder.o obj/path.o obj/sorting.o obj/rollout.o \
@@ -147,6 +147,14 @@ bin/show_buckets:	obj/show_buckets.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/show_buckets obj/show_buckets.o \
 	$(OBJS) $(LIBRARIES)
 
+bin/show_num_boards:	obj/show_num_boards.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/show_num_boards \
+	obj/show_num_boards.o $(OBJS) $(LIBRARIES)
+
+bin/show_boards:	obj/show_boards.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/show_boards \
+	obj/show_boards.o $(OBJS) $(LIBRARIES)
+
 bin/show_num_hands:	obj/show_num_hands.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/show_num_hands \
 	obj/show_num_hands.o $(OBJS) $(LIBRARIES)
@@ -206,6 +214,26 @@ bin/show_flop_reach_probs:	obj/show_flop_reach_probs.o $(OBJS) $(HEADS)
 bin/show_preflop_strategy:	obj/show_preflop_strategy.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/show_preflop_strategy \
 	obj/show_preflop_strategy.o $(OBJS) $(LIBRARIES)
+
+bin/run_approx_rgbr:	obj/run_approx_rgbr.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/run_approx_rgbr obj/run_approx_rgbr.o \
+	$(OBJS) $(LIBRARIES)
+
+bin/compare_cbrs:	obj/compare_cbrs.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/compare_cbrs obj/compare_cbrs.o \
+	$(OBJS) $(LIBRARIES)
+
+bin/show_cbrs:	obj/show_cbrs.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/show_cbrs obj/show_cbrs.o \
+	$(OBJS) $(LIBRARIES)
+
+bin/show_reach_probs:	obj/show_reach_probs.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/show_reach_probs \
+	obj/show_reach_probs.o $(OBJS) $(LIBRARIES)
+
+bin/test_shared_ptrs:	obj/test_shared_ptrs.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/test_shared_ptrs \
+	obj/test_shared_ptrs.o $(OBJS) $(LIBRARIES)
 
 bin/x:	obj/x.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/x obj/x.o \

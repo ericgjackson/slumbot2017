@@ -31,6 +31,7 @@ Turn combined 8/200:  Exploitability: 83.15 mbb/g
 
 Try with bigger game
 ms3f1t1r1h8
+mb2b2t
 hshshshsbc3tr_params
   St 2 num buckets 2911
   St 3 num buckets 38844
@@ -59,12 +60,13 @@ and flop.  So we get a greater likelihood of a big pot on the turn.
 Games quickly get too big though when we allow a lot of betting.
 Can we solve a game with mb2b2 and holdem5?  Looks like I can.
 
+ms3f1t1r1h5
 mb2b2
 cfrps
 200 (262m): Exploitability: 201.00 mbb/g
 
-
 hshshshsbc3/tcfr
+1,457 river buckets (43,460 null river buckets)
 1b (87m):    Exploitability: 1027.48 mbb/g
 2b (+87m):   Exploitability: 837.13 mbb/g
 3b (+63m):   Exploitability: 763.82 mbb/g

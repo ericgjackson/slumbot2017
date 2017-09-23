@@ -1,0 +1,62 @@
+How much longer does it take to solve game when we increase stack size?
+Hold exploitability fixed.
+
+holdem
+nhshshs
+
+mb1b1ss50:  274 betting sequences
+mb1b1ss100: 322 betting sequences
+  This is not typical though.
+
+mb2b2ss50:  11282
+mb2b2ss100: 21442
+
+mb3b3ss50:   44,770
+mb3b3ss100: 160,874
+
+This is a fairly crude card abstraction.  We may min out exploitability very
+quickly.  Might be better to use a better card abstraction.
+
+run_approx_rgbr
+
+100m:
+Est. P0 BR val: 0.398117 (norm 278405063.999999)
+Est. P1 BR val: 1.233146 (norm 278405064.000000)
+Est. expl: 407.815949 mbb/g
+1b:
+Est. P0 BR val: 0.446978 (norm 278405063.999999)
+Est. P1 BR val: 1.280006 (norm 278405064.000000)
+Est. expl: 431.746136 mbb/g
+
+
+onem abstraction
+St 0 num buckets 169
+St 1 num buckets 1286792
+St 2 num buckets 74970
+St 3 num buckets 1346221
+
+15.4g process size for mb1b1ss50.
+
+1b:
+Est. P0 BR val: 0.003479 (norm 278405064.000000)
+Est. P1 BR val: 0.807721 (norm 278405064.000000)
+Est. expl: 202.799948 mbb/g
+2b:
+Est. P0 BR val: -0.022885 (norm 278405064.000000)
+Est. P1 BR val: 0.791811 (norm 278405064.000000)
+Est. expl: 192.231566 mbb/g
+
+mb1b1ss100
+16.1g process size
+1b:
+Est. P0 BR val: 0.067192 (norm 278405064.000000)
+Est. P1 BR val: 1.165172 (norm 278405064.000000)
+Est. expl: 308.090835 mbb/g
+2b:
+Est. P0 BR val: 0.037132 (norm 278405064.000000)
+Est. P1 BR val: 1.133132 (norm 278405064.000000)
+Est. expl: 292.565920 mbb/g
+3b:
+Est. P0 BR val: 0.029436 (norm 278405063.999999)
+Est. P1 BR val: 1.125434 (norm 278405064.000000)
+Est. expl: 288.717525 mbb/g

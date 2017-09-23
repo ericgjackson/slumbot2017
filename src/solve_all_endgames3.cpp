@@ -374,7 +374,7 @@ void EndgameSolver3::Walk(Node *node, const string &action_sequence,
       double *t_vals = dynamic_cbr.Compute(node, reach_probs, gbd, hand_tree,
 					   sumprobs, root_bd_st, root_bd,
 					   buckets, card_abstraction,
-					   cfr_target_p^1, false);
+					   cfr_target_p^1, false, true);
       bool cfrs = false;
       bool zero_sum = true;
       EGCFR eg_cfr(endgame_card_abstraction_, base_card_abstraction_,

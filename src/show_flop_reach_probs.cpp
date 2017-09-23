@@ -59,52 +59,48 @@ void Process(Node *node, const Buckets &buckets, CFRValues *sumprobs,
     sumprobs->Values(p, st, nt, &d_my_sumprobs);
   }
   for (unsigned int s = 0; s < num_succs; ++s) {
-    double *new_reach = new double[num_hole_card_pairs];
-    for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
-      if (buckets.None(st)) {
-	if (sumprobs->Ints(p, st)) {
-	  RegretsToProbs(i_my_sumprobs + i * num_succs, num_succs, true,
-			 false, default_succ_index, 0, 0, nullptr,
-			 current_probs);
-	} else {
-	  RegretsToProbs(d_my_sumprobs + i * num_succs, num_succs, true,
-			 false, default_succ_index, 0, 0, nullptr,
-			 current_probs);
-	}
-      } else {
-	unsigned int b = buckets.Bucket(0, i);
-	if (sumprobs->Ints(p, st)) {
-	  RegretsToProbs(i_my_sumprobs + b * num_succs, num_succs, true,
-			 false, default_succ_index, 0, 0, nullptr,
-			 current_probs);
-	  if (nt == 1 && p == 0) {
-	    const Card *hole_cards = hands->Cards(i);
-	    printf("B i %u b %u ", i, b);
-	    OutputTwoCards(hole_cards);
-	    printf(" s %u prob %f\n", s, current_probs[s]);
+    double *new_reach;
+    if (num_succs == 1) {
+      if (p == 0) new_reach = p0_reach;
+      else        new_reach = p1_reach;
+    } else {
+      new_reach = new double[num_hole_card_pairs];
+      for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
+	if (buckets.None(st)) {
+	  if (sumprobs->Ints(p, st)) {
+	    RegretsToProbs(i_my_sumprobs + i * num_succs, num_succs, true,
+			   false, default_succ_index, 0, 0, nullptr,
+			   current_probs);
+	  } else {
+	    RegretsToProbs(d_my_sumprobs + i * num_succs, num_succs, true,
+			   false, default_succ_index, 0, 0, nullptr,
+			   current_probs);
 	  }
 	} else {
-	  RegretsToProbs(d_my_sumprobs + b * num_succs, num_succs, true,
-			 false, default_succ_index, 0, 0, nullptr,
-			 current_probs);
+	  unsigned int b = buckets.Bucket(0, i);
+	  if (sumprobs->Ints(p, st)) {
+	    RegretsToProbs(i_my_sumprobs + b * num_succs, num_succs, true,
+			   false, default_succ_index, 0, 0, nullptr,
+			   current_probs);
+	  } else {
+	    RegretsToProbs(d_my_sumprobs + b * num_succs, num_succs, true,
+			   false, default_succ_index, 0, 0, nullptr,
+			   current_probs);
+	  }
 	}
-      }
-      double sp = current_probs[s];
-      if (p == 0) new_reach[i] = p0_reach[i] * sp;
-      else        new_reach[i] = p1_reach[i] * sp;
-    }
-    if (nt == 1 && st == 0 && p == 0 && s == 0) {
-      double sum = 0;
-      for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
-	sum += p1_reach[i];
+	double sp = current_probs[s];
+	if (p == 0) new_reach[i] = p0_reach[i] * sp;
+	else        new_reach[i] = p1_reach[i] * sp;
       }
     }
     if (p == 0) {
-      Process(node->IthSucc(s), buckets, sumprobs, new_reach, p1_reach, hands);
+      Process(node->IthSucc(s), buckets, sumprobs, new_reach, p1_reach,
+	      hands);
     } else {
-      Process(node->IthSucc(s), buckets, sumprobs, p0_reach, new_reach, hands);
+      Process(node->IthSucc(s), buckets, sumprobs, p0_reach, new_reach,
+	      hands);
     }
-    delete [] new_reach;
+    if (num_succs > 1) delete [] new_reach;
   }
   delete [] current_probs;
 }

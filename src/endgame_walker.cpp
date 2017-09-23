@@ -169,6 +169,10 @@ void EndgameWalker::CalculateSuccProbs(Node *node, unsigned int bd,
 				       double ****ret_new_reach_probs) {
   unsigned int st = node->Street();
   unsigned int num_succs = node->NumSuccs();
+  if (num_succs == 1) {
+    fprintf(stderr, "Need to update code to handle single succ\n");
+    exit(-1);
+  }
   unsigned int nt = node->NonterminalID();
   unsigned int pa = node->PlayerActing();
   unsigned int default_succ_index = node->DefaultSuccIndex();

@@ -112,8 +112,7 @@ CBRThread::CBRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
       sprintf(buf, ".p%u", p_^1);
       strcat(dir, buf);
     }
-    sumprobs_->Read(dir, it_, betting_tree_->Root(),
-		    betting_tree_->Root()->NonterminalID(), kMaxUInt);
+    sumprobs_->Read(dir, it_, betting_tree_->Root(), "x", kMaxUInt);
 
     unique_ptr<bool []> bucketed_streets(new bool[max_street + 1]);
     bucketed_ = false;
@@ -151,10 +150,10 @@ CBRThread::~CBRThread(void) {
   delete [] final_hand_vals_;
 }
 
-void CBRThread::WriteValues(Node *node, unsigned int gbd, double *vals) {
+void CBRThread::WriteValues(Node *node, unsigned int gbd,
+			    const string &action_sequence, double *vals) {
   char dir[500], dir2[500], buf[500];
   unsigned int street = node->Street();
-  unsigned int nonterminal_id = node->NonterminalID();
   sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s",
 	  Files::NewCFRBase(), Game::GameName().c_str(),
 	  card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
@@ -170,8 +169,8 @@ void CBRThread::WriteValues(Node *node, unsigned int gbd, double *vals) {
     sprintf(buf2, ".p%u", p_);
     strcat(dir, buf2);
   }
-  sprintf(dir2, "%s/%s.%u.p%u/%u.%u.%u", dir, cfrs_ ? "cfrs" : "cbrs",
-	  it_, p_, nonterminal_id, street, node->PlayerActing());
+  sprintf(dir2, "%s/%s.%u.p%u/%s", dir, cfrs_ ? "cfrs" : "cbrs",
+	  it_, p_,  action_sequence.c_str());
   Mkdir(dir2);
   sprintf(buf, "%s/vals.%u", dir2, gbd);
   Writer writer(buf);
@@ -182,9 +181,10 @@ void CBRThread::WriteValues(Node *node, unsigned int gbd, double *vals) {
 }
 
 double *CBRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
-			     double sum_opp_probs, double *total_card_probs) {
+			     double sum_opp_probs, double *total_card_probs,
+			     const string &action_sequence) {
   double *vals = VCFR::OurChoice(node, lbd, opp_probs, sum_opp_probs,
-				 total_card_probs);
+				 total_card_probs, action_sequence);
 
   unsigned int st = node->Street();
   unsigned int gbd = 0;
@@ -207,22 +207,23 @@ double *CBRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
     }
   }
 #endif
-  WriteValues(node, gbd, vals);
+  WriteValues(node, gbd, action_sequence, vals);
   
   return vals;
 }
 
 double *CBRThread::OppChoice(Node *node, unsigned int lbd, double *opp_probs,
-			     double sum_opp_probs, double *total_card_probs) {
+			     double sum_opp_probs, double *total_card_probs,
+			     const string &action_sequence) {
   double *vals = VCFR::OppChoice(node, lbd, opp_probs, sum_opp_probs,
-				 total_card_probs);
+				 total_card_probs, action_sequence);
 
   unsigned int st = node->Street();
   unsigned int gbd = 0;
   if (st > 0) {
     gbd = BoardTree::GlobalIndex(root_bd_st_, root_bd_, st, lbd);
   }
-  WriteValues(node, gbd, vals);
+  WriteValues(node, gbd, action_sequence, vals);
   
   return vals;
 }
@@ -256,6 +257,7 @@ double *CBRThread::Split(Node *node, unsigned int bd, double *opp_probs) {
 
 double *CBRThread::Process(Node *node, unsigned int lbd, double *opp_probs,
 			   double sum_opp_probs, double *total_card_probs,
+			   const string &action_sequence,
 			   unsigned int last_st) {
   unsigned int st = node->Street();
   if (st > last_st && st == kSplitStreet) {
@@ -279,7 +281,7 @@ double *CBRThread::Process(Node *node, unsigned int lbd, double *opp_probs,
     }
 #endif
     return VCFR::Process(node, lbd, opp_probs, sum_opp_probs,
-			 total_card_probs, last_st);
+			 total_card_probs, action_sequence, last_st);
   }
 }
 
@@ -400,8 +402,9 @@ void CBRThread::AfterSplit(void) {
     // We are assuming sumprobs are split in the same way as we want to
     // split CBR calculation.
     fprintf(stderr, "AfterSplit9\n");
-    sumprobs_->Read(dir, it_, subtree->Root(), split_node_->NonterminalID(),
-		    kMaxUInt);
+    fprintf(stderr, "Should pass in current action sequence\n");
+    exit(-1);
+    sumprobs_->Read(dir, it_, subtree->Root(), "x", kMaxUInt);
     fprintf(stderr, "AfterSplit10\n");
 
     unsigned int num_variants = BoardTree::NumVariants(nst, ngbd);
@@ -413,8 +416,10 @@ void CBRThread::AfterSplit(void) {
     // terminal node.
     // Or maybe it's OK because we are not updating sum-opp-probs in a CBR
     // calculation.
+    fprintf(stderr, "Should pass in current action sequence\n");
+    exit(-1);
     double *next_vals = Process(subtree->Root(), nlbd, opp_reach_probs_, 0,
-				NULL, nst);
+				NULL, "", nst);
     sumprobs_.reset(nullptr);
 
     const CanonicalCards *next_hands = hand_tree_->Hands(nst, 0);
@@ -471,7 +476,7 @@ double CBRThread::Go(void) {
   CommonBetResponseCalcs(0, hands, opp_probs, &sum_opp_probs,
 			 total_card_probs);
   double *vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-			 total_card_probs, 0);
+			 total_card_probs, "x", 0);
   delete [] total_card_probs;
   // EVs for our hands are summed over all opponent hole card pairs.  To
   // compute properly normalized EV, need to divide by that number.

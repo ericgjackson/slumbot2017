@@ -1,7 +1,7 @@
 #ifndef _CBR_THREAD_H_
 #define _CBR_THREAD_H_
 
-#include <vector>
+#include <string>
 
 #include "vcfr.h"
 
@@ -29,15 +29,18 @@ public:
   static const unsigned int kSplitStreet = 999;
 private:
   
-  void WriteValues(Node *node, unsigned int gbd, double *vals);
+  void WriteValues(Node *node, unsigned int gbd, const string &action_sequence,
+		   double *vals);
   double *OurChoice(Node *node, unsigned int lbd, double *opp_probs,
-		    double sum_opp_probs, double *total_card_probs);
+		    double sum_opp_probs, double *total_card_probs,
+		    const string &action_sequence);
   double *OppChoice(Node *node, unsigned int lbd, double *opp_probs,
-		    double sum_opp_probs, double *total_card_probs);
+		    double sum_opp_probs, double *total_card_probs,
+		    const string &action_sequence);
   double *Split(Node *node, unsigned int bd, double *opp_probs);
   double *Process(Node *node, unsigned int lbd, double *opp_probs,
 		  double sum_opp_probs, double *total_card_probs,
-		  unsigned int last_st);
+		  const string &action_sequence, unsigned int last_st);
   void Run(void);
   void Join(void);
   void SetSplitNode(Node *n) {split_node_ = n;}

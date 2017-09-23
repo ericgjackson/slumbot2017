@@ -1,0 +1,41 @@
+Can I implement imperfect recall of actions?
+
+I did an experiment with mb2b2 and mb2b2rft.  The number of river
+nonterminal nodes was cut in half roughly.  The exploitability of
+the base went up from 611 to 975.  After river resolving, the
+exploitability went up from 239 to 318.
+
+Is this good?  Hard to say.  Probably not in isolation.  We shrunk the
+game size by a factor of only two and lost ~80 mbb/g in exploitability.
+Probably would be better off cutting the size of the river card abstraction
+in half.
+
+But there's the potential of getting a much bigger reduction in the tree
+size when we start allowing more bets per street.
+
+Maybe we can collapse nodes that we think we are unlikely to ever reach
+at equilibrium.
+
+Is there a good way to test this?  Won't we need tons of memory and time
+to solve and resolve a game with a ton of betting sequences?  Well, we
+can use a coarse river abstraction in the base.  Maybe for the resolve,
+we can sample.
+
+What if I solve an mb3b3 system with a coarse abstraction and then see
+what bet sequences are seldom used?
+
+37,961 nts in mb3b3rft tree.
+75,245 nts in mb3b3 tree.
+Still only a 50% reduction.
+
+mb3b3 has 374,907 river betting sequences.  10k buckets would be
+30g.  Maybe just use hand strength. 6 gigs.
+51,046 turn betting sequences.  Maybe use two hand strength features
+at 0.5 and 0.9 with squashing.
+5,802 flop betting sequences.  Can't use NULL.  Maybe lots of features
+  with no squashing and perfect memory of preflop?  nhs is 64,692.
+
+Use only turn betting sequence as key: mb2b2rt.
+mb2b2rt: 916 river nonterminals
+mb2b2rft: 4,553 river nonterminals
+mb2b2: 9,070 river nonterminals

@@ -15,8 +15,8 @@ class RGBR : public VCFR {
 public:
   RGBR(const CardAbstraction &ca, const BettingAbstraction &ba,
        const CFRConfig &cc, const Buckets &buckets,
-       const BettingTree *betting_tree, bool current,
-       unsigned int num_threads, const bool *streets);
+       const BettingTree *betting_tree, bool current, unsigned int num_threads,
+       const bool *streets, bool always_call_preflop);
   virtual ~RGBR(void);
   double Go(unsigned int it, unsigned int p);
 };

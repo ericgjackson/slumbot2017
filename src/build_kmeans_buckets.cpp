@@ -29,12 +29,6 @@ static void Write(unsigned int street, const string &bucketing,
   Writer writer(buf);
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(street);
   unsigned int num_hands = BoardTree::NumBoards(street) * num_hole_card_pairs;
-  // Write out in Array format
-  writer.WriteUnsignedInt(1);
-  // Item size
-  if (short_buckets) writer.WriteUnsignedInt(2);
-  else               writer.WriteUnsignedInt(4);
-  writer.WriteUnsignedInt(num_hands);
   for (unsigned int h = 0; h < num_hands; ++h) {
     unsigned int b = buckets[h];
     if (short_buckets) {

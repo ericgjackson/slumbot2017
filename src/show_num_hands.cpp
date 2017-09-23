@@ -12,22 +12,25 @@
 using namespace std;
 
 static void Usage(const char *prog_name) {
-  fprintf(stderr, "USAGE: %s <game params> <street>\n", prog_name);
+  fprintf(stderr, "USAGE: %s <game params>\n", prog_name);
   exit(-1);
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 3) Usage(argv[0]);
+  if (argc != 2) Usage(argv[0]);
   Files::Init();
   unique_ptr<Params> game_params = CreateGameParams();
   game_params->ReadFromFile(argv[1]);
   Game::Initialize(*game_params);
-  unsigned int st;
-  if (sscanf(argv[2], "%u", &st) != 1) Usage(argv[0]);
 
   BoardTree::Create();
-  unsigned int num_boards = BoardTree::NumBoards(st);
-  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
-  unsigned int num_hands = num_boards * num_hole_card_pairs;
-  printf("St %u num hands %u\n", st, num_hands);
+  unsigned int max_street = Game::MaxStreet();
+  for (unsigned int st = 0; st <= max_street; ++st) {
+    unsigned int num_boards;
+    if (st == 0) num_boards = 1;
+    else         num_boards = BoardTree::NumBoards(st);
+    unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
+    unsigned int num_hands = num_boards * num_hole_card_pairs;
+    printf("St %u num hands %u\n", st, num_hands);
+  }
 }

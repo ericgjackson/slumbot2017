@@ -1,0 +1,6 @@
+CFRConfigName tcfrt
+Algorithm tcfr
+# 4/5 flop/turn only, 1/5 all treets
+ActiveMod 5
+ActiveConditions 1,2:0,1,2,3
+CloseThreshold 2000

@@ -243,7 +243,7 @@ void Assembler::ReadEndgame(Node *node, unsigned int p, unsigned int gbd,
     return;
   }
   unsigned int num_succs = node->NumSuccs();
-  if (node->PlayerActing() == p) {
+  if (node->PlayerActing() == p && num_succs > 1) {
     char dir[500], dir2[500], dir3[500], filename[500];
     sprintf(dir, "%s/%s.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
 	    Game::GameName().c_str(),base_ca_.CardAbstractionName().c_str(),

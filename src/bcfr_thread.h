@@ -29,11 +29,14 @@ public:
   static const unsigned int kSplitStreet = 999;
 private:
   
-  void WriteValues(Node *node, unsigned int gbd, double *vals);
+  void WriteValues(Node *node, unsigned int gbd, const string &action_sequence,
+		   double *vals);
   double *OurChoice(Node *node, unsigned int lbd, double *opp_probs,
-		    double sum_opp_probs, double *total_card_probs);
+		    double sum_opp_probs, double *total_card_probs,
+		    const string &action_sequence);
   double *OppChoice(Node *node, unsigned int lbd, double *opp_probs,
-		    double sum_opp_probs, double *total_card_probs);
+		    double sum_opp_probs, double *total_card_probs,
+		    const string &action_sequence);
 
   HandTree *trunk_hand_tree_;
   unsigned int thread_index_;
