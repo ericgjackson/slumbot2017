@@ -47,8 +47,8 @@ int main(int argc, char *argv[]) {
   BoardTree::Create();
   unsigned int num_boards = BoardTree::NumBoards(st);
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
-  unsigned int num_hands = num_boards * num_hole_card_pairs;
-  fprintf(stderr, "num_hands %u\n", num_hands);
+  unsigned long long int num_hands = num_boards * num_hole_card_pairs;
+  fprintf(stderr, "num_hands %llu\n", num_hands);
 
   char buf[500];
   sprintf(buf, "%s/num_buckets.%s.%u.%u.%u.%s.%u", Files::StaticBase(),
@@ -61,14 +61,14 @@ int main(int argc, char *argv[]) {
 	  Game::GameName().c_str(), Game::NumRanks(), Game::NumSuits(),
 	  max_street, bucketing1.c_str(), st);
   Reader reader1(buf);
-  long long int file_size1 = reader1.FileSize();
+  unsigned long long int file_size1 = reader1.FileSize();
   bool shorts1;
   if (file_size1 == 2 * num_hands) {
     shorts1 = true;
   } else if (file_size1 == 4 * num_hands) {
     shorts1 = false;
   } else {
-    fprintf(stderr, "Unexpected file size B: %lli\n", file_size1);
+    fprintf(stderr, "Unexpected file size B: %llu\n", file_size1);
     fprintf(stderr, "File: %s\n", buf);
     exit(-1);
   }
@@ -77,21 +77,21 @@ int main(int argc, char *argv[]) {
 	  Game::GameName().c_str(), Game::NumRanks(), Game::NumSuits(),
 	  max_street, bucketing2.c_str(), st);
   Reader reader2(buf);
-  long long int file_size2 = reader2.FileSize();
+  unsigned long long int file_size2 = reader2.FileSize();
   bool shorts2;
   if (file_size2 == 2 * num_hands) {
     shorts2 = true;
   } else if (file_size2 == 4 * num_hands) {
     shorts2 = false;
   } else {
-    fprintf(stderr, "Unexpected file size B: %lli\n", file_size2);
+    fprintf(stderr, "Unexpected file size B: %llu\n", file_size2);
     fprintf(stderr, "File: %s\n", buf);
     exit(-1);
   }
   
   unsigned int *buckets = new unsigned int[num_hands];
   SparseAndDenseLong sad;
-  for (unsigned int h = 0; h < num_hands; ++h) {
+  for (unsigned long long int h = 0; h < num_hands; ++h) {
     unsigned long long int b1, b2;
     if (shorts1) {
       b1 = reader1.ReadUnsignedShortOrDie();

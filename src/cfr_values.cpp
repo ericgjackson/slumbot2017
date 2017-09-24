@@ -1138,8 +1138,8 @@ void CFRValues::ReadSubtreeFromFull(Node *full_node, Node *full_subtree_root,
 	  }
 	} else {
 	  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
-	  int iv;
-	  double dv;
+	  int iv = 0;
+	  double dv = 0;
 	  for (unsigned int a = 0; a < num_full_actions; ++a) {
 	    if (ints[p][st]) {
 	      iv = reader->ReadIntOrDie();
