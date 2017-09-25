@@ -1,0 +1,9 @@
+BettingAbstractionName psbb4
+Limit false
+StackSize 8
+Asymmetric false
+NoLimitTreeType 1
+MinBet 2
+AlwaysAllIn true
+MaxBets 3,3,3,3
+AllBetSizeStreets 0,1,2,3
