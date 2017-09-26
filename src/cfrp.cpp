@@ -288,8 +288,8 @@ void CFRP::Run(unsigned int start_it, unsigned int end_it) {
   
   for (it_ = start_it; it_ <= end_it; ++it_) {
     fprintf(stderr, "It %u\n", it_);
-    HalfIteration(true);
-    HalfIteration(false);
+    HalfIteration(1);
+    HalfIteration(0);
   }
 
   Checkpoint(end_it);

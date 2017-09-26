@@ -1,0 +1,13 @@
+# Max of two bets
+# Four bet sizes: min, 1/4, 1/2, 1x.
+BettingAbstractionName mb2b4ss100
+Limit false
+StackSize 100
+Asymmetric false
+NoLimitTreeType 1
+MinBet 2
+AlwaysAllIn false
+AlwaysMinBet true
+MaxBets 2,2,2,2
+BetSizes 0.5,1.0;0.25,0.5,1.0|0.25,0.5,1.0;0.25,0.5,1.0|0.25,0.5,1.0;0.25,0.5,1.0|0.25,0.5,1.0;0.25,0.5,1.0
+CloseToAllInFrac 0.5

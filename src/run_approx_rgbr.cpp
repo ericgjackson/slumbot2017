@@ -278,6 +278,7 @@ CFRValues *ApproxRGBR::GetSumprobs(void) {
     new CFRValues(nullptr, true, streets.get(), betting_tree_.get(), 0, 0,
 		  card_abstraction_, buckets_, nullptr);
   sumprobs->Read(dir, it_, betting_tree_->Root(), "x", kMaxUInt);
+  fprintf(stderr, "Read sumprobs\n");
   return sumprobs;
 
 }

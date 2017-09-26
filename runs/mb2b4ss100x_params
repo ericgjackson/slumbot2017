@@ -1,0 +1,13 @@
+# An expansion of mb2b4ss100 to add intervening bet sizes in the middle of the
+# gaps.  Add 1/8, 3/8, 3/4.
+BettingAbstractionName mb2b4ss100x
+Limit false
+StackSize 100
+Asymmetric false
+NoLimitTreeType 1
+MinBet 2
+AlwaysAllIn false
+AlwaysMinBet true
+MaxBets 2,2,2,2
+BetSizes 0.5,0.75,1.0;0.125,0.25,0.375,0.5,0.75,1.0|0.125,0.25,0.375,0.5,0.75,1.0;0.125,0.25,0.375,0.5,0.75,1.0|0.125,0.25,0.375,0.5,0.75,1.0;0.125,0.25,0.375,0.5,0.75,1.0|0.125,0.25,0.375,0.5,0.75,1.0;0.125,0.25,0.375,0.5,0.75,1.0
+CloseToAllInFrac 0.5

@@ -63,13 +63,6 @@
 //   wrong.
 // What's the solution?  Use the closest approximation that we have?
 //
-// How can I do translation for bet sizes smaller than smallest bet in
-// abstraction?  I am immediately going to get to a call/fold/raise
-// decision.  Only add smallest bet to vector of base nodes?  Add twice -
-// once for translate to zero, once for translate to over.  Use translation
-// probs generated in usual way.  When we get to call/fold/raise on "below"
-// node, take entire fold prob and assign to call.  Just need boolean flag.
-//
 // I calculate new_sumprobs even when num_succs is 1.  Doesn't hurt.  In
 // SetValues() I do nothing.
 
@@ -109,8 +102,8 @@ class Expander {
 public:
   Expander(const CardAbstraction &ca, const BettingAbstraction &base_ba,
 	   const BettingAbstraction &expanded_ba, const CFRConfig &base_cc,
-	   const CFRConfig &expanded_cc, unsigned int it, unsigned int p,
-	   bool nearest);
+	   const CFRConfig &expanded_cc, const Buckets &buckets,
+	   unsigned int it, unsigned int p, bool nearest);
   ~Expander(void) {}
 
   void Go(void);
@@ -123,6 +116,7 @@ private:
   const BettingAbstraction &expanded_betting_abstraction_;
   const CFRConfig &base_cfr_config_;
   const CFRConfig &expanded_cfr_config_;
+  const Buckets &buckets_;
   unsigned int it_;
   unsigned int p_;
   bool nearest_;
@@ -136,10 +130,11 @@ Expander::Expander(const CardAbstraction &ca,
 		   const BettingAbstraction &base_ba,
 		   const BettingAbstraction &expanded_ba,
 		   const CFRConfig &base_cc, const CFRConfig &expanded_cc,
-		   unsigned int it, unsigned int p, bool nearest) :
+		   const Buckets &buckets, unsigned int it, unsigned int p,
+		   bool nearest) :
   card_abstraction_(ca), base_betting_abstraction_(base_ba),
   expanded_betting_abstraction_(expanded_ba), base_cfr_config_(base_cc),
-  expanded_cfr_config_(expanded_cc) {
+  expanded_cfr_config_(expanded_cc), buckets_(buckets) {
   it_ = it;
   p_ = p;
   nearest_ = nearest;
@@ -156,8 +151,6 @@ Expander::Expander(const CardAbstraction &ca,
     expanded_betting_tree_.reset(
 		     BettingTree::BuildTree(expanded_betting_abstraction_));
   }
-
-  Buckets buckets(card_abstraction_, true);
 
   unsigned int max_street = Game::MaxStreet();
   unsigned int num_players = Game::NumPlayers();
@@ -189,10 +182,10 @@ Expander::Expander(const CardAbstraction &ca,
 
   base_sumprobs_.reset(new CFRValues(players.get(), true, nullptr,
 				     base_betting_tree_.get(), 0, 0,
-				     ca, buckets, base_compressed_streets));
+				     ca, buckets_, base_compressed_streets));
   expanded_sumprobs_.reset(new CFRValues(players.get(), true, nullptr,
 					 expanded_betting_tree_.get(), 0, 0,
-					 ca, buckets,
+					 ca, buckets_,
 					 expanded_compressed_streets));
 
   delete [] base_compressed_streets;
@@ -210,7 +203,7 @@ Expander::Expander(const CardAbstraction &ca,
     sprintf(buf, ".p%u", p_);
     strcat(dir, buf);
   }
-  base_sumprobs_->Read(dir, it_, base_betting_tree_->Root(), 0, kMaxUInt);
+  base_sumprobs_->Read(dir, it_, base_betting_tree_->Root(), "x", kMaxUInt);
 
   expanded_sumprobs_->AllocateAndClearDoubles(expanded_betting_tree_->Root(),
 					      kMaxUInt);
@@ -238,9 +231,14 @@ void Expander::Process(Node *node, unsigned int pot_size,
   unsigned int this_p = node->PlayerActing();
   if (this_p == p_) {
     unsigned int st = node->Street();
-    unsigned int num_boards = BoardTree::NumBoards(st);
-    unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
-    unsigned int num_holdings = num_boards * num_hole_card_pairs;
+    unsigned int num_holdings;
+    if (buckets_.None(st)) {
+      num_holdings = buckets_.NumBuckets(st);
+    } else {
+      unsigned int num_boards = BoardTree::NumBoards(st);
+      unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
+      num_holdings = num_boards * num_hole_card_pairs;
+    }
     unsigned int num_base = base_nodes->size();
     unsigned int num_actions = num_holdings * num_succs;
     double *new_sumprobs = new double[num_actions];
@@ -814,7 +812,7 @@ void Expander::Go(void) {
     strcat(dir, buf);
   }
   Mkdir(dir);
-  expanded_sumprobs_->Write(dir, it_, expanded_betting_tree_->Root(), 0, p_);
+  expanded_sumprobs_->Write(dir, it_, expanded_betting_tree_->Root(), "x", p_);
 }
 
 static void Usage(const char *prog_name) {
@@ -860,11 +858,12 @@ int main(int argc, char *argv[]) {
   else                   Usage(argv[0]);
 
   BoardTree::Create();
+  Buckets buckets(*card_abstraction, false);
   
   for (unsigned int p = 0; p <= 1; ++p) {
     Expander expander(*card_abstraction, *base_betting_abstraction,
 		      *expanded_betting_abstraction, *base_cfr_config,
-		      *expanded_cfr_config, it, p, nearest);
+		      *expanded_cfr_config, buckets, it, p, nearest);
     expander.Go();
   }
 }
