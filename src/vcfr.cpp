@@ -1077,7 +1077,7 @@ double *VCFR::StreetInitial(Node *node, unsigned int plbd, double *opp_probs,
     }
   }
 
-  if (nst == 1 && subgame_street_ == 0 && num_threads_ > 1) {
+  if (nst == 1 && subgame_street_ == kMaxUInt && num_threads_ > 1) {
     // Currently only flop supported
     unique_ptr<VCFRThread * []> threads(new VCFRThread *[num_threads_]);
     for (unsigned int t = 0; t < num_threads_; ++t) {
@@ -1089,8 +1089,10 @@ double *VCFR::StreetInitial(Node *node, unsigned int plbd, double *opp_probs,
     }
     // Do first thread in main thread
     threads[0]->Go();
-    for (unsigned int t = 0; t < num_threads_; ++t) {
+    for (unsigned int t = 1; t < num_threads_; ++t) {
       threads[t]->Join();
+    }
+    for (unsigned int t = 0; t < num_threads_; ++t) {
       double *t_vals = threads[t]->RetVals();
       for (unsigned int i = 0; i < prev_num_hole_card_pairs; ++i) {
 	vals[i] += t_vals[i];
