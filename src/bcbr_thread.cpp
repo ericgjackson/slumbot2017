@@ -239,13 +239,14 @@ static unsigned int g_bcbr_nolimp_count = 0;
 
 double *BCBRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
 			      double sum_opp_probs, double *total_card_probs,
+			      unsigned int **street_buckets,
 			      const string &action_sequence) {
   unsigned int st = node->Street();
   double *vals;
   
   if (first_pass_ || st < target_st_) {
     vals = VCFR::OurChoice(node, lbd, opp_probs, sum_opp_probs,
-			   total_card_probs, action_sequence);
+			   total_card_probs, street_buckets, action_sequence);
   } else {
     unsigned int nt = node->NonterminalID();
     unsigned int num_succs = node->NumSuccs();
@@ -253,7 +254,7 @@ double *BCBRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
     for (unsigned int s = 0; s < num_succs; ++s) {
       succ_card_vals[s] = Process(node->IthSucc(s), lbd, opp_probs,
 				  sum_opp_probs, total_card_probs,
-				  action_sequence, st);
+				  street_buckets, action_sequence, st);
     }
     
     unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
@@ -264,7 +265,7 @@ double *BCBRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
     }
   
     for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
-      unsigned int b = street_buckets_[st][i];
+      unsigned int b = street_buckets[st][i];
       unsigned int s = best_succs_[st][nt][b];
       if (s == 255) {
 	fprintf(stderr, "best_succs_[%u][%u][%u] unset\n", st, nt, b);
@@ -305,9 +306,11 @@ double *BCBRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
 // out BCBR values at every node.
 double *BCBRThread::OppChoice(Node *node, unsigned int lbd, double *opp_probs,
 			      double sum_opp_probs, double *total_card_probs,
+			      unsigned int **street_buckets,
 			      const string &action_sequence) {
   double *vals = VCFR::OppChoice(node, lbd, opp_probs, sum_opp_probs,
-				 total_card_probs, action_sequence);
+				 total_card_probs, street_buckets,
+				 action_sequence);
 
   unsigned int st = node->Street();
   if (! first_pass_ && st == target_st_) {
@@ -321,11 +324,13 @@ double *BCBRThread::OppChoice(Node *node, unsigned int lbd, double *opp_probs,
 
 double *BCBRThread::Process(Node *node, unsigned int lbd, double *opp_probs,
 			    double sum_opp_probs, double *total_card_probs,
+			    unsigned int **street_buckets,
 			    const string &action_sequence,
 			    unsigned int last_st) {
   unsigned int st = node->Street();
   double *vals = VCFR::Process(node, lbd, opp_probs, sum_opp_probs,
-			       total_card_probs, action_sequence, last_st);
+			       total_card_probs, street_buckets,
+			       action_sequence, last_st);
   if (first_pass_) {
     if (node->Terminal()) {
       unsigned int tid = node->TerminalID();
@@ -340,7 +345,7 @@ double *BCBRThread::Process(Node *node, unsigned int lbd, double *opp_probs,
       }
       unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
       for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
-	unsigned int b = street_buckets_[st][i];
+	unsigned int b = street_buckets[st][i];
 	bucket_vals[b] += vals[i];
       }
     }
@@ -360,7 +365,7 @@ double *BCBRThread::Process(Node *node, unsigned int lbd, double *opp_probs,
       }
       unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(pst);
       for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
-	unsigned int b = street_buckets_[pst][i];
+	unsigned int b = street_buckets[pst][i];
 	bucket_vals[b] += vals[i];
       }
     }
@@ -464,9 +469,11 @@ void BCBRThread::CardPass(bool first_pass) {
   double *total_card_probs = new double[num_hole_card_pairs];
   CommonBetResponseCalcs(0, hands, opp_probs, &sum_opp_probs,
 			 total_card_probs);
+  unsigned int **street_buckets = InitializeStreetBuckets();
   first_pass_ = first_pass;
   double *vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-			 total_card_probs, "", 0);
+			 total_card_probs, street_buckets, "x", 0);
+  DeleteStreetBuckets(street_buckets);
   delete [] total_card_probs;
 
   if (! first_pass) {

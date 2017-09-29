@@ -379,12 +379,27 @@ of opponent probs.
 * Build a kmeans abstraction for our turn abstraction experiments.
 * Could I solve a system where we learn to handle bets that are actually
   a bit deeper than our stack?  This is to facilitate translation later.
-* Do more nested expansion tests.  Why is 0.5/0.75->0.625 so much worse than
-  0.75/1.0->0.875?  0.25/0.5->0.375?  1.0/1.5->1.25?  1.5/2.0->1.75.
-* Imperfect recall of actions?  Especially for river which will get resolved.
-  Why is CFR+ yielding terrible results?  Try reentrancy at earlier streets.
-  Try resolving rivers.  Can't handle base imperfect recall trees currently.
+* Do more nested expansion tests.  When we add many new bets, do things
+  get much worse?  Use a TCFR base maybe.  Start with 1/2, 3/4 and 1x
+  and add 5/8 and 7/8?
 * Could try expanding imperfect recall tree to perfect recall tree as a
   sanity test.  RGBR results should not change.
-* Redo imperfect recall tests with fixed betting trees.
-* Try imperfect recall test on mb2b2 with only turn betting as key.
+* Try imperfect recall for rarely reached betting states.  Initial test
+  on mb3b3 may determine which states are rarely reached.
+* Any other ideas on when to merge betting states?
+* Write paper on approx RGBR?
+* River abstraction experiments.  Evaluate with run_approx_rgbr on mb1b1.
+* Try progressive endgame solving again?  Can I start with mb2b2 system,
+  and then do eight successive resolves (!)?  1) Add third opening bet;
+  2) Add third preflop raise; 3) Add third flop bet; etc.  Is this equivalent
+  to doing solve_all_endgames2?
+* Can I use targeted CFR to solve turn endgames?  Can I benefit from
+  knowing which hands reach?  For target player, safe to skip any hands
+  that don't reach.  For opponent, though, if I want to use combined method,
+  need to evaluate other hands.  Hang on, more basic question: can the
+  combined method be made to work with targeted CFR?
+* Build ornarrowb100 for fewer iterations; see if gap from expansion is
+  less.  Use cfrps1?  Might as well.
+* mb2b4ss100.  Try expanding.  Need 128 GB machine?  Finish multithreading
+  run_rgbr.
+* More evaluation of turn resolving.  See expt1_results.

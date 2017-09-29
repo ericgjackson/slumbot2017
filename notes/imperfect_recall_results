@@ -45,18 +45,33 @@ Resolve rivers
 
 ms3f1t1r1h5
 hshshshsbc3
-mb2b2
+mb2b2: 9,071 river nonterminals
 1b:  Exploitability: 1027.48 mbb/g
 12b: Exploitability: 611.22 mbb/g
 Resolve rivers:
   12b/200 (~800m): Exploitability: 238.71 mbb/g
-mb2b2rft
+mb2b2rft: 4,554 river nonterminals
 1b:  Exploitability: 1334.53 mbb/g
 2b:  Exploitability: 1181.94 mbb/g
 16b: Exploitability: 980.08 mbb/g
 17b: Exploitability: 975.44 mbb/g
 Resolve rivers
   17b/200 (872m): Exploitability: 317.87 mbb/g
+mb2b2rft100
+12b: Exploitability: 808.70 mbb/g
+Resolve rivers
+  12b/200 (> 800m): Exploitability: 280.80 mbb/g
+mb2b2rt
+12b (640m): Exploitability: 2039.28 mbb/g
+Resolve rivers
+  12b/200 (525m): Exploitability: 679.52 mbb/g
+    Lots worse.
+
+ms3f1t1r1h5
+nhshshs
+mb3b3
+Process size 18.3g
+4b: 
 
 
 cfrps

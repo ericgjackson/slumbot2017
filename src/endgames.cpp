@@ -207,14 +207,18 @@ void EndgameSolver::BRGo(double *p0_br, double *p1_br) {
   const CanonicalCards *hands = hand_tree_->Hands(0, 0);
   CommonBetResponseCalcs(0, hands, uniform_probs, &sum_uniform_probs,
 			 total_card_probs);
+  unsigned int **street_buckets = InitializeStreetBuckets();
   
   p_ = 0;
   double *p0_vals = Process(betting_tree_->Root(), 0, uniform_probs,
-			    sum_uniform_probs, total_card_probs, 0);
+			    sum_uniform_probs, total_card_probs,
+			    street_buckets, 0);
   p_ = 1;
   double *p1_vals = Process(betting_tree_->Root(), 0, uniform_probs,
-			    sum_uniform_probs, total_card_probs, 0);
+			    sum_uniform_probs, total_card_probs,
+			    street_buckets, 0);
 
+  DeleteStreetBuckets(street_buckets);
   delete hand_tree_;
   delete [] uniform_probs;
   delete [] total_card_probs;
@@ -239,6 +243,7 @@ void EndgameSolver::BRGo(double *p0_br, double *p1_br) {
 
 double *EndgameSolver::Process(Node *node, unsigned int lbd, double *opp_probs,
 			       double sum_opp_probs, double *total_card_probs,
+			       unsigned int **street_buckets,
 			       unsigned int last_st) {
   unsigned int st = node->Street();
   if (st == solve_street_ && last_st == solve_street_) {
@@ -251,7 +256,7 @@ double *EndgameSolver::Process(Node *node, unsigned int lbd, double *opp_probs,
     return vals;
   } else {
     return VCFR::Process(node, lbd, opp_probs, sum_opp_probs, total_card_probs,
-			 "", last_st);
+			 street_buckets, "", last_st);
   }
 }
 

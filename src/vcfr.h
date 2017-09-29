@@ -25,6 +25,14 @@ class VCFR {
        const CFRConfig &cc, const Buckets &buckets,
        const BettingTree *betting_tree, unsigned int num_threads);
   virtual ~VCFR(void);
+  virtual double *Process(Node *node, unsigned int lbd, double *opp_probs,
+			  double sum_opp_probs, double *total_card_probs,
+			  unsigned int **street_buckets,
+			  const string &action_sequence, unsigned int last_st);
+  unsigned int **InitializeStreetBuckets(void);
+  void DeleteStreetBuckets(unsigned int **street_buckets);
+  virtual void SetStreetBuckets(unsigned int st, unsigned int gbd,
+				unsigned int **street_buckets);
   void SetIt(unsigned int it) {it_ = it;}
   void SetLastCheckpointIt(unsigned int it) {last_checkpoint_it_ = it;}
   void SetP(unsigned int p) {p_ = p;}
@@ -33,6 +41,7 @@ class VCFR {
   void SetBRCurrent(bool b) {br_current_ = b;}
   void SetValueCalculation(bool b) {value_calculation_ = b;}
   virtual void Post(unsigned int t);
+  HandTree *GetHandTree(void) const {return hand_tree_;}
  protected:
   const unsigned int kMaxDepth = 100;
   
@@ -40,18 +49,25 @@ class VCFR {
 			     int *regrets);
   virtual void UpdateRegrets(Node *node, double *vals, double **succ_vals,
 			     double *regrets);
-  virtual void UpdateRegretsBucketed(Node *node, double *vals,
-				     double **succ_vals, int *regrets);
-  virtual void UpdateRegretsBucketed(Node *node, double *vals,
-				     double **succ_vals, double *regrets);
+  virtual void UpdateRegretsBucketed(Node *node, unsigned int **street_buckets,
+				     double *vals, double **succ_vals,
+				     int *regrets);
+  virtual void UpdateRegretsBucketed(Node *node, unsigned int **street_buckets,
+				     double *vals, double **succ_vals,
+				     double *regrets);
   virtual double *OurChoice(Node *node, unsigned int lbd, double *opp_probs,
 			    double sum_opp_probs, double *total_card_probs,
+			    unsigned int **street_buckets,
 			    const string &action_sequence);
-  virtual void ProcessOppProbsBucketed(Node *node, const CanonicalCards *hands,
+  virtual void ProcessOppProbsBucketed(Node *node,
+				       unsigned int **street_buckets,
+				       const CanonicalCards *hands,
 				       bool nonneg, double *opp_probs,
 				       double **succ_opp_probs,
 				       double *current_probs, int *sumprobs);
-  virtual void ProcessOppProbsBucketed(Node *node, const CanonicalCards *hands,
+  virtual void ProcessOppProbsBucketed(Node *node,
+				       unsigned int **street_buckets,
+				       const CanonicalCards *hands,
 				       bool nonneg, double *opp_probs,
 				       double **succ_opp_probs,
 				       double *current_probs, double *sumprobs);
@@ -69,16 +85,15 @@ class VCFR {
 			       int *cs_vals, double *sumprobs);
   virtual double *OppChoice(Node *node, unsigned int lbd, double *opp_probs,
 			    double sum_opp_probs, double *total_card_probs,
+			    unsigned int **street_buckets,
 			    const string &action_sequence);
   virtual double *StreetInitial(Node *node, unsigned int lbd,
 				double *opp_probs,
+				unsigned int **street_buckets,
 				const string &action_sequence);
   virtual void WaitForFinalSubgames(void);
   virtual void SpawnSubgame(Node *node, unsigned int bd,
 			    const string &action_sequence, double *opp_probs);
-  virtual double *Process(Node *node, unsigned int lbd, double *opp_probs,
-			  double sum_opp_probs, double *total_card_probs,
-			  const string &action_sequence, unsigned int last_st);
   virtual void SetCurrentStrategy(Node *node);
 
   const CardAbstraction &card_abstraction_;
@@ -105,6 +120,7 @@ class VCFR {
   unsigned int target_p_;
   unsigned int num_players_;
   unsigned int subgame_street_;
+  unsigned int split_street_;
   bool nn_regrets_;
   bool uniform_;
   unsigned int soft_warmup_;
@@ -123,8 +139,6 @@ class VCFR {
   unsigned int p_;
   HandTree *hand_tree_;
   bool bucketed_; // Does at least one street have buckets?
-  unsigned int **street_buckets_;
-  double *sumprob_defaults_;
   bool pre_phase_;
   double ****final_vals_;
   bool *subgame_running_;

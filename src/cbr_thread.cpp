@@ -182,9 +182,11 @@ void CBRThread::WriteValues(Node *node, unsigned int gbd,
 
 double *CBRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
 			     double sum_opp_probs, double *total_card_probs,
+			     unsigned int **street_buckets,
 			     const string &action_sequence) {
   double *vals = VCFR::OurChoice(node, lbd, opp_probs, sum_opp_probs,
-				 total_card_probs, action_sequence);
+				 total_card_probs, street_buckets,
+				 action_sequence);
 
   unsigned int st = node->Street();
   unsigned int gbd = 0;
@@ -214,9 +216,11 @@ double *CBRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
 
 double *CBRThread::OppChoice(Node *node, unsigned int lbd, double *opp_probs,
 			     double sum_opp_probs, double *total_card_probs,
+			     unsigned int **street_buckets,
 			     const string &action_sequence) {
   double *vals = VCFR::OppChoice(node, lbd, opp_probs, sum_opp_probs,
-				 total_card_probs, action_sequence);
+				 total_card_probs, street_buckets,
+				 action_sequence);
 
   unsigned int st = node->Street();
   unsigned int gbd = 0;
@@ -257,6 +261,7 @@ double *CBRThread::Split(Node *node, unsigned int bd, double *opp_probs) {
 
 double *CBRThread::Process(Node *node, unsigned int lbd, double *opp_probs,
 			   double sum_opp_probs, double *total_card_probs,
+			   unsigned int **street_buckets,
 			   const string &action_sequence,
 			   unsigned int last_st) {
   unsigned int st = node->Street();
@@ -281,7 +286,8 @@ double *CBRThread::Process(Node *node, unsigned int lbd, double *opp_probs,
     }
 #endif
     return VCFR::Process(node, lbd, opp_probs, sum_opp_probs,
-			 total_card_probs, action_sequence, last_st);
+			 total_card_probs, street_buckets, action_sequence,
+			 last_st);
   }
 }
 
@@ -417,9 +423,10 @@ void CBRThread::AfterSplit(void) {
     // Or maybe it's OK because we are not updating sum-opp-probs in a CBR
     // calculation.
     fprintf(stderr, "Should pass in current action sequence\n");
+    fprintf(stderr, "Should pass in street buckets\n");
     exit(-1);
     double *next_vals = Process(subtree->Root(), nlbd, opp_reach_probs_, 0,
-				NULL, "", nst);
+				NULL, nullptr, "", nst);
     sumprobs_.reset(nullptr);
 
     const CanonicalCards *next_hands = hand_tree_->Hands(nst, 0);
@@ -475,8 +482,10 @@ double CBRThread::Go(void) {
   const CanonicalCards *hands = hand_tree_->Hands(0, 0);
   CommonBetResponseCalcs(0, hands, opp_probs, &sum_opp_probs,
 			 total_card_probs);
+  unsigned int **street_buckets = InitializeStreetBuckets();
   double *vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-			 total_card_probs, "x", 0);
+			 total_card_probs, street_buckets, "x", 0);
+  DeleteStreetBuckets(street_buckets);
   delete [] total_card_probs;
   // EVs for our hands are summed over all opponent hole card pairs.  To
   // compute properly normalized EV, need to divide by that number.

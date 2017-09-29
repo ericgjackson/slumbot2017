@@ -54,7 +54,7 @@ private:
 		     unsigned int *prior_bds, double **reach_probs);
   double *Process(Node *node, unsigned int lbd, double *opp_probs,
 		  double sum_opp_probs, double *total_card_probs,
-		  unsigned int last_st);
+		  unsigned int **street_buckets, unsigned int last_st);
 
   unsigned int solve_street_;
   ResolvingMethod method_;

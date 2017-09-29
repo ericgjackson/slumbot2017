@@ -181,17 +181,19 @@ void CFRP::HalfIteration(unsigned int p) {
   const CanonicalCards *hands = hand_tree_->Hands(0, 0);
   CommonBetResponseCalcs(0, hands, opp_probs, &sum_opp_probs,
 			 total_card_probs);
+  unsigned int **street_buckets = InitializeStreetBuckets();
 
   if (subgame_street_ <= Game::MaxStreet()) pre_phase_ = true;
   double *vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-			 total_card_probs, "", 0);
+			 total_card_probs, street_buckets, "", 0);
   if (subgame_street_ <= Game::MaxStreet()) {
     delete [] vals;
     WaitForFinalSubgames();
     pre_phase_ = false;
     vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-		   total_card_probs, "", 0);
+		   total_card_probs, street_buckets, "", 0);
   }
+  DeleteStreetBuckets(street_buckets);
 #if 0
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(0);
   for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {

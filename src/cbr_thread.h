@@ -33,14 +33,17 @@ private:
 		   double *vals);
   double *OurChoice(Node *node, unsigned int lbd, double *opp_probs,
 		    double sum_opp_probs, double *total_card_probs,
+		    unsigned int **street_buckets,
 		    const string &action_sequence);
   double *OppChoice(Node *node, unsigned int lbd, double *opp_probs,
 		    double sum_opp_probs, double *total_card_probs,
+		    unsigned int **street_buckets,
 		    const string &action_sequence);
   double *Split(Node *node, unsigned int bd, double *opp_probs);
   double *Process(Node *node, unsigned int lbd, double *opp_probs,
 		  double sum_opp_probs, double *total_card_probs,
-		  const string &action_sequence, unsigned int last_st);
+		  unsigned int **street_buckets, const string &action_sequence,
+		  unsigned int last_st);
   void Run(void);
   void Join(void);
   void SetSplitNode(Node *n) {split_node_ = n;}

@@ -187,17 +187,19 @@ double RGBR::Go(unsigned int it, unsigned int p) {
   double sum_opp_probs;
   const CanonicalCards *hands = hand_tree_->Hands(0, 0);
   CommonBetResponseCalcs(0, hands, opp_probs, &sum_opp_probs, total_card_probs);
+  unsigned int **street_buckets = InitializeStreetBuckets();
 
   if (subgame_street_ <= max_street) pre_phase_ = true;
   double *vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-			 total_card_probs, "", 0);
+			 total_card_probs, street_buckets, "x", 0);
   if (subgame_street_ <= max_street) {
     delete [] vals;
     WaitForFinalSubgames();
     pre_phase_ = false;
     vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-		   total_card_probs, "", 0);
+		   total_card_probs, street_buckets, "x", 0);
   }
+  DeleteStreetBuckets(street_buckets);
   
   delete [] total_card_probs;
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(0);

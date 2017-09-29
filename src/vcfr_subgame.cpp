@@ -196,7 +196,7 @@ void VCFRSubgame::Go(void) {
 				  compressed_streets_));
 
     if (it_ == 1) {
-      if (p_) {
+      if (p_ == 1) {
 	// It 1 P1 phase: initialize P0 and P1 regrets
 	regrets_->AllocateAndClearInts(subtree_->Root(), kMaxUInt);
       } else {
@@ -205,7 +205,7 @@ void VCFRSubgame::Go(void) {
 	regrets_->AllocateAndClearInts(subtree_->Root(), 0);
       }
     } else {
-      if (p_) {
+      if (p_ == 1) {
 	// Read regrets for both players from previous iteration
 	regrets_->Read(dir, it_ - 1, subtree_->Root(), action_sequence_,
 		       kMaxUInt);
@@ -230,8 +230,15 @@ void VCFRSubgame::Go(void) {
   const CanonicalCards *hands = hand_tree_->Hands(root_bd_st_, 0);
   CommonBetResponseCalcs(root_bd_st_, hands, opp_probs_, &sum_opp_probs,
 			 total_card_probs);
+  // Should set buckets for initial street of subgame
+  unsigned int **street_buckets = InitializeStreetBuckets();
+  if (! buckets_.None(subtree_st)) {
+    fprintf(stderr, "Need to set buckets for initial street of subgame\n");
+    exit(-1);
+  }
   final_vals_ = Process(subtree_->Root(), 0, opp_probs_, sum_opp_probs,
-			total_card_probs, "", subtree_st - 1);
+			total_card_probs, street_buckets, "", subtree_st - 1);
+  DeleteStreetBuckets(street_buckets);
 
   delete [] total_card_probs;
 

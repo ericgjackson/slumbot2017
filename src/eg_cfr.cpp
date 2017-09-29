@@ -93,7 +93,8 @@ EGCFR::~EGCFR(void) {
 }
 
 double *EGCFR::HalfIteration(BettingTree *subtree, unsigned int p,
-			     double *opp_probs) {
+			     double *opp_probs,
+			     unsigned int **street_buckets) {
   p_ = p;
   Node *subtree_root = subtree->Root();
   unsigned int max_card = Game::MaxCard();
@@ -113,7 +114,8 @@ double *EGCFR::HalfIteration(BettingTree *subtree, unsigned int p,
     return vals;
   }
   double *vals = Process(subtree_root, 0, opp_probs, sum_opp_probs,
-			 total_card_probs, "", subtree_root->Street());
+			 total_card_probs, street_buckets, "",
+			 subtree_root->Street());
 
   delete [] total_card_probs;
   return vals;
@@ -124,7 +126,7 @@ double *EGCFR::HalfIteration(BettingTree *subtree, unsigned int p,
 // Use "villain" to mean the player who is not the target player.
 void EGCFR::CFRDHalfIteration(BettingTree *subtree, unsigned int p,
 			      double *target_reach_probs,
-			      double *opp_cvs) {
+			      double *opp_cvs, unsigned int **street_buckets) {
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(root_bd_st_);
   unsigned int num_hole_cards = Game::NumCardsForStreet(0);
   unsigned int max_card1 = Game::MaxCard() + 1;
@@ -152,12 +154,13 @@ void EGCFR::CFRDHalfIteration(BettingTree *subtree, unsigned int p,
   delete [] probs;
   
   if (p == target_p_) {
-    double *vals = HalfIteration(subtree, p, villain_probs);
+    double *vals = HalfIteration(subtree, p, villain_probs, street_buckets);
     delete [] vals;
   } else {
     // Opponent phase.  The target player plays his fixed range to the
     // subgame.
-    double *vals = HalfIteration(subtree, p, target_reach_probs);
+    double *vals = HalfIteration(subtree, p, target_reach_probs,
+				 street_buckets);
     for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
       double *regrets = &cfrd_regrets_[i * 2];
       const Card *cards = hands->Cards(i);
@@ -191,7 +194,8 @@ void EGCFR::CFRDHalfIteration(BettingTree *subtree, unsigned int p,
 // Attempt at a different method for combine unsafe, CFR-D and uniform
 // ranges.
 void EGCFR::CombinedHalfIteration(BettingTree *subtree, unsigned int p,
-				  double **reach_probs) {
+				  double **reach_probs,
+				  unsigned int **street_buckets) {
   double *cfrd_probs = new double[num_enc];
   double *unsafe_probs = new double[num_enc];
   const CanonicalCards *hands = hand_tree_->Hands(root_bd_st_, 0);
@@ -260,7 +264,8 @@ void EGCFR::CombinedHalfIteration(BettingTree *subtree, unsigned int p,
 void EGCFR::SymmetricCombinedHalfIteration(BettingTree *subtree,
 					   unsigned int p,
 					   double **reach_probs,
-					   double **opp_cvs) {
+					   double **opp_cvs,
+					   unsigned int **street_buckets) {
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(root_bd_st_);
   unsigned int num_hole_cards = Game::NumCardsForStreet(0);
   unsigned int max_card1 = Game::MaxCard() + 1;
@@ -321,7 +326,8 @@ void EGCFR::SymmetricCombinedHalfIteration(BettingTree *subtree,
 // the subgame.  Succ 1 corresponds to taking the T value.
 // Use "villain" to mean the player who is not the target player.
 void EGCFR::CombinedHalfIteration(BettingTree *subtree, unsigned int p,
-				  double **reach_probs, double *opp_cvs) {
+				  double **reach_probs, double *opp_cvs,
+				  unsigned int **street_buckets) {
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(root_bd_st_);
   unsigned int num_hole_cards = Game::NumCardsForStreet(0);
   unsigned int max_card1 = Game::MaxCard() + 1;
@@ -430,13 +436,14 @@ void EGCFR::CombinedHalfIteration(BettingTree *subtree, unsigned int p,
   }
   
   if (p == target_p_) {
-    double *vals = HalfIteration(subtree, p, villain_probs);
+    double *vals = HalfIteration(subtree, p, villain_probs, street_buckets);
     delete [] vals;
   } else {
     // Opponent phase.  The target player plays his fixed range to the
     // subgame.
     double *target_reach_probs = reach_probs[target_p_];
-    double *vals = HalfIteration(subtree, p, target_reach_probs);
+    double *vals = HalfIteration(subtree, p, target_reach_probs,
+				 street_buckets);
 #if 0
     if (it_ == 200 && target_p_ == 0) {
       for (unsigned int i = 0; i < num_hole_card_pairs; i += 100) {
@@ -486,7 +493,8 @@ void EGCFR::CombinedHalfIteration(BettingTree *subtree, unsigned int p,
 // issue arises during P2 phase.  P2 "T" values were calculated relative to
 // P1 hands that reach, right?
 void EGCFR::MaxMarginHalfIteration(BettingTree *subtree, unsigned int p,
-				   double **reach_probs, double *opp_cvs) {
+				   double **reach_probs, double *opp_cvs,
+				   unsigned int **street_buckets) {
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(root_bd_st_);
   unsigned int num_hole_cards = Game::NumCardsForStreet(0);
   unsigned int max_card1 = Game::MaxCard() + 1;
@@ -531,11 +539,11 @@ void EGCFR::MaxMarginHalfIteration(BettingTree *subtree, unsigned int p,
     }
   }
   if (p == target_p_) {
-    double *vals = HalfIteration(subtree, p, opp_probs);
+    double *vals = HalfIteration(subtree, p, opp_probs, street_buckets);
     delete [] vals;
   } else {
     double *opp_reach_probs = reach_probs[p^1];
-    double *vals = HalfIteration(subtree, p, opp_reach_probs);
+    double *vals = HalfIteration(subtree, p, opp_reach_probs, street_buckets);
     // Offset CVs by "T" values
     double val = 0, sum_probs = 0;
     for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
@@ -826,6 +834,7 @@ void EGCFR::SolveSubgame(BettingTree *subtree, unsigned int solve_bd,
   sumprobs_->AllocateAndClearDoubles(subtree->Root(), kMaxUInt);
   delete [] subtree_streets;
 
+  unsigned int **street_buckets = InitializeStreetBuckets();
   if (! buckets_.None(root_bd_st_)) {
     unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(root_bd_st_);
     if (max_street == root_bd_st_) {
@@ -842,12 +851,12 @@ void EGCFR::SolveSubgame(BettingTree *subtree, unsigned int solve_bd,
 	cards[1] = hole_cards[1];
 	unsigned int hcp = HCPIndex(root_bd_st_, cards);
 	unsigned int h = root_bd_ * num_hole_card_pairs + hcp;
-	street_buckets_[root_bd_st_][i] = buckets_.Bucket(root_bd_st_, h);
+	street_buckets[root_bd_st_][i] = buckets_.Bucket(root_bd_st_, h);
       }
     } else {
       for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
 	unsigned int h = root_bd_ * num_hole_card_pairs + i;
-	street_buckets_[root_bd_st_][i] = buckets_.Bucket(root_bd_st_, h);
+	street_buckets[root_bd_st_][i] = buckets_.Bucket(root_bd_st_, h);
       }
     }
   }
@@ -952,21 +961,24 @@ void EGCFR::SolveSubgame(BettingTree *subtree, unsigned int solve_bd,
   for (it_ = 1; it_ <= num_its; ++it_) {
     // fprintf(stderr, "It %i\n", it_);
     if (method_ == ResolvingMethod::MAXMARGIN) {
-      MaxMarginHalfIteration(subtree, 1, reach_probs, opp_cvs);
-      MaxMarginHalfIteration(subtree, 0, reach_probs, opp_cvs);
+      MaxMarginHalfIteration(subtree, 1, reach_probs, opp_cvs, street_buckets);
+      MaxMarginHalfIteration(subtree, 0, reach_probs, opp_cvs, street_buckets);
     } else if (method_ == ResolvingMethod::CFRD) {
-      CFRDHalfIteration(subtree, 1, reach_probs[target_p_], opp_cvs);
-      CFRDHalfIteration(subtree, 0, reach_probs[target_p_], opp_cvs);
+      CFRDHalfIteration(subtree, 1, reach_probs[target_p_], opp_cvs,
+			street_buckets);
+      CFRDHalfIteration(subtree, 0, reach_probs[target_p_], opp_cvs,
+			street_buckets);
     } else if (method_ == ResolvingMethod::UNSAFE) {
-      vals = HalfIteration(subtree, 1, reach_probs[0]);
+      vals = HalfIteration(subtree, 1, reach_probs[0], street_buckets);
       delete [] vals;
-      vals = HalfIteration(subtree, 0, reach_probs[1]);
+      vals = HalfIteration(subtree, 0, reach_probs[1], street_buckets);
       delete [] vals;
     } else if (method_ == ResolvingMethod::COMBINED) {
-      CombinedHalfIteration(subtree, 1, reach_probs, opp_cvs);
-      CombinedHalfIteration(subtree, 0, reach_probs, opp_cvs);
+      CombinedHalfIteration(subtree, 1, reach_probs, opp_cvs, street_buckets);
+      CombinedHalfIteration(subtree, 0, reach_probs, opp_cvs, street_buckets);
     }
   }
+  DeleteStreetBuckets(street_buckets);
   
 #if 0
   if (target_p_ == 0) {
@@ -1141,6 +1153,9 @@ double *EGCFR::BRGo(BettingTree *subtree, unsigned int p,
   const CanonicalCards *hands = hand_tree_->Hands(root_bd_st_, 0);
   CommonBetResponseCalcs(subtree_root->Street(), hands, opp_probs,
 			 &sum_opp_probs, total_card_probs);
+  fprintf(stderr, "Need to initialize and set street buckets\n");
+  exit(-1);
+  unsigned int **street_buckets = nullptr;
   // If no opponent reach the subtree with non-zero probability, then all
   // vals are zero.
   double *vals;
@@ -1149,7 +1164,7 @@ double *EGCFR::BRGo(BettingTree *subtree, unsigned int p,
     for (unsigned int i = 0; i < num_hole_card_pairs; ++i) vals[i] = 0;
   } else {
     vals = Process(subtree_root, 0, opp_probs, sum_opp_probs, total_card_probs,
-		   "", subtree_root->Street());
+		   street_buckets, "", subtree_root->Street());
   }
   delete [] total_card_probs;
   return vals;

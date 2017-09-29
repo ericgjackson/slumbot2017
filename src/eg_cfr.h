@@ -48,13 +48,16 @@ class EGCFR : public VCFR {
   const CFRValues *Sumprobs(void) const {return sumprobs_.get();}
  private:
   double *HalfIteration(BettingTree *subtree, unsigned int p,
-			double *opp_probs);
+			double *opp_probs, unsigned int **street_buckets);
   void CFRDHalfIteration(BettingTree *subtree, unsigned int p,
-			 double *target_reach_probs, double *opp_cvs);
+			 double *target_reach_probs, double *opp_cvs,
+			 unsigned int **street_buckets);
   void CombinedHalfIteration(BettingTree *subtree, unsigned int p,
-			     double **reach_probs, double *opp_cvs);
+			     double **reach_probs, double *opp_cvs,
+			     unsigned int **street_buckets);
   void MaxMarginHalfIteration(BettingTree *subtree, unsigned int p,
-			      double **reach_probs, double *opp_cvs);
+			      double **reach_probs, double *opp_cvs,
+			      unsigned int **street_buckets);
   double *LoadCVs(Node *subtree_root, const string &action_sequence,
 		  unsigned int gbd, unsigned int base_it, unsigned int p,
 		  double **reach_probs, const CanonicalCards *hands,

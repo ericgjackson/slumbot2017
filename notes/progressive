@@ -81,3 +81,6 @@ But will this work any better than solve_all_endgames2 which did not work
 
 -------------------------------------------------------------------
 
+Nested expansion is yielding bad results.
+
+What if we resolve as soon as we get off tree?

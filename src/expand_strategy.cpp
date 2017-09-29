@@ -233,11 +233,11 @@ void Expander::Process(Node *node, unsigned int pot_size,
     unsigned int st = node->Street();
     unsigned int num_holdings;
     if (buckets_.None(st)) {
-      num_holdings = buckets_.NumBuckets(st);
-    } else {
       unsigned int num_boards = BoardTree::NumBoards(st);
       unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
       num_holdings = num_boards * num_hole_card_pairs;
+    } else {
+      num_holdings = buckets_.NumBuckets(st);
     }
     unsigned int num_base = base_nodes->size();
     unsigned int num_actions = num_holdings * num_succs;

@@ -255,3 +255,25 @@ Plan:
 
 Challenge: seems like we might need lots and lots of bets for low
 exploitability.  For example, need 5/8: 1/2 and 3/4 not sufficient.
+
+---------------------------------------------------------------------
+
+Actually, now it appears that nested expansion may not hurt that much if
+your base system is not that good to begin with.  If your base system
+has exploitability 200-300 mbb/g or more, expanding to more bets hardly
+hurts at all.  Since our eventual system cannot be that good, maybe we
+don't need that many bet sizes for the early streets.
+
+---------------------------------------------------------------------
+
+What is my goal?  If it's really to minimize exploitability, then I would
+either need to a) have lots and lots of bet sizes in the base for the
+preflop, flop and probably turn; or b) come up with a dynamic progressive
+resolving approach.  Either (a) or (b) would likely lead to inferior
+head-to-head results.
+
+What if I choose to minimize exploitability under certain assumptions
+about bet sizes?  Well, I'm happy to assume the bets will not be too
+big or too small, but I'm not sure I want to assume anything about
+5/8 pot bets, say, happening or not happening.
+

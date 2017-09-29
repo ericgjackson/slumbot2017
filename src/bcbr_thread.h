@@ -33,13 +33,16 @@ private:
 		   const string &action_sequence, double *vals);
   double *OurChoice(Node *node, unsigned int lbd, double *opp_probs,
 		    double sum_opp_probs, double *total_card_probs,
+		    unsigned int **street_buckets,
 		    const string &action_sequence);
   double *OppChoice(Node *node, unsigned int lbd, double *opp_probs,
 		    double sum_opp_probs, double *total_card_probs,
+		    unsigned int **street_buckets,
 		    const string &action_sequence);
   double *Process(Node *node, unsigned int lbd, double *opp_probs,
 		  double sum_opp_probs, double *total_card_probs,
-		  const string &action_sequence, unsigned int last_st);
+		  unsigned int **street_buckets, const string &action_sequence,
+		  unsigned int last_st);
   void CardPass(bool first_pass);
 
   double *SecondPassOurChoice(Node *node);

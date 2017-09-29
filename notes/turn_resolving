@@ -127,3 +127,53 @@ trbase3
 Stack size 45 (was 54)
 200 (64m): Exploitability: 36.56 mbb/g
 trbase3->trexp3 200: Exploitability: 67.53 mbb/g
+
+-----------------------------------------------------------------
+
+Solving base ms1f1 game is analogous to endgame solving of turn game.
+One board card to come from 52-card deck.
+Try some experiments on this.
+
+ms1f1
+none
+cfrps
+
+mb1b1 200 (2.8s): Exploitability: 2.86 mbb/g
+mb2b2 200 (44s):  Exploitability: 9.59 mbb/g
+mb3b3 200 (12m):  Exploitability: 68.34 mbb/g
+
+cfrps1
+nhs1
+mb3b3 50 (2m):     Exploitability: 392.43 mbb/g
+mb3b3 100 (+1.5m): Exploitability: 236.81 mbb/g
+mb3b3 150 (+1.5m): Exploitability: 185.25 mbb/g
+mb3b3 200 (+1.5m): Exploitability: 160.16 mbb/g
+mb3b3 250 (+1.5m): Exploitability: 150.42 mbb/g
+mb3b3 300 (+1.5m): Exploitability: 144.35 mbb/g
+
+mb4b4 50 (16.5m):   Exploitability: 601.91 mbb/g
+mb4b4 100 (+24.5m): Exploitability: 372.77 mbb/g
+mb4b4 150 (+25m):   Exploitability: 262.95 mbb/g
+
+
+tcfrf
+Single threaded
+nhs1
+mb3b3 1m in 1.8s:   Exploitability: 1691.77 mbb/g
+mb3b3 10m in 11s:   Exploitability: 604.76 mbb/g
+mb3b3 100m in 1.5m: Exploitability: 219.87 mbb/g
+mb3b3 200m in 3m:   Exploitability: 192.41 mbb/g
+
+mb4b4 100m in 7.25m: Exploitability: 393.04 mbb/g
+mb4b4 200m in +6m:   Exploitability: 302.06 mbb/g
+mb4b4 300m in +7m:   Exploitability: 264.39 mbb/g
+  Better than cfrps1.
+
+pcs
+Single threaded
+nhs1
+mb1b1 1k in 1.3s: Exploitability: 42.10 mbb/g
+mb1b1 10k in 12s: Exploitability: 39.47 mbb/g
+  No improvement?
+mb3b3 1k in 3.25m: Exploitability: 219.39 mbb/g
+mb4b4 1k in 29m:   Exploitability: 273.80 mbb/g

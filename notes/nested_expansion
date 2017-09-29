@@ -119,9 +119,35 @@ ornarrow: Stack sizes of 400 (200 BB)
   Out of memory in expansion
 ornarrowb100: 1/2 and 3/4
   200: Exploitability: 58.82 mbb/g
+  cfrps1/50:  Exploitability: 579.11 mbb/g
+  cfrps1/60:  Exploitability: 468.06 mbb/g
+  cfrps1/70:  Exploitability: 383.97 mbb/g
+  cfrps1/80:  Exploitability: 321.85 mbb/g
+  cfrps1/90:  Exploitability: 276.20 mbb/g
+  cfrps1/100: Exploitability: 240.37 mbb/g
+  cfrps1/150: Exploitability: 137.37 mbb/g
+  cfrps1/160: Exploitability: 124.31 mbb/g
+  cfrps1/170: Exploitability: 113.28 mbb/g
+  cfrps1/180: Exploitability: 103.37 mbb/g
+  cfrps1/190: Exploitability: 94.81 mbb/g
+  cfrps1/200: Exploitability: 87.16 mbb/g
+  cfrps1/250: Exploitability: 60.65 mbb/g
 ornarrowb100x: expand to 5/8
-  200: Exploitability: 132.09 mbb/g
+  200: Exploitability: 132.09 mbb/g (+73)
   Why so much worse?
+  cfrps1/50:  Exploitability: 584.82 mbb/g (+6)
+  cfrps1/60:  Exploitability: 475.28 mbb/g (+7)
+  cfrps1/70:  Exploitability: 392.23 mbb/g (+8)
+  cfrps1/80:  Exploitability: 331.26 mbb/g (+10)
+  cfrps1/90:  Exploitability: 287.07 mbb/g (+11)
+  cfrps1/100: Exploitability: 253.55 mbb/g (+13)
+  cfrps1/150: Exploitability: 162.87 mbb/g (+25)
+  cfrps1/160: Exploitability: 152.61 mbb/g (+28)
+  cfrps1/170: Exploitability: 144.36 mbb/g (+31)
+  cfrps1/180: Exploitability: 137.24 mbb/g (+34)
+  cfrps1/190: Exploitability: 131.49 mbb/g (+37)
+  cfrps1/200: Exploitability: 126.55 mbb/g (+39)
+  cfrps1/250: Exploitability: 111.95 mbb/g (+51)
 ornarrowb100x2: expand to 5/8 (but not preflop)
   200: Exploitability: 116.98 mbb/g
   Still pretty bad, but significantly better.

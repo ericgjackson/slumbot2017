@@ -162,11 +162,13 @@ void BCFRThread::WriteValues(Node *node, unsigned int gbd,
 
 double *BCFRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
 			      double sum_opp_probs, double *total_card_probs,
+			      unsigned int **street_buckets,
 			      const string &action_sequence) {
   unsigned int st = node->Street();
   
   double *vals = VCFR::OurChoice(node, lbd, opp_probs, sum_opp_probs,
-				 total_card_probs, action_sequence);
+				 total_card_probs, street_buckets,
+				 action_sequence);
   unsigned int gbd = 0;
   if (st > 0) gbd = BoardTree::GlobalIndex(root_bd_st_, root_bd_, st, lbd);
   WriteValues(node, gbd, action_sequence, vals);
@@ -178,9 +180,11 @@ double *BCFRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
 // out values at every node.
 double *BCFRThread::OppChoice(Node *node, unsigned int lbd, double *opp_probs,
 			      double sum_opp_probs, double *total_card_probs,
+			      unsigned int **street_buckets,
 			      const string &action_sequence) {
   double *vals = VCFR::OppChoice(node, lbd, opp_probs, sum_opp_probs,
-				 total_card_probs, action_sequence);
+				 total_card_probs, street_buckets,
+				 action_sequence);
 
   unsigned int st = node->Street();
   unsigned int gbd = 0;
@@ -208,8 +212,10 @@ void BCFRThread::Go(void) {
   double *total_card_probs = new double[num_hole_card_pairs];
   CommonBetResponseCalcs(0, hands, opp_probs, &sum_opp_probs,
 			 total_card_probs);
+  unsigned int **street_buckets = InitializeStreetBuckets();
   double *vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-			 total_card_probs, "", 0);
+			 total_card_probs, street_buckets, "x", 0);
+  DeleteStreetBuckets(street_buckets);
   delete [] total_card_probs;
 
   // EVs for our hands are summed over all opponent hole card pairs.  To
