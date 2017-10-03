@@ -16,7 +16,7 @@ HEADS =	src/constants.h src/rand.h src/split.h src/files.h \
 	src/bcfr_thread.h src/bcbr_builder.h src/vcfr_subgame.h src/kmeans.h \
 	src/dynamic_cbr.h src/endgame_utils.h \
 	src/compression_utils.h src/regret_compression.h src/tcfr.h src/ols.h \
-	src/ej_compress.h
+	src/ej_compress.h src/pcs_cfr.h
 
 # -Wl,--no-as-needed fixes my problem of undefined reference to
 # pthread_create (and pthread_join).  Comments I found on the web indicate
@@ -49,7 +49,7 @@ OBJS =	obj/rand.o obj/split.o obj/files.o obj/cards.o obj/io.o \
 	obj/bcfr_thread.o obj/bcbr_builder.o obj/vcfr_subgame.o obj/kmeans.o \
 	obj/dynamic_cbr.o obj/endgame_utils.o \
 	obj/compression_utils.o obj/regret_compression.o obj/tcfr.o obj/ols.o \
-	obj/ej_compress.o
+	obj/ej_compress.o obj/pcs_cfr.o
 
 bin/test:	obj/test.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/test obj/test.o $(OBJS) \
@@ -73,6 +73,10 @@ bin/run_cfrp:	obj/run_cfrp.o $(OBJS) $(HEADS)
 
 bin/run_tcfr:	obj/run_tcfr.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/run_tcfr obj/run_tcfr.o $(OBJS) \
+	$(LIBRARIES)
+
+bin/run_pcs:	obj/run_pcs.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/run_pcs obj/run_pcs.o $(OBJS) \
 	$(LIBRARIES)
 
 bin/run_rgbr:	obj/run_rgbr.o $(OBJS) $(HEADS)
@@ -175,6 +179,10 @@ bin/build_board_features:	obj/build_board_features.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/build_board_features \
 	obj/build_board_features.o $(OBJS) $(LIBRARIES)
 
+bin/combine_features:	obj/combine_features.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/combine_features \
+	obj/combine_features.o $(OBJS) $(LIBRARIES)
+
 bin/prify:	obj/prify.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/prify obj/prify.o \
 	$(OBJS) $(LIBRARIES)
@@ -230,6 +238,10 @@ bin/show_cbrs:	obj/show_cbrs.o $(OBJS) $(HEADS)
 bin/show_reach_probs:	obj/show_reach_probs.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/show_reach_probs \
 	obj/show_reach_probs.o $(OBJS) $(LIBRARIES)
+
+bin/show_joint_reach_probs:	obj/show_joint_reach_probs.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/show_joint_reach_probs \
+	obj/show_joint_reach_probs.o $(OBJS) $(LIBRARIES)
 
 bin/test_shared_ptrs:	obj/test_shared_ptrs.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/test_shared_ptrs \
