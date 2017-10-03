@@ -369,13 +369,13 @@ void BettingTreeBuilder::CreateNoLimitSuccs(unsigned int street,
 
     if (num_street_bets < betting_abstraction_.MaxBets(street, our_bet)) {
       if ((! betting_abstraction_.Asymmetric() &&
-	   betting_abstraction_.AlwaysMinBet()) ||
+	   betting_abstraction_.AlwaysMinBet(street, num_street_bets)) ||
 	  (betting_abstraction_.Asymmetric() &&
 	   player_acting == target_player &&
-	   betting_abstraction_.OurAlwaysMinBet()) ||
+	   betting_abstraction_.OurAlwaysMinBet(street, num_street_bets)) ||
 	  (betting_abstraction_.Asymmetric() &&
 	   player_acting != target_player &&
-	   betting_abstraction_.OppAlwaysMinBet())) {
+	   betting_abstraction_.OppAlwaysMinBet(street, num_street_bets))) {
 	// Allow a min bet
 	unsigned int min_bet;
 	if (num_street_bets == 0) {

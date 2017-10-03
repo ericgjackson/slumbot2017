@@ -97,6 +97,44 @@ static unsigned int *ParseMaxBets(const Params &params, const string &param) {
   return max_bets;
 }
 
+bool **BettingAbstraction::ParseMinBets(const string &value) {
+  unsigned int max_street = Game::MaxStreet();
+  vector<string> v1;
+  Split(value.c_str(), ';', true, &v1);
+  if (v1.size() != max_street + 1) {
+    fprintf(stderr, "ParseMinBets: expected %u street values\n",
+	    max_street + 1);
+    exit(-1);
+  }
+  bool **min_bets = new bool *[max_street + 1];
+  for (unsigned int st = 0; st <= max_street; ++st) {
+    unsigned int max_bets = max_bets_[st];
+    min_bets[st] = new bool[max_bets];
+    // Default
+    for (unsigned int b = 0; b < max_bets; ++b) {
+      min_bets[st][b] = false;
+    }
+    const string &sv = v1[st];
+    vector<string> v2;
+    Split(sv.c_str(), ',', false, &v2);
+    unsigned int num = v2.size();
+    for (unsigned int i = 0; i < num; ++i) {
+      const string &sv2 = v2[i];
+      unsigned int nb;
+      if (sscanf(sv2.c_str(), "%u", &nb) != 1) {
+	fprintf(stderr, "ParseMinBets: couldn't parse %s\n", value.c_str());
+	exit(-1);
+      }
+      if (nb >= max_bets) {
+	fprintf(stderr, "ParseMinBets: OOB value %u\n", nb);
+	exit(-1);
+      }
+      min_bets[st][nb] = true;
+    }
+  }
+  return min_bets;
+}
+
 BettingAbstraction::BettingAbstraction(const Params &params) {
   betting_abstraction_name_ = params.GetStringValue("BettingAbstractionName");
   limit_ = params.GetBooleanValue("Limit");
@@ -197,13 +235,24 @@ BettingAbstraction::BettingAbstraction(const Params &params) {
       }
     }
   }
-  
+
   always_all_in_ = params.GetBooleanValue("AlwaysAllIn");
   our_always_all_in_ = params.GetBooleanValue("OurAlwaysAllIn");
   opp_always_all_in_ = params.GetBooleanValue("OppAlwaysAllIn");
-  always_min_bet_ = params.GetBooleanValue("AlwaysMinBet");
-  our_always_min_bet_ = params.GetBooleanValue("OurAlwaysMinBet");
-  opp_always_min_bet_ = params.GetBooleanValue("OppAlwaysMinBet");
+
+  always_min_bet_ = nullptr;
+  our_always_min_bet_ = nullptr;
+  opp_always_min_bet_ = nullptr;
+  if (params.IsSet("MinBets")) {
+    always_min_bet_ = ParseMinBets(params.GetStringValue("MinBets"));
+  }
+  if (params.IsSet("OurMinBets")) {
+    our_always_min_bet_ = ParseMinBets(params.GetStringValue("OurMinBets"));
+  }
+  if (params.IsSet("OppMinBets")) {
+    opp_always_min_bet_ = ParseMinBets(params.GetStringValue("OppMinBets"));
+  }
+  
   min_all_in_pot_ = params.GetIntValue("MinAllInPot");
   no_open_limp_ = params.GetBooleanValue("NoOpenLimp");
   our_no_open_limp_ = params.GetBooleanValue("OurNoOpenLimp");

@@ -757,7 +757,6 @@ double *VCFR::OppChoice(Node *node, unsigned int lbd, double *opp_probs,
     bool bucketed = ! buckets_.None(st) &&
       node->PotSize() < card_abstraction_.BucketThreshold(st);
 
-    
     if (bucketed) {
       current_strategy_->Values(opp, st, nt, &d_all_current_probs);
     } else {
@@ -789,8 +788,8 @@ double *VCFR::OppChoice(Node *node, unsigned int lbd, double *opp_probs,
     // (e.g., endgame solving with CFR-D method) we are only saving probs for
     // one player.
     // Don't update sumprobs during pre phase
-    if (sumprob_streets_[st] && sumprobs_->Players(opp) && ! pre_phase_ &&
-	! value_calculation_) {
+    if (! pre_phase_ && ! value_calculation_ && sumprob_streets_[st] &&
+	sumprobs_->Players(opp)) {
       if (sumprobs_->Ints(opp, st)) {
 	sumprobs_->Values(opp, st, nt, &i_all_sumprobs);
       } else {
@@ -1382,7 +1381,7 @@ void VCFR::SetCurrentStrategy(Node *node) {
     int *i_all_cs_vals = nullptr;
     bool nonneg;
     double explore;
-    if (value_calculation_ ||
+    if ((value_calculation_ && ! br_current_) ||
 	(use_avg_for_current_it_ > 0 && it_ >= use_avg_for_current_it_)) {
       // Use average strategy for the "cs vals"
       if (sumprobs_->Ints(p, st)) {

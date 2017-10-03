@@ -29,9 +29,9 @@ unique_ptr<Params> CreateBettingAbstractionParams(void) {
   params->AddParam("AlwaysAllIn", P_BOOLEAN);
   params->AddParam("OurAlwaysAllIn", P_BOOLEAN);
   params->AddParam("OppAlwaysAllIn", P_BOOLEAN);
-  params->AddParam("AlwaysMinBet", P_BOOLEAN);
-  params->AddParam("OurAlwaysMinBet", P_BOOLEAN);
-  params->AddParam("OppAlwaysMinBet", P_BOOLEAN);
+  params->AddParam("MinBets", P_STRING);
+  params->AddParam("OurMinBets", P_STRING);
+  params->AddParam("OppMinBets", P_STRING);
   params->AddParam("MinAllInPot", P_INT);
   params->AddParam("NoOpenLimp", P_BOOLEAN);
   params->AddParam("OurNoOpenLimp", P_BOOLEAN);

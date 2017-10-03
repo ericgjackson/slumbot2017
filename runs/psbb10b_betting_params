@@ -1,0 +1,9 @@
+BettingAbstractionName psbb10b
+Limit false
+StackSize 20
+Asymmetric false
+NoLimitTreeType 1
+MinBet 2
+AlwaysAllIn true
+MaxBets 3,3,3,3
+BetSizes 0.5;0.5;1000.0|0.5;0.5;1000.0|0.5;0.5;1000.0|0.5;0.5;1000.0

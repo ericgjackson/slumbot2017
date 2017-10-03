@@ -19,18 +19,20 @@
 using namespace std;
 
 static void Write(unsigned int street, const string &bucketing,
-		  unsigned int *buckets, unsigned int num_buckets) {
+		  KMeans *kmeans, unsigned int *indices,
+		  unsigned int num_buckets) {
   unsigned int max_street = Game::MaxStreet();
   char buf[500];
   bool short_buckets = num_buckets <= 65536;
-  sprintf(buf, "%s/buckets.%s.%i.%i.%i.%s.%s.%i", Files::StaticBase(),
+  sprintf(buf, "%s/buckets.%s.%i.%i.%i.%s.%i", Files::StaticBase(),
 	  Game::GameName().c_str(), Game::NumRanks(), Game::NumSuits(),
-	  max_street, short_buckets ? "s" : "i", bucketing.c_str(), street);
+	  max_street, bucketing.c_str(), street);
   Writer writer(buf);
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(street);
   unsigned int num_hands = BoardTree::NumBoards(street) * num_hole_card_pairs;
   for (unsigned int h = 0; h < num_hands; ++h) {
-    unsigned int b = buckets[h];
+    unsigned int index = indices[h];
+    unsigned int b = kmeans->Assignment(index);
     if (short_buckets) {
       if (b > kMaxUnsignedShort) {
 	fprintf(stderr, "Bucket %i out of range for short\n", b);
@@ -86,8 +88,9 @@ int main(int argc, char *argv[]) {
   unsigned int *indices = new unsigned int[num_hands];
 
   char buf[500];
-  sprintf(buf, "%s/features.%s.%s.%u", Files::StaticBase(),
-	  Game::GameName().c_str(), features.c_str(), street);
+  sprintf(buf, "%s/features.%s.%u.%s.%u", Files::StaticBase(),
+	  Game::GameName().c_str(), Game::NumRanks(), features.c_str(),
+	  street);
   Reader reader(buf);
   unsigned int num_features = reader.ReadUnsignedIntOrDie();
   fprintf(stderr, "%u features\n", num_features);
@@ -147,16 +150,6 @@ int main(int argc, char *argv[]) {
   }
   delete unique_objects;
 
-#if 0
-  for (unsigned int i = 0; i < num_unique; ++i) {
-    for (unsigned int j = 0; j < num_features; ++j) {
-      printf("%f ", objects[i][j]);
-    }
-    printf("\n");
-  }
-  exit(0);
-#endif
-
   KMeans kmeans(num_clusters, num_features, num_unique, objects,
 		neighbor_thresh, num_threads);
   kmeans.Cluster(num_iterations);
@@ -168,13 +161,7 @@ int main(int argc, char *argv[]) {
   }
   delete [] objects;
 
-  unsigned int *buckets = new unsigned int[num_hands];
-  for (unsigned int h = 0; h < num_hands; ++h) {
-    unsigned int index = indices[h];
-    buckets[h] = kmeans.Assignment(index);
-  }
-  delete [] indices;
+  Write(street, bucketing, &kmeans, indices, num_actual);
 
-  Write(street, bucketing, buckets, num_actual);
-  delete [] buckets;
+  delete [] indices;
 }

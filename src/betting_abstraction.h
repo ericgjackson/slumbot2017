@@ -45,9 +45,18 @@ class BettingAbstraction {
   bool AlwaysAllIn(void) const {return always_all_in_;}
   bool OurAlwaysAllIn(void) const {return our_always_all_in_;}
   bool OppAlwaysAllIn(void) const {return opp_always_all_in_;}
-  bool AlwaysMinBet(void) const {return always_min_bet_;}
-  bool OurAlwaysMinBet(void) const {return our_always_min_bet_;}
-  bool OppAlwaysMinBet(void) const {return opp_always_min_bet_;}
+  bool AlwaysMinBet(unsigned int st, unsigned int nsb) const {
+    if (always_min_bet_ == nullptr) return false;
+    return always_min_bet_[st][nsb];
+  }
+  bool OurAlwaysMinBet(unsigned int st, unsigned int nsb) const {
+    if (our_always_min_bet_ == nullptr) return false;
+    return our_always_min_bet_[st][nsb];
+  }
+  bool OppAlwaysMinBet(unsigned int st, unsigned int nsb) const {
+    if (opp_always_min_bet_ == nullptr) return false;
+    return opp_always_min_bet_[st][nsb];
+  }
   unsigned int MinAllInPot(void) const {return min_all_in_pot_;}
   unsigned int NoLimitTreeType(void) const {return no_limit_tree_type_;}
   bool NoOpenLimp(void) const {return no_open_limp_;}
@@ -88,6 +97,8 @@ class BettingAbstraction {
   }
   unsigned int MinReentrantPot(void) const {return min_reentrant_pot_;}
  private:
+  bool **ParseMinBets(const string &value);
+  
   string betting_abstraction_name_;
   bool limit_;
   unsigned int stack_size_;
@@ -105,9 +116,9 @@ class BettingAbstraction {
   bool always_all_in_;
   bool our_always_all_in_;
   bool opp_always_all_in_;
-  bool always_min_bet_;
-  bool our_always_min_bet_;
-  bool opp_always_min_bet_;
+  bool **always_min_bet_;
+  bool **our_always_min_bet_;
+  bool **opp_always_min_bet_;
   unsigned int min_all_in_pot_;
   unsigned int no_limit_tree_type_;
   bool no_open_limp_;

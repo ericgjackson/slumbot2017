@@ -16,6 +16,8 @@
 #include "rand.h"
 #include "sorting.h"
 
+static unsigned int g_it = 0;
+
 class KMeansThread {
 public:
   KMeansThread(unsigned int num_objects, unsigned int num_clusters,
@@ -294,6 +296,9 @@ void KMeansThread::Assign(void) {
   double dist;
   sum_dists_ = 0;
   for (unsigned int o = thread_index_; o < num_objects_; o += num_threads_) {
+    if (g_it == 0 && thread_index_ == 0 && (o / num_threads_) % 10000 == 0) {
+      fprintf(stderr, "It %u o %u/%u\n", g_it, o, num_objects_);
+    }
     float *obj = objects_[o];
     unsigned int nearest = Nearest(o, obj, &dist);
     sum_dists_ += dist;
@@ -630,9 +635,9 @@ KMeans::KMeans(unsigned int num_clusters, unsigned int dim,
   intra_time_ = 0;
   assign_time_ = 0;
 
-  // SeedPlusPlus() is pretty slow.  For now don't use when more than 100,000
+  // SeedPlusPlus() is pretty slow.  For now don't use when more than 10,000
   // clusters and more than 1m objects.
-  if (num_clusters >= 100000 && num_objects >= 1000000) {
+  if (num_clusters >= 1000 && num_objects >= 1000000) {
     fprintf(stderr, "Calling Seed1\n");
     Seed1();
     fprintf(stderr, "Back from Seed1\n");
@@ -855,6 +860,7 @@ void KMeans::Cluster(unsigned int num_its) {
   }
   unsigned int it = 0;
   while (true) {
+    g_it = it;
     double avg_dist;
     unsigned int num_changed = Assign(&avg_dist);
     fprintf(stderr, "It %i num_changed %i avg dist %f\n", it, num_changed,
