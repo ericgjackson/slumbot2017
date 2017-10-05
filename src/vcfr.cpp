@@ -1290,7 +1290,7 @@ double *VCFR::Process(Node *node, unsigned int lbd, double *opp_probs,
   if (node->Terminal()) {
     if (node->Showdown()) {
       double *vals = Showdown(node, hand_tree_->Hands(st, lbd), opp_probs,
-			     sum_opp_probs, total_card_probs);
+			      sum_opp_probs, total_card_probs);
       return vals;
     } else {
       double *vals = Fold(node, p_, hand_tree_->Hands(st, lbd), opp_probs,
