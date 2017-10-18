@@ -20,6 +20,7 @@
 #include "board_tree.h"
 #include "buckets.h"
 #include "canonical_cards.h"
+#include "canonical.h"
 #include "card_abstraction.h"
 #include "card_abstraction_params.h"
 #include "cfr_config.h"
@@ -48,11 +49,14 @@ public:
   ~Player(void);
   void Go(unsigned long long int num_duplicate_hands, bool deterministic);
 private:
-  void SetHCPsAndBoards(const Card *p0_hand_cards, const Card *p1_hand_cards);
-  int Play(Node *node, bool a_is_p1);
-  int PlayDuplicateHand(unsigned int h, const Card *cards,
-			bool deterministic);
+  void SetHCPsAndBoards(Card **raw_hole_cards, const Card *raw_board);
+  void Play(Node *node, unsigned int b_pos, unsigned int *contributions,
+	    unsigned int last_bet_to, bool *folded, unsigned int num_remaining,
+	    int *outcomes);
+  void PlayDuplicateHand(unsigned long long int h, const Card *cards,
+			 bool deterministic, int *a_sum, int *b_sum);
 
+  unsigned int num_players_;
   BettingTree *betting_tree_;
   const Buckets &a_buckets_;
   const Buckets &b_buckets_;
@@ -60,25 +64,74 @@ private:
   CFRValues *b_probs_;
   unsigned int *boards_;
   unsigned int **raw_hcps_;
-  int p1_showdown_;
+  unique_ptr<unsigned int []> hvs_;
+  unique_ptr<bool []> winners_;
   unsigned short **sorted_hcps_;
-  long long int sum_p1_outcomes_;
+  unique_ptr<long long int []> sum_pos_outcomes_;
 };
 
-// Returns outcomes from P1's perspective
-int Player::Play(Node *node, bool a_is_p1) {
+void Player::Play(Node *node, unsigned int b_pos, unsigned int *contributions,
+		  unsigned int last_bet_to, bool *folded,
+		  unsigned int num_remaining, int *outcomes) {
   if (node->Terminal()) {
-    if (node->PlayerFolding() == 1) {
-      int ret = -((int)node->PotSize()) / 2;
-      return ret;
-    } else if (node->PlayerFolding() == 0) {
-      int ret = ((int)node->PotSize()) / 2;
-      return ret;
+    if (num_remaining == 1) {
+      unsigned int sum_other_contributions = 0;
+      unsigned int remaining_p = kMaxUInt;
+      for (unsigned int p = 0; p < num_players_; ++p) {
+	if (folded[p]) {
+	  sum_other_contributions += contributions[p];
+	} else {
+	  remaining_p = p;
+	}
+      }
+      outcomes[remaining_p] = sum_other_contributions;
     } else {
       // Showdown
-      int ret = p1_showdown_ * ((int)node->PotSize() / 2);
-      return ret;
+      if (num_players_ == 2 &&
+	  contributions[0] + contributions[1] != node->PotSize()) {
+	fprintf(stderr, "Mismatch 3 %u %u %u\n", contributions[0],
+		contributions[1], node->PotSize());
+	fprintf(stderr, "TID: %u\n", node->TerminalID());
+	exit(-1);
+      }
+
+      // Find the best hand value of anyone remaining in the hand, and the
+      // total pot size which includes contributions from remaining players
+      // and players who folded earlier.
+      unsigned int best_hv = 0;
+      unsigned int pot_size = 0;
+      for (unsigned int p = 0; p < num_players_; ++p) {
+	pot_size += contributions[p];
+	if (! folded[p]) {
+	  unsigned int hv = hvs_[p];
+	  if (hv > best_hv) best_hv = hv;
+	}
+      }
+
+      // Determine if we won, the number of winners, and the total contribution
+      // of all winners.
+      unsigned int num_winners = 0;
+      unsigned int winner_contributions = 0;
+      for (unsigned int p = 0; p < num_players_; ++p) {
+	if (! folded[p] && hvs_[p] == best_hv) {
+	  winners_[p] = true;
+	  ++num_winners;
+	  winner_contributions += contributions[p];
+	} else {
+	  winners_[p] = false;
+	}
+      }
+      
+      for (unsigned int p = 0; p < num_players_; ++p) {
+	if (winners_[p]) {
+	  outcomes[p] = ((double)(pot_size - winner_contributions)) /
+	    ((double)num_winners);
+	} else if (! folded[p]) {
+	  outcomes[p] = -(int)contributions[p];
+	}
+      }
     }
+    return;
   } else {
     unsigned int nt = node->NonterminalID();
     unsigned int st = node->Street();
@@ -114,25 +167,59 @@ int Player::Play(Node *node, bool a_is_p1) {
     int s;
     for (s = 0; s < ((int)num_succs) - 1; ++s) {
       double prob;
-      if (a_is_p1 == (pa == 1)) {
-	prob = a_probs_->Prob(pa, st, nt, a_offset, s, num_succs, dsi);
-      } else {
+      if (pa == b_pos) {
 	prob = b_probs_->Prob(pa, st, nt, b_offset, s, num_succs, dsi);
+      } else {
+	prob = a_probs_->Prob(pa, st, nt, a_offset, s, num_succs, dsi);
       }
       cum += prob;
       if (r < cum) break;
     }
-    int ret = Play(node->IthSucc(s), a_is_p1);
-    return ret;
+    if (s == (int)node->CallSuccIndex()) {
+      contributions[pa] = last_bet_to;
+      Play(node->IthSucc(s), b_pos, contributions, last_bet_to, folded,
+	   num_remaining, outcomes);
+    } else if (s == (int)node->FoldSuccIndex()) {
+      folded[pa] = true;
+      outcomes[pa] = -(int)contributions[pa];
+      Play(node->IthSucc(s), b_pos, contributions, last_bet_to, folded,
+	   num_remaining - 1, outcomes);
+    } else {
+      Node *succ = node->IthSucc(s);
+      unsigned int new_bet_to;
+      if (num_players_ == 2) {
+	Node *call = succ->IthSucc(succ->CallSuccIndex());
+	unsigned int new_pot_size = call->PotSize();
+	new_bet_to = new_pot_size / 2;
+      } else {
+	new_bet_to = succ->LastBetTo();
+      }
+      contributions[pa] = new_bet_to;
+      Play(succ, b_pos, contributions, new_bet_to, folded, num_remaining,
+	   outcomes);
+    }
   }
+}
+
+static unsigned int PrecedingPlayer(unsigned int p) {
+  if (p == 0) return Game::NumPlayers() - 1;
+  else        return p - 1;
 }
 
 // Play one hand of duplicate, which is a pair of regular hands.  Return
 // outcome from A's perspective.
-int Player::PlayDuplicateHand(unsigned int h, const Card *cards,
-			      bool deterministic) {
-  int a_sum = 0;
-  for (unsigned int a_is_p1 = 0; a_is_p1 <= 1; ++a_is_p1) {
+void Player::PlayDuplicateHand(unsigned long long int h, const Card *cards,
+			       bool deterministic, int *a_sum, int *b_sum) {
+  unique_ptr<int []> outcomes(new int[num_players_]);
+  unique_ptr<unsigned int []> contributions(new unsigned int[num_players_]);
+  unique_ptr<bool []> folded(new bool[num_players_]);
+  // Assume the big blind is last to act preflop
+  // Assume the small blind is prior to the big blind
+  unsigned int big_blind_p = PrecedingPlayer(Game::FirstToAct(0));
+  unsigned int small_blind_p = PrecedingPlayer(big_blind_p);
+  *a_sum = 0;
+  *b_sum = 0;
+  for (unsigned int b_pos = 0; b_pos < num_players_; ++b_pos) {
 #if 0
     if (deterministic) {
       // Reseed the RNG again before play within this loop.  This ensure
@@ -145,15 +232,27 @@ int Player::PlayDuplicateHand(unsigned int h, const Card *cards,
       SeedRand(h);
     }
 #endif
-    int p1_outcome = Play(betting_tree_->Root(), a_is_p1);
-    if (a_is_p1) {
-      a_sum += p1_outcome;
-    } else {
-      a_sum -= p1_outcome;
+    for (unsigned int p = 0; p < num_players_; ++p) {
+      folded[p] = false;
+      if (p == small_blind_p) {
+	contributions[p] = Game::SmallBlind();
+      } else if (p == big_blind_p) {
+	contributions[p] = Game::BigBlind();
+      } else {
+	contributions[p] = 0;
+      }
     }
-    sum_p1_outcomes_ += p1_outcome;
+    Play(betting_tree_->Root(), b_pos, contributions.get(), Game::BigBlind(),
+	 folded.get(), num_players_, outcomes.get());
+    for (unsigned int p = 0; p < num_players_; ++p) {
+      if (p == b_pos) {
+	*b_sum += outcomes[p];
+      } else {
+	*a_sum += outcomes[p];
+      }
+      sum_pos_outcomes_[p] += outcomes[p];
+    }
   }
-  return a_sum;
 }
 
 static void DealNCards(Card *cards, unsigned int n) {
@@ -172,152 +271,131 @@ static void DealNCards(Card *cards, unsigned int n) {
   }
 }
 
-void Player::SetHCPsAndBoards(const Card *p0_hand_cards,
-			      const Card *p1_hand_cards) {
+void Player::SetHCPsAndBoards(Card **raw_hole_cards,
+			      const Card *raw_board) {
   unsigned int max_street = Game::MaxStreet();
   for (unsigned int st = 0; st <= max_street; ++st) {
     if (st == 0) {
-      raw_hcps_[0][0] = HCPIndex(st, p0_hand_cards);
-      raw_hcps_[1][0] = HCPIndex(st, p1_hand_cards);
+      for (unsigned int p = 0; p < num_players_; ++p) {
+	raw_hcps_[p][0] = HCPIndex(st, raw_hole_cards[p]);
+      }
     } else {
       // Store the hole cards *after* the board cards
       unsigned int num_hole_cards = Game::NumCardsForStreet(0);
-      Card p0_raw_cards[7], p0_canon_cards[7];
-      Card p1_raw_cards[7], p1_canon_cards[7];
       unsigned int num_board_cards = Game::NumBoardCards(st);
-      for (unsigned int i = 0; i < num_board_cards; ++i) {
-	p0_raw_cards[i] = p0_hand_cards[i + num_hole_cards];
-	p1_raw_cards[i] = p1_hand_cards[i + num_hole_cards];
-      }
-      for (unsigned int i = 0; i < num_hole_cards; ++i) {
-	p0_raw_cards[num_board_cards + i] = p0_hand_cards[i];
-	p1_raw_cards[num_board_cards + i] = p1_hand_cards[i];
-      }
-      bool p0_change_made = 
-	CanonicalCards::ToCanon2(p0_raw_cards, num_board_cards + num_hole_cards,
-				 0, p0_canon_cards);
-      if (p0_change_made) {
-	num_board_cards = 0;
-	for (unsigned int st1 = 1; st1 <= st; ++st1) {
-	  unsigned int num_street_cards = Game::NumCardsForStreet(st1);
-	  SortCards(p0_canon_cards + num_board_cards, num_street_cards);
-	  num_board_cards += num_street_cards;
+      for (unsigned int p = 0; p < num_players_; ++p) {
+	Card canon_board[5];
+	Card canon_hole_cards[2];
+	CanonicalizeCards(raw_board, raw_hole_cards[p], st,
+			  canon_board, canon_hole_cards);
+	// Don't need to do this repeatedly
+	if (p == 0) {
+	  boards_[st] = BoardTree::LookupBoard(canon_board, st);
 	}
-	SortCards(p0_canon_cards + num_board_cards, num_hole_cards);
-      }
-      bool p1_change_made = 
-	CanonicalCards::ToCanon2(p1_raw_cards, num_board_cards + num_hole_cards,
-				 0, p1_canon_cards);
-      if (p1_change_made) {
-	num_board_cards = 0;
-	for (unsigned int st1 = 1; st1 <= st; ++st1) {
-	  unsigned int num_street_cards = Game::NumCardsForStreet(st1);
-	  SortCards(p1_canon_cards + num_board_cards, num_street_cards);
-	  num_board_cards += num_street_cards;
+	Card canon_cards[7];
+	for (unsigned int i = 0; i < num_board_cards; ++i) {
+	  canon_cards[num_hole_cards + i] = canon_board[i];
 	}
-	SortCards(p1_canon_cards + num_board_cards, num_hole_cards);
+	for (unsigned int i = 0; i < num_hole_cards; ++i) {
+	  canon_cards[i] = canon_hole_cards[i];
+	}
+	raw_hcps_[p][st] = HCPIndex(st, canon_cards);
       }
-      unsigned int bd = BoardTree::LookupBoard(p1_canon_cards, st);
-      boards_[st] = bd;
-      // Put the hole cards back at the beginning
-      Card canon_cards2[7];
-      for (unsigned int i = 0; i < num_board_cards; ++i) {
-	canon_cards2[num_hole_cards + i] = p1_canon_cards[i];
-      }
-      for (unsigned int i = 0; i < num_hole_cards; ++i) {
-	canon_cards2[i] = p0_canon_cards[num_board_cards + i];
-      }
-      raw_hcps_[0][st] = HCPIndex(st, canon_cards2);
-      for (unsigned int i = 0; i < num_hole_cards; ++i) {
-	canon_cards2[i] = p1_canon_cards[num_board_cards + i];
-      }
-      raw_hcps_[1][st] = HCPIndex(st, canon_cards2);
     }
   }
-#if 0
-  // On the final street we need the sorted HCP index (the index into the
-  // vector of hole card pairs that has been sorted by hand strength).
-  unsigned int msbd = boards_[max_street];
-  p0_hcps_[max_street] = sorted_hcps_[msbd][p0_hcps_[max_street]];
-  p1_hcps_[max_street] = sorted_hcps_[msbd][p1_hcps_[max_street]];
-#endif
 }
 
 void Player::Go(unsigned long long int num_duplicate_hands,
 		bool deterministic) {
-  // From perspective of player A
-  long long int sum_pair_outcomes = 0;
-  long long int sum_sqd_pair_outcomes = 0;
+  long long int sum_a_outcomes = 0, sum_b_outcomes = 0;
+  long long int sum_sqd_a_outcomes = 0, sum_sqd_b_outcomes = 0;
   unsigned int max_street = Game::MaxStreet();
   unsigned int num_board_cards = Game::NumBoardCards(max_street);
-  Card cards[9], p0_hand_cards[7], p1_hand_cards[7];
+  Card cards[100], hand_cards[7];
+  Card **hole_cards = new Card *[num_players_];
+  for (unsigned int p = 0; p < num_players_; ++p) {
+    hole_cards[p] = new Card[2];
+  }
   if (! deterministic) {
     InitRand();
   }
-  for (unsigned int h = 0; h < num_duplicate_hands; ++h) {
+  for (unsigned long long int h = 0; h < num_duplicate_hands; ++h) {
     if (deterministic) {
       // Seed just as we do in play_agents so we can get the same cards and
       // compare results.
       SeedRand(h);
     }
     // Assume 2 hole cards
-    DealNCards(cards, num_board_cards + 4);
-    SortCards(cards, 2);
-    SortCards(cards + 2, 2);
-    unsigned int num = 4;
+    DealNCards(cards, num_board_cards + 2 * num_players_);
+    for (unsigned int p = 0; p < num_players_; ++p) {
+      SortCards(cards + 2 * p, 2);
+    }
+    unsigned int num = 2 * num_players_;
     for (unsigned int st = 1; st <= max_street; ++st) {
       unsigned int num_street_cards = Game::NumCardsForStreet(st);
       SortCards(cards + num, num_street_cards);
       num += num_street_cards;
     }
-    // OutputNCards(cards, num_board_cards + 4);
-    // printf("\n");
     for (unsigned int i = 0; i < num_board_cards; ++i) {
-      p0_hand_cards[i + 2] = cards[i + 4];
-      p1_hand_cards[i + 2] = cards[i + 4];
+      hand_cards[i+2] = cards[i + 2 * num_players_];
     }
-    p0_hand_cards[0] = cards[0];
-    p0_hand_cards[1] = cards[1];
-    unsigned int p0_hv = HandValueTree::Val(p0_hand_cards);
-    p1_hand_cards[0] = cards[2];
-    p1_hand_cards[1] = cards[3];
-    unsigned int p1_hv = HandValueTree::Val(p1_hand_cards);
-    SetHCPsAndBoards(p0_hand_cards, p1_hand_cards);
-    if (p1_hv > p0_hv)      p1_showdown_ = 1;
-    else if (p0_hv > p1_hv) p1_showdown_ = -1;
-    else                    p1_showdown_ = 0;
-    // PlayDuplicateHand() returns the result of a pair of hands
-    int pair_outcome = PlayDuplicateHand(h, cards, deterministic);
-    sum_pair_outcomes += pair_outcome;
-    sum_sqd_pair_outcomes += pair_outcome * pair_outcome;
+    for (unsigned int p = 0; p < num_players_; ++p) {
+      hand_cards[0] = cards[2 * p];
+      hand_cards[1] = cards[2 * p + 1];
+      hvs_[p] = HandValueTree::Val(hand_cards);
+      hole_cards[p][0] = cards[2 * p];
+      hole_cards[p][1] = cards[2 * p + 1];
+    }
+    
+    SetHCPsAndBoards(hole_cards, cards + 2 * num_players_);
+    // PlayDuplicateHand() returns the result of a duplicate hand (which is
+    // N hands if N is the number of players)
+    int a_outcome, b_outcome;
+    PlayDuplicateHand(h, cards, deterministic, &a_outcome, &b_outcome);
+    sum_a_outcomes += a_outcome;
+    sum_b_outcomes += b_outcome;
+    sum_sqd_a_outcomes += a_outcome * a_outcome;
+    sum_sqd_b_outcomes += b_outcome * b_outcome;
   }
-  double mean_pair_outcome = sum_pair_outcomes / (double)num_duplicate_hands;
-  // Need to divide by two twice:
-  // 1) Once to convert pair outcomes to hand outcomes.
-  // 2) A second time to convert from small blind units to big blind units
+  for (unsigned int p = 0; p < num_players_; ++p) {
+    delete [] hole_cards[p];
+  }
+  delete [] hole_cards;
+#if 0
+  unsigned long long int num_a_hands =
+    (num_players_ - 1) * num_players_ * num_duplicate_hands;
+  double mean_a_outcome = sum_a_outcomes / (double)num_a_hands;
+#endif
+  // Divide by num_players because we evaluate B that many times (once for
+  // each position).
+  unsigned long long int num_b_hands = num_duplicate_hands * num_players_;
+  double mean_b_outcome = sum_b_outcomes / (double)num_b_hands;
+  // Need to divide by two to convert from small blind units to big blind units
   // Multiply by 1000 to go from big blinds to milli-big-blinds
-  double mbb_g = ((mean_pair_outcome / 2.0) / 2.0) * 1000.0;
-  printf("Avg A outcome: %f (%.1f mbb/g) over %llu dup hands\n",
-	 mean_pair_outcome / 2.0, mbb_g, num_duplicate_hands);
+  double b_mbb_g = (mean_b_outcome / 2.0) * 1000.0;
+  printf("Avg B outcome: %f (%.1f mbb/g) over %llu dup hands\n",
+	 mean_b_outcome, b_mbb_g, num_duplicate_hands);
   // Variance is the mean of the squares minus the square of the means
-  double var_pair =
-    (((double)sum_sqd_pair_outcomes) / ((double)num_duplicate_hands)) -
-    (mean_pair_outcome * mean_pair_outcome);
-  double stddev_pair = sqrt(var_pair);
-  double match_stddev = stddev_pair * sqrt(num_duplicate_hands);
-  double match_lower = sum_pair_outcomes - 1.96 * match_stddev;
-  double match_upper = sum_pair_outcomes + 1.96 * match_stddev;
+  double var_b =
+    (((double)sum_sqd_b_outcomes) / ((double)num_b_hands)) -
+    (mean_b_outcome * mean_b_outcome);
+  double stddev_b = sqrt(var_b);
+  double match_stddev = stddev_b * sqrt(num_b_hands);
+  double match_lower = sum_b_outcomes - 1.96 * match_stddev;
+  double match_upper = sum_b_outcomes + 1.96 * match_stddev;
   double mbb_lower =
-    ((match_lower / (2.0 * num_duplicate_hands)) / 2.0) * 1000.0;
+    ((match_lower / (num_b_hands)) / 2.0) * 1000.0;
   double mbb_upper =
-    ((match_upper / (2.0 * num_duplicate_hands)) / 2.0) * 1000.0;
+    ((match_upper / (num_b_hands)) / 2.0) * 1000.0;
   printf("MBB confidence interval: %f-%f\n", mbb_lower, mbb_upper);
   fflush(stdout);
 
-  double avg_p1_outcome =
-    ((double)sum_p1_outcomes_) / (double)(2 * num_duplicate_hands);
-  printf("Avg P1 outcome: %f\n", avg_p1_outcome);
-  fflush(stdout);
+  for (unsigned int p = 0; p < num_players_; ++p) {
+    double avg_outcome =
+      sum_pos_outcomes_[p] / (double)(num_players_ * num_duplicate_hands);
+    printf("Avg P%u outcome: %f\n", p, avg_outcome);
+    fflush(stdout);
+  }
 }
 
 Player::Player(BettingTree *betting_tree, const BettingAbstraction &ba,
@@ -326,6 +404,10 @@ Player::Player(BettingTree *betting_tree, const BettingAbstraction &ba,
 	       const CFRConfig &a_cc, const CFRConfig &b_cc,
 	       unsigned int a_it, unsigned int b_it) :
   a_buckets_(a_buckets), b_buckets_(b_buckets) {
+  num_players_ = Game::NumPlayers();
+  hvs_.reset(new unsigned int[num_players_]);
+  winners_.reset(new bool[num_players_]);
+  sum_pos_outcomes_.reset(new long long int [num_players_]);
   betting_tree_ = betting_tree;
   BoardTree::Create();
   BoardTree::CreateLookup();
@@ -336,27 +418,27 @@ Player::Player(BettingTree *betting_tree, const BettingAbstraction &ba,
 			   b_ca, b_buckets, nullptr);
 
   char dir[500];
-  sprintf(dir, "%s/%s.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
-	  Game::GameName().c_str(), a_ca.CardAbstractionName().c_str(),
+  sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
+	  a_ca.CardAbstractionName().c_str(),
 	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
 	  ba.BettingAbstractionName().c_str(),
 	  a_cc.CFRConfigName().c_str());
-  a_probs_->Read(dir, a_it, betting_tree->Root(),
-		 betting_tree->Root()->NonterminalID(), kMaxUInt);
+  a_probs_->Read(dir, a_it, betting_tree->Root(), "x", kMaxUInt);
   fprintf(stderr, "Read A probs\n");
-  sprintf(dir, "%s/%s.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
-	  Game::GameName().c_str(), b_ca.CardAbstractionName().c_str(),
+  sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
+	  b_ca.CardAbstractionName().c_str(),
 	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
 	  ba.BettingAbstractionName().c_str(),
 	  b_cc.CFRConfigName().c_str());
-  b_probs_->Read(dir, b_it, betting_tree->Root(),
-		 betting_tree->Root()->NonterminalID(), kMaxUInt);
+  b_probs_->Read(dir, b_it, betting_tree->Root(), "x", kMaxUInt);
   fprintf(stderr, "Read B probs\n");
 
   boards_ = new unsigned int[max_street + 1];
   boards_[0] = 0;
-  raw_hcps_ = new unsigned int *[2];
-  for (unsigned int p = 0; p <= 1; ++p) {
+  raw_hcps_ = new unsigned int *[num_players_];
+  for (unsigned int p = 0; p < num_players_; ++p) {
     raw_hcps_[p] = new unsigned int[max_street + 1];
   }
 
@@ -394,7 +476,9 @@ Player::Player(BettingTree *betting_tree, const BettingAbstraction &ba,
     fprintf(stderr, "Not creating sorted_hcps_\n");
   }
 
-  sum_p1_outcomes_ = 0LL;
+  for (unsigned int p = 0; p < num_players_; ++p) {
+    sum_pos_outcomes_[p] = 0LL;
+  }
 }
 
 Player::~Player(void) {
@@ -407,7 +491,7 @@ Player::~Player(void) {
     delete [] sorted_hcps_;
   }
   delete [] boards_;
-  for (unsigned int p = 0; p <= 1; ++p) {
+  for (unsigned int p = 0; p < num_players_; ++p) {
     delete [] raw_hcps_[p];
   }
   delete [] raw_hcps_;

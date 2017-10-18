@@ -105,6 +105,15 @@ int main(int argc, char *argv[]) {
   unique_ptr<Params> game_params = CreateGameParams();
   game_params->ReadFromFile(argv[1]);
   Game::Initialize(*game_params);
+  char *buf = new char[10];
+  for (unsigned int i = 0; i < 10; ++i) {
+    buf[i] = 1;
+  }
+  // Test byte alignment
+  unsigned long long int ull = *(unsigned long long int *)&buf[2];
+  fprintf(stderr, "ULL %llu\n", ull);
+  exit(0);
+
   Writer xwriter("/home/eric/nntorch/nn/xxx");
   xwriter.WriteDouble(4.5);
   xwriter.WriteDouble(2.7213);

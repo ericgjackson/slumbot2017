@@ -177,8 +177,7 @@ CanonicalCards::~CanonicalCards(void) {
 // This version does not resort the cards
 // Returns true if a change was made
 bool CanonicalCards::ToCanon2(const Card *cards, unsigned int num_cards,
-			      unsigned int suit_groups,
-			      Card *canon_cards) {
+			      unsigned int suit_groups, Card *canon_cards) {
   unsigned int num_suits = Game::NumSuits();
   bool change_made = false;
 
@@ -186,7 +185,7 @@ bool CanonicalCards::ToCanon2(const Card *cards, unsigned int num_cards,
 
   unsigned int *rank_used = new unsigned int[num_suits];
 
-  unsigned int new_suit_groups = suit_groups;
+  unsigned int nsg = suit_groups;
 
   for (unsigned int i = 0; i != num_suits; ++i) rank_used[i] = 0;
 
@@ -200,7 +199,7 @@ bool CanonicalCards::ToCanon2(const Card *cards, unsigned int num_cards,
     /* Get the current suit of the card */
     unsigned int old_suit = Suit(canon_cards[i]);
     /* Get the new suit */
-    unsigned int new_suit = ((unsigned char *)&new_suit_groups)[old_suit];
+    unsigned int new_suit = ((unsigned char *)&nsg)[old_suit];
 
     unsigned int rank = Rank(canon_cards[i]);
     rank_used[new_suit] |= 1 << rank;
@@ -231,15 +230,15 @@ bool CanonicalCards::ToCanon2(const Card *cards, unsigned int num_cards,
 	  // Were the suits in the same group before, and they
 	  // now have the same cards again?  If so, recombine them.
 	  break;
-	} else if (((unsigned char *)&new_suit_groups)[n] ==
-		   ((unsigned char *)&new_suit_groups)[m] &&
+	} else if (((unsigned char *)&nsg)[n] ==
+		   ((unsigned char *)&nsg)[m] &&
 		   rank_used[n] == rank_used[m]) {
 	  // Have we found a new suit that is isomorphic, given the 
 	  // cards we've seen so far?
 	  break;
 	}
       }
-      ((unsigned char *)&new_suit_groups)[m] = n;
+      ((unsigned char *)&nsg)[m] = n;
     }
   }
 
@@ -249,8 +248,7 @@ bool CanonicalCards::ToCanon2(const Card *cards, unsigned int num_cards,
 }
 
 void CanonicalCards::ToCanon(const Card *cards, unsigned int num_cards,
-			     unsigned int suit_groups,
-			     Card *canon_cards) {
+			     unsigned int suit_groups, Card *canon_cards) {
   bool change_made = ToCanon2(cards, num_cards, suit_groups, canon_cards);
   if (change_made) {
     if (num_cards == 1) {

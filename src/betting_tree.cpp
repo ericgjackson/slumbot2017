@@ -18,7 +18,7 @@ using namespace std;
 
 Node::Node(unsigned int id, unsigned int street, unsigned int player_acting,
 	   const shared_ptr<Node> &call_succ, const shared_ptr<Node> &fold_succ,
-	   vector< shared_ptr<Node> > *bet_succs, unsigned int player_folding,
+	   vector< shared_ptr<Node> > *bet_succs, unsigned int num_remaining,
 	   unsigned int pot_size) {
   unsigned int num_succs = 0;
   if (call_succ) {
@@ -55,12 +55,12 @@ Node::Node(unsigned int id, unsigned int street, unsigned int player_acting,
     fprintf(stderr, "player_acting OOB: %u\n", player_acting);
     exit(-1);
   }
-  if (player_folding > 255) {
-    fprintf(stderr, "player_folding OOB: %u\n", player_folding);
+  if (num_remaining > 255) {
+    fprintf(stderr, "num_remaining OOB: %u\n", num_remaining);
     exit(-1);
   }
   player_acting_ = player_acting;
-  player_folding_ = player_folding;
+  num_remaining_ = num_remaining;
 }
 
 Node::Node(Node *src) {
@@ -68,8 +68,6 @@ Node::Node(Node *src) {
   if (num_succs == 0) {
     succs_ = NULL;
   } else {
-    // succs_ = (Node **)pool->Allocate(num_succs, sizeof(void *));
-    // succs_ = new Node *[num_succs];
     succs_ = new shared_ptr<Node>[num_succs];
   }
   for (unsigned int s = 0; s < num_succs; ++s) succs_[s] = NULL;
@@ -78,26 +76,24 @@ Node::Node(Node *src) {
   num_succs_ = src->num_succs_;
   flags_ = src->flags_;
   player_acting_ = src->player_acting_;
-  player_folding_ = src->player_folding_;
+  num_remaining_ = src->num_remaining_;
 }
 
 Node::Node(unsigned int id, unsigned int pot_size, unsigned int num_succs,
 	   unsigned short flags, unsigned char player_acting,
-	   unsigned char player_folding) {
+	   unsigned char num_remaining) {
   id_ = id;
   pot_size_ = pot_size;
   num_succs_ = num_succs;
   if (num_succs == 0) {
     succs_ = nullptr;
   } else {
-    // succs_ = (Node **)pool->Allocate(num_succs, sizeof(void *));
-    // succs_ = new Node *[num_succs];
     succs_ = new shared_ptr<Node>[num_succs];
   }
   for (unsigned int s = 0; s < num_succs; ++s) succs_[s] = nullptr;
   flags_ = flags;
   player_acting_ = player_acting;
-  player_folding_ = player_folding;
+  num_remaining_ = num_remaining;
 }
 
 Node::~Node(void) {
@@ -112,21 +108,26 @@ string Node::ActionName(unsigned int s) {
     return "f";
   } else {
     Node *b = IthSucc(s);
-    if (! b->HasCallSucc()) {
-      fprintf(stderr, "Expected node to have call succ\n");
-      exit(-1);
-    }
-    unsigned int csi = b->CallSuccIndex();
-    Node *bc = b->IthSucc(csi);
-    unsigned int pot_size;
-    if (HasCallSucc()) {
-      // I want the pot size including the current bet.
-      Node *c = IthSucc(CallSuccIndex());
-      pot_size = c->PotSize();
+    unsigned int bet_size;
+    if (Game::NumPlayers() > 2) {
+      bet_size = b->LastBetTo() - LastBetTo();
     } else {
-      pot_size = PotSize();
+      if (! b->HasCallSucc()) {
+	fprintf(stderr, "Expected node to have call succ\n");
+	exit(-1);
+      }
+      unsigned int csi = b->CallSuccIndex();
+      Node *bc = b->IthSucc(csi);
+      unsigned int pot_size;
+      if (HasCallSucc()) {
+	// I want the pot size including the current bet.
+	Node *c = IthSucc(CallSuccIndex());
+	pot_size = c->PotSize();
+      } else {
+	pot_size = PotSize();
+      }
+      bet_size = (bc->PotSize() - pot_size) / 2;
     }
-    unsigned int bet_size = (bc->PotSize() - pot_size) / 2;
     char buf[100];
     sprintf(buf, "b%u", bet_size);
     return buf;
@@ -142,8 +143,13 @@ void Node::PrintTree(unsigned int depth, string name,
   Indent(2 * depth);
   unsigned int street = Street();
   if (street > last_street) name += " ";
-  printf("\"%s\" (id %u ps %u ns %u s %u", name.c_str(), id_, PotSize(),
-	 NumSuccs(), street);
+  if (Game::NumPlayers() > 2) {
+    printf("\"%s\" (id %u lbt %u ns %u s %u", name.c_str(), id_, LastBetTo(),
+	   NumSuccs(), street);
+  } else {
+    printf("\"%s\" (id %u ps %u ns %u s %u", name.c_str(), id_, PotSize(),
+	   NumSuccs(), street);
+  }
   if (NumSuccs() > 0) {
     printf(" p%uc", player_acting_);
   }
@@ -395,7 +401,7 @@ BettingTree::Read(Reader *reader,
   unsigned short num_succs = reader->ReadUnsignedShortOrDie();
   unsigned short flags = reader->ReadUnsignedShortOrDie();
   unsigned char pa = reader->ReadUnsignedCharOrDie();
-  unsigned char player_folding = reader->ReadUnsignedCharOrDie();
+  unsigned char num_remaining = reader->ReadUnsignedCharOrDie();
   if (num_succs > 0) {
     // Check if node already seen.  For now assume reentrancy only at
     // nonterminal nodes.
@@ -408,7 +414,7 @@ BettingTree::Read(Reader *reader,
     }
   }
   shared_ptr<Node>
-    node(new Node(id, pot_size, num_succs, flags, pa, player_folding));
+    node(new Node(id, pot_size, num_succs, flags, pa, num_remaining));
   if (num_succs == 0) {
     ++num_terminals_;
     return node;
@@ -427,12 +433,12 @@ void BettingTree::Initialize(unsigned int target_player,
 			     const BettingAbstraction &ba) {
   char buf[500];
   if (ba.Asymmetric()) {
-    sprintf(buf, "%s/betting_tree.%s.%s.%u", Files::StaticBase(),
-	    Game::GameName().c_str(),
+    sprintf(buf, "%s/betting_tree.%s.%u.%s.%u", Files::StaticBase(),
+	    Game::GameName().c_str(), Game::NumPlayers(),
 	    ba.BettingAbstractionName().c_str(), target_player);
   } else {
-    sprintf(buf, "%s/betting_tree.%s.%s", Files::StaticBase(),
-	    Game::GameName().c_str(),
+    sprintf(buf, "%s/betting_tree.%s.%u.%s", Files::StaticBase(),
+	    Game::GameName().c_str(), Game::NumPlayers(),
 	    ba.BettingAbstractionName().c_str());
   }
   Reader reader(buf);

@@ -17,6 +17,7 @@
 
 #include "board_tree.h"
 #include "canonical_cards.h"
+#include "canonical.h"
 #include "cards.h"
 #include "constants.h"
 #include "game.h"
@@ -251,21 +252,18 @@ unsigned int BoardTree::LookupBoard(const Card *board, unsigned int st) {
 void BoardTree::DealRawBoards(Card *board, unsigned int st) {
   unsigned int max_street = Game::MaxStreet();
   if (st > 1) {
-    unsigned int num_board_cards = Game::NumBoardCards(st - 1);
     Card canon_board[5];
-    bool change_made = 
-      CanonicalCards::ToCanon2(board, num_board_cards, 0, canon_board);
-    // I need this, right?  ToCanon2() can change the suits of the cards,
-    // which could make, e.g., the flop no longer be ordered from high to low.
-    if (change_made) {
-      num_board_cards = 0;
-      for (unsigned int st1 = 1; st1 <= st - 1; ++st1) {
-	unsigned int num_street_cards = Game::NumCardsForStreet(st1);
-	SortCards(canon_board + num_board_cards, num_street_cards);
-	num_board_cards += num_street_cards;
-      }
-    }
+    CanonicalizeCards(board, nullptr, st - 1, canon_board, nullptr);
     unsigned int canon_bd = BoardTree::LookupBoard(canon_board, st - 1);
+    if (canon_bd >= num_boards_[st - 1]) {
+      fprintf(stderr, "DealRawBoards: couldn't look up canonical board\n");
+      OutputThreeCards(board);
+      printf(" -> ");
+      OutputThreeCards(canon_board);
+      printf("\n");
+      fflush(stdout);
+      exit(-1);
+    }
     ++board_counts_[st - 1][canon_bd];
     if (st == max_street + 1) return;
   }
@@ -323,6 +321,19 @@ void BoardTree::BuildBoardCounts(void) {
   if (max_street_ >= 1) {
     Card board[5];
     DealRawBoards(board, 1);
+  }
+  // Test that we saw each canonical board at least once
+  for (unsigned int st = 1; st <= max_street_; ++st) {
+    unsigned int num_boards = num_boards_[st];
+    // unsigned int sum_counts = 0;
+    for (unsigned int bd = 0; bd < num_boards; ++bd) {
+      if (board_counts_[st][bd] == 0) {
+	fprintf(stderr, "Never saw st %u bd %u\n", st, bd);
+	exit(-1);
+      }
+      // sum_counts += board_counts_[st][bd];
+    }
+    // fprintf(stderr, "St %u sum counts %u\n", st, sum_counts);
   }
 }
 

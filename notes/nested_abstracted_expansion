@@ -1,0 +1,105 @@
+Some experiments along the same lines as those in nested_expansion.
+But we will use card abstraction so we can run bigger experiments.
+
+ms3f1t1r1h5
+hshshshsbc3
+ornarrowb100
+Process size < 1g
+
+1b (64m):  Exploitability: 328.97 mbb/g
+2b (+65m): Exploitability: 279.67 mbb/g
+3b (+62m): Exploitability: 261.31 mbb/g
+4b (+63m): Exploitability: 249.88 mbb/g
+5b:        Exploitability: 243.56 mbb/g
+6b:        Exploitability: 239.25 mbb/g
+8b:        Exploitability: 234.54 mbb/g
+9b:        Exploitability: 233.09 mbb/g
+ornarrowb100->ornarrowb100x:
+  1b: Exploitability: 339.60 mbb/g
+  2b: Exploitability: 290.23 mbb/g
+  3b: Exploitability: 272.16 mbb/g
+  4b: Exploitability: 261.68 mbb/g
+  5b: Exploitability: 255.60 mbb/g
+  6b: Exploitability: 251.42 mbb/g
+  8b: Exploitability: 245.73 mbb/g
+  9b: Exploitability: 244.44 mbb/g
+
+Much better spread so far.
+
+m4.4xlarge is 64 gigs
+r3.2xlarge is 61 gigs
+r4.2xlarge is 61 gigs
+r4.2xlarge has best on-demand price
+
+mb2b4ss100: min, 1/4, 1/2, 1x.
+mb2b4ss100 has 925,827 river betting sequences
+mb2b4ss100x has 18.6m river betting sequences
+CloseToAllInFrac 0.5
+mb2b4ss100 has 459,099 river betting sequences
+mb2b4ss100x has 5.8mm river betting sequences
+  729,696 betting sequences with eight bets
+  2,629,536 betting sequences with seven bets
+
+hshshshsbc3 has 1457 river buckets.
+67.5g for expanded system
+5.4g for base system
+
+on c3.xlarge
+ms3f1t1r1h5
+mb2b4ss100
+10m for RGBR
+230m-250m for a 1b batch
+1b:  Exploitability: 984.26 mbb/g
+2b:  Exploitability: 765.12 mbb/g
+3b:  Exploitability: 668.77 mbb/g
+4b:  Exploitability: 612.01 mbb/g
+5b:  Exploitability: 570.85 mbb/g
+6b:  Exploitability: 542.00 mbb/g
+7b:  Exploitability: 519.36 mbb/g
+8b:  Exploitability: 501.99 mbb/g
+9b:  Exploitability: 488.65 mbb/g
+10b: Exploitability: 476.99 mbb/g
+11b: Exploitability: 467.09 mbb/g
+12b: Exploitability: 458.69 mbb/g
+13b: Exploitability: 450.44 mbb/g
+14b: Exploitability: 443.31 mbb/g
+
+
+mb2b4ss100->mb2b4ss100x 12b: Exploitability: 710.14 mbb/g
+  P0 best response: 1.333536 (666.77 mbb/g)
+  P1 best response: 1.507032 (753.52 mbb/g)
+
+Hmm, that's a pretty big degradation still.
+
+Add just 1/8 bet.
+mb2b4ss100x1
+mb2b4ss100->mb2b4ss100x1 14b: Exploitability: 482.46 mbb/g
+  Adds 1/8
+mb2b4ss100->mb2b4ss100x2 14b: Exploitability: 482.18 mbb/g
+  Adds 3/8
+mb2b4ss100->mb2b4ss100x3 14b: Exploitability: 690.87 mbb/g
+  Adds 3/4
+
+------------
+
+mb2b5ss100
+1b:  Exploitability: 1073.28 mbb/g
+2b:  Exploitability: 835.13 mbb/g
+3b:  Exploitability: 727.19 mbb/g
+4b:  Exploitability: 662.20 mbb/g
+5b:  Exploitability: 620.18 mbb/g
+6b:  Exploitability: 590.96 mbb/g
+7b:  Exploitability: 566.43 mbb/g
+8b:  Exploitability: 547.08 mbb/g
+9b:  Exploitability: 531.60 mbb/g
+10b: Exploitability: 518.69 mbb/g
+11b: Exploitability: 507.42 mbb/g
+12b: Exploitability: 497.29 mbb/g
+13b: Exploitability: 489.21 mbb/g
+14b: Exploitability: 481.01 mbb/g
+15b: Exploitability: 475.05 mbb/g
+16b: Exploitability: 469.52 mbb/g
+
+Add 1/8, 3/8, 5/8 and 7/8
+mb2b5ss100->mb2b5ss100x 16b: Exploitability: 534.30 mbb/g
+  Not bad.  Only degrade by 65 mbb/g (< 15%).

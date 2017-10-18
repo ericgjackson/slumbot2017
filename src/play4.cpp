@@ -527,6 +527,7 @@ void Player::DealRawBoards(Card *board, unsigned int st,
   if (st > 1) {
     unsigned int num_board_cards = Game::NumBoardCards(st - 1);
     Card canon_board[5];
+    Fix
     bool change_made = 
       CanonicalCards::ToCanon2(board, num_board_cards, 0, canon_board);
     // I need this, right?  ToCanon2() can change the suits of the cards,

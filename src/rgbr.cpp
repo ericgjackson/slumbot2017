@@ -71,8 +71,8 @@ double *RGBR::Process(Node *node, unsigned int lbd, double *opp_probs,
   unsigned int st = node->Street();
   if (st == Game::MaxStreet() && st > last_st) {
     char dir[500];
-    sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s", Files::OldCFRBase(),
-	    Game::GameName().c_str(),
+    sprintf(dir, "%s/%s.%u.%s.%i.%i.%i.%s.%s", Files::OldCFRBase(),
+	    Game::GameName().c_str(), Game::NumPlayers(),
 	    card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	    Game::NumSuits(), Game::MaxStreet(),
 	    betting_abstraction_.BettingAbstractionName().c_str(),
@@ -92,8 +92,8 @@ double RGBR::Go(unsigned int it, unsigned int p) {
   target_p_ = p_^1;
 
   char dir[500];
-  sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s", Files::OldCFRBase(),
-	  Game::GameName().c_str(),
+  sprintf(dir, "%s/%s.%u.%s.%i.%i.%i.%s.%s", Files::OldCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
 	  card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	  Game::NumSuits(), Game::MaxStreet(),
 	  betting_abstraction_.BettingAbstractionName().c_str(),

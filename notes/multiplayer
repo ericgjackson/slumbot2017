@@ -1,0 +1,30 @@
+Not sure we can support in CFR+.  No efficient Showdown() method.
+
+Want to support in TCFR.
+
+Need richer encoding of nodes in Prepare().
+
+Bit field for all active players.  Or maintain who is active in Process()?
+
+Hmm, not too hard to do it in Process().
+
+Pass down folded array of booleans and num active.
+
+When we get to fold succ, update array and num active.
+
+Terminate hand if one man standing.
+
+Need to record player acting at nonterminals.  Not just simple 0/1 bit.
+
+Have TCFR running, but probably buggy.
+
+Very negative CVs for weak hands.  Why aren't we learning to open fold?
+Or if we are open folding, why isn't CV much less?
+
+Need to return from Process() when current player folds.  Don't continue
+until end.  (Is that true?  What about for updating other player's
+strategies?  Maybe not.)
+
+Need to store pot size in nonterminal nodes so that we can return correct
+CV when we fold.
+

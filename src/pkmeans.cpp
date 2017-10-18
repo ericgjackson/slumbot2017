@@ -2,6 +2,14 @@
 // being clustered will have different types of features.
 // Have to take the square root or the triangle equality based test will not
 // work properly.
+//
+// Should I have fixed number of neighbors or max distance for neighbors?
+// The appropriate max distance varies a lot depending on the problem and
+// perhaps can't be easily guessed.
+//
+// If I have a max distance then if c1 is a neighbor c2, c2 is also a
+// neighbor of c1.  We can take advantage of that to cut neighbor calculation
+// time by half.
 
 #include <math.h>
 #include <pthread.h>
@@ -12,26 +20,30 @@
 #include <vector>
 
 #include "constants.h"
-#include "kmeans.h"
+#include "pkmeans.h"
 #include "rand.h"
 #include "sorting.h"
 
 static unsigned int g_it = 0;
 
-class KMeansThread {
+class PKMeansThread {
 public:
-  KMeansThread(unsigned int num_objects, unsigned int num_clusters,
-	       float **objects, unsigned int dim, double neighbor_thresh,
-	       unsigned int *cluster_sizes, float **means,
-	       unsigned int *assignments, unsigned char **nearest_centroids,
-	       unsigned char **neighbor_ptrs,
-	       vector< pair<float, unsigned int> > *neighbor_vectors,
-	       unsigned int thread_index, unsigned int num_threads);
-  ~KMeansThread(void) {}
+  PKMeansThread(unsigned int num_objects, unsigned int num_clusters,
+		float **objects, unsigned int dim, double neighbor_thresh,
+		unsigned int *cluster_sizes, float **means,
+		unsigned int num_pivots, float **pivot_means,
+		unsigned int *assignments, unsigned char **nearest_centroids,
+		float *centroid_pivot_distances, unsigned int *best_pivots,
+		vector< pair<float, unsigned int> > *neighbor_vectors,
+		unsigned int max_neighbor_vector_length,
+		unsigned int thread_index, unsigned int num_threads);
+  ~PKMeansThread(void) {}
   void Assign(void);
+  void ComputeCentroidPivotDistances(void);
   void ComputeIntraCentroidDistances(void);
   void SortNeighbors();
   void RunAssign(void);
+  void RunPivot(void);
   void RunIntra(void);
   void RunSort(void);
   void Join(void);
@@ -41,6 +53,7 @@ private:
   unsigned int ExhaustiveNearest(unsigned int o, float *obj,
 				 unsigned int guess_c, double guess_min_dist,
 				 double *ret_min_dist);
+  unsigned int GetInitialGuess(unsigned int o);
   unsigned int Nearest(unsigned int o, float *obj, double *ret_min_dist);
 
   unsigned int num_objects_;
@@ -51,9 +64,14 @@ private:
   unsigned int *cluster_sizes_;
   float **means_;
   unsigned int *assignments_;
+  unsigned int num_pivots_;
+  float **pivot_means_;
+  float *centroid_pivot_distances_;
+  unsigned int *best_pivots_;
   unsigned char **nearest_centroids_;
-  unsigned char **neighbor_ptrs_;
   vector< pair<float, unsigned int> > *neighbor_vectors_;
+  // Unused currently
+  unsigned int max_neighbor_vector_length_;
   unsigned int thread_index_;
   unsigned int num_threads_;
   unsigned int num_changed_;
@@ -64,17 +82,21 @@ private:
   pthread_t pthread_id_;
 };
 
-KMeansThread::KMeansThread(unsigned int num_objects,
-			   unsigned int num_clusters, float **objects,
-			   unsigned int dim, double neighbor_thresh,
-			   unsigned int *cluster_sizes,
-			   float **means, unsigned int *assignments,
-			   unsigned char **nearest_centroids,
-			   unsigned char **neighbor_ptrs,
-			   vector< pair<float, unsigned int> > *
-			   neighbor_vectors,
-			   unsigned int thread_index,
-			   unsigned int num_threads) {
+PKMeansThread::PKMeansThread(unsigned int num_objects,
+			     unsigned int num_clusters, float **objects,
+			     unsigned int dim, double neighbor_thresh,
+			     unsigned int *cluster_sizes,
+			     float **means, unsigned int num_pivots,
+			     float **pivot_means,
+			     unsigned int *assignments,
+			     unsigned char **nearest_centroids,
+			     float *centroid_pivot_distances,
+			     unsigned int *best_pivots,
+			     vector< pair<float, unsigned int> > *
+			     neighbor_vectors,
+			     unsigned int max_neighbor_vector_length,
+			     unsigned int thread_index,
+			     unsigned int num_threads) {
   num_objects_ = num_objects;
   num_clusters_ = num_clusters;
   objects_ = objects;
@@ -82,78 +104,20 @@ KMeansThread::KMeansThread(unsigned int num_objects,
   neighbor_thresh_ = neighbor_thresh;
   cluster_sizes_ = cluster_sizes;
   means_ = means;
+  num_pivots_ = num_pivots;
+  pivot_means_ = pivot_means;
   assignments_ = assignments;
   nearest_centroids_ = nearest_centroids;
-  neighbor_ptrs_ = neighbor_ptrs;
+  centroid_pivot_distances_ = centroid_pivot_distances;
+  best_pivots_ = best_pivots;
   neighbor_vectors_ = neighbor_vectors;
+  max_neighbor_vector_length_ = max_neighbor_vector_length;
   thread_index_ = thread_index;
   num_threads_ = num_threads;
   num_changed_ = 0;
 }
 
-#if 0
-// Could add early termination when dist exceeds min dist
-unsigned int KMeansThread::Nearest(unsigned int o, float *obj,
-				   double *ret_min_dist) {
-  // Initialize best_c to the current assignment.  This will make the triangle
-  // inequality based optimization work better.
-  unsigned int best_c = assignments_[o];
-  if (best_c == kMaxUInt) {
-    // Arbitrarily set best_c to first cluster with non-zero size
-    unsigned int c;
-    for (c = 0; c < num_clusters_; ++c) {
-      if (cluster_sizes_[c] > 0) {
-	best_c = c;
-	break;
-      }
-    }
-    if (c == num_clusters_) {
-      fprintf(stderr, "No clusters with non-zero size?!?\n");
-      exit(-1);
-    }
-  }
-  float orig_min_dist = 0;
-  for (unsigned int d = 0; d < dim_; ++d) {
-    float ov = obj[d];
-    float cm = means_[best_c][d];
-    float dim_delta = ov - cm;
-    orig_min_dist += dim_delta * dim_delta;
-  }
-  orig_min_dist = sqrt(orig_min_dist);
-  float min_dist = orig_min_dist;
-  unsigned char *neighbors = nearest_centroids_[best_c];
-  while (true) {
-    unsigned int c = *(unsigned int *)neighbors;
-    if (c == kMaxUInt) break;
-    if (c == best_c) continue;
-    if (cluster_sizes_[c] == 0) continue;
-    neighbors += sizeof(unsigned int);
-    float centroid_dist = *(float *)neighbors;
-    neighbors += sizeof(float);
-    if (centroid_dist >= 2 * orig_min_dist) {
-      continue;
-    }
-
-    float *cluster_means = means_[c];
-    float dist_sq = 0;
-    for (unsigned int d = 0; d < dim_; ++d) {
-      float ov = obj[d];
-      float cm = cluster_means[d];
-      float dim_delta = ov - cm;
-      dist_sq += dim_delta * dim_delta;
-    }
-    float dist = sqrt(dist_sq);
-    if (dist < min_dist) {
-      best_c = c;
-      min_dist = dist;
-    }
-  }
-  *ret_min_dist = min_dist;
-  return best_c;
-}
-#endif
-
-unsigned int KMeansThread::ExhaustiveNearest(unsigned int o, float *obj,
+unsigned int PKMeansThread::ExhaustiveNearest(unsigned int o, float *obj,
 					     unsigned int guess_c,
 					     double guess_min_dist,
 					     double *ret_min_dist) {
@@ -185,6 +149,30 @@ unsigned int KMeansThread::ExhaustiveNearest(unsigned int o, float *obj,
   return best_c;
 }
 
+// Return an initial guess as to which cluster is closest to the given
+// object.  This is the cluster that was assigned on the last iteration.
+// On the first iteration we arbitrarily pick one cluster.
+unsigned int PKMeansThread::GetInitialGuess(unsigned int o) {
+  // Initialize orig_best_c to the current assignment.  This will make the
+  // triangle inequality based optimization work better.
+  unsigned int initial_guess = assignments_[o];
+  if (initial_guess == kMaxUInt) {
+    // Arbitrarily set initial_guess to first cluster with non-zero size
+    unsigned int c;
+    for (c = 0; c < num_clusters_; ++c) {
+      if (cluster_sizes_[c] > 0) {
+	initial_guess = c;
+	break;
+      }
+    }
+    if (c == num_clusters_) {
+      fprintf(stderr, "No clusters with non-zero size?!?\n");
+      exit(-1);
+    }
+  }
+  return initial_guess;
+}
+
 // Finds the nearest centroid to the given object o.  We have the current
 // best assignment for o.  Call it c.  (If this is the first iteration,
 // then choose a cluster c arbitrarily.)  We will start by only considering
@@ -198,41 +186,33 @@ unsigned int KMeansThread::ExhaustiveNearest(unsigned int o, float *obj,
 // with ExhaustiveNearest().  Hopefully this doesn't happen too often.  In
 // case (1) we can instead repeat the process we just followed, this time
 // using the neighbors list of the new best candidate.
-unsigned int KMeansThread::Nearest(unsigned int o, float *obj,
-				   double *ret_min_dist) {
-  // Initialize orig_best_c to the current assignment.  This will make the
-  // triangle inequality based optimization work better.
-  unsigned int orig_best_c = assignments_[o];
-  if (orig_best_c == kMaxUInt) {
-    // Arbitrarily set orig_best_c to first cluster with non-zero size
-    unsigned int c;
-    for (c = 0; c < num_clusters_; ++c) {
-      if (cluster_sizes_[c] > 0) {
-	orig_best_c = c;
-	break;
-      }
-    }
-    if (c == num_clusters_) {
-      fprintf(stderr, "No clusters with non-zero size?!?\n");
-      exit(-1);
-    }
-  }
-  float orig_dist = 0;
+unsigned int PKMeansThread::Nearest(unsigned int o, float *obj,
+				    double *ret_min_dist) {
+  unsigned int initial_guess = GetInitialGuess(o);
+  float initial_dist = 0;
   for (unsigned int d = 0; d < dim_; ++d) {
     float ov = obj[d];
-    float cm = means_[orig_best_c][d];
+    float cm = means_[initial_guess][d];
     float dim_delta = ov - cm;
-    orig_dist += dim_delta * dim_delta;
+    initial_dist += dim_delta * dim_delta;
   }
-  orig_dist = sqrt(orig_dist);
+  initial_dist = sqrt(initial_dist);
   ++dist_count_;
   // For testing purposes, if we can just call ExhaustiveNearest() here if
   // we suspect a bug in the optimized code below.
   if (neighbor_vectors_ == NULL) {
-    return ExhaustiveNearest(o, obj, orig_best_c, orig_dist, ret_min_dist);
+    return ExhaustiveNearest(o, obj, initial_guess, initial_dist, ret_min_dist);
   }
-  float min_dist = orig_dist;
-  unsigned int best_c = orig_best_c;
+  // current_guess is set before each iteration of the below while loop,
+  // and not changed during that iteration.
+  // Each iteration of the while loop scans a neighbors list.
+  // best_c starts out as current_guess and gets updated if we find a
+  // better cluster on the neighbors list.  Likewise current_dist and
+  // min_dist.
+  unsigned int current_guess = initial_guess;
+  float current_dist = initial_dist;
+  unsigned int best_c = initial_guess;
+  float min_dist = initial_dist;
   while (true) {
     const vector< pair<float, unsigned int> > &v = neighbor_vectors_[best_c];
     unsigned int num = v.size();
@@ -240,8 +220,8 @@ unsigned int KMeansThread::Nearest(unsigned int o, float *obj,
       float intra_dist = v[i].first;
       unsigned int c = v[i].second;
       if (cluster_sizes_[c] == 0) continue;
-      // Has to be orig_dist, not min_dist.
-      if (intra_dist >= 2 * orig_dist) {
+      // Has to be current_dist, not min_dist.
+      if (intra_dist >= 2 * current_dist) {
 	// We sorted neighbors by distance so we can skip all other clusters
 	++abbreviated_count_;
 	*ret_min_dist = min_dist;
@@ -266,7 +246,7 @@ unsigned int KMeansThread::Nearest(unsigned int o, float *obj,
 	if (c < best_c) best_c = c;
       }
     }
-    if (best_c == orig_best_c) {
+    if (best_c == current_guess) {
       // We got to the end of the neighbors list and we a) could not prove
       // that we had the best cluster, and b) didn't find a better candidate
       // best cluster.  All we can do now is an exhaustive search of all
@@ -278,8 +258,8 @@ unsigned int KMeansThread::Nearest(unsigned int o, float *obj,
       // that we had the best cluster, *but* we did find a better candidate
       // cluster.  So we can now try to search the neighbors of this new
       // better candidate.
-      orig_best_c = best_c;
-      orig_dist = min_dist;
+      current_guess = best_c;
+      current_dist = min_dist;
       continue;
     }
   }
@@ -288,7 +268,7 @@ unsigned int KMeansThread::Nearest(unsigned int o, float *obj,
   exit(-1);
 }
 
-void KMeansThread::Assign(void) {
+void PKMeansThread::Assign(void) {
   abbreviated_count_ = 0ULL;
   exhaustive_count_ = 0ULL;
   dist_count_ = 0ULL;
@@ -321,22 +301,59 @@ void KMeansThread::Assign(void) {
   }
 }
 
-#if 0
-// Can I parallelize SeedPlusPlus()?  What if I select N clusters
-// independently each time?
-void KMeansThread::SeedPlusPlus(void) {
+void PKMeansThread::ComputeCentroidPivotDistances(void) {
+  for (unsigned int c = 0; c < num_clusters_; ++c) {
+    // Only do work that is mine
+    if (c % num_threads_ != thread_index_) continue;
+    if (cluster_sizes_[c] == 0) continue;
+    float *cluster_means = means_[c];
+    unsigned int best_p = kMaxUInt;
+    float best_pivot_dist = 0;
+    for (unsigned int p = 0; p < num_pivots_; ++p) {
+      float *pivot_means = pivot_means_[p];
+      float dist_sq = 0;
+      for (unsigned int d = 0; d < dim_; ++d) {
+	float cm = cluster_means[d];
+	float pm = pivot_means[d];
+	float delta = cm - pm;
+	dist_sq += delta * delta;
+      }
+      float dist = sqrt(dist_sq);
+      centroid_pivot_distances_[c * num_pivots_ + p] = dist;
+      if (best_p == kMaxUInt || dist < best_pivot_dist) {
+	best_p = p;
+	best_pivot_dist = dist;
+      }
+    }
+    best_pivots_[c] = best_p;
+  }
 }
-#endif
 
-void KMeansThread::ComputeIntraCentroidDistances(void) {
+void PKMeansThread::ComputeIntraCentroidDistances(void) {
+  unsigned long long int ic_pruned = 0, ic_not_pruned = 0;
   // First loop puts c1 on c2's list for c1 < c2
   for (unsigned int c1 = 0; c1 < num_clusters_ - 1; ++c1) {
     if (cluster_sizes_[c1] == 0) continue;
+    if (g_it == 0 && thread_index_ == 0 && c1 % 10000 == 0) {
+      fprintf(stderr, "ComputeIntraCentroidDistances c %u/%u "
+	      "IC pruned %.2f%%\n", c1, num_clusters_,
+	      100.0 * ic_pruned / (ic_pruned + ic_not_pruned));
+    }
     float *cluster_means1 = means_[c1];
+    unsigned int p = best_pivots_[c1];
+    float c1_pivot_dist = centroid_pivot_distances_[c1 * num_pivots_ + p];
     for (unsigned int c2 = c1 + 1; c2 < num_clusters_; ++c2) {
       if (cluster_sizes_[c2] == 0) continue;
       // Only do work that is mine
       if (c2 % num_threads_ != thread_index_) continue;
+      float c2_pivot_dist = centroid_pivot_distances_[c2 * num_pivots_ + p];
+      // Want to know if D(c1, c2) could be less than neighbor_thresh_.
+      // D(c1, c2) >= |c1_pivot_dist - c2_pivot_dist|
+      if (fabs(c1_pivot_dist - c2_pivot_dist) >= neighbor_thresh_) {
+	++ic_pruned;
+	continue;
+      }
+      ++ic_not_pruned;
       float *cluster_means2 = means_[c2];
       float dist_sq = 0;
       for (unsigned int d = 0; d < dim_; ++d) {
@@ -350,9 +367,13 @@ void KMeansThread::ComputeIntraCentroidDistances(void) {
       neighbor_vectors_[c2].push_back(make_pair(dist, c1));
     }
   }
+  if (thread_index_ == 0) {
+    fprintf(stderr, "IC pruned: %.2f%%\n",
+	    100.0 * ic_pruned / (ic_pruned + ic_not_pruned));
+  }
 }
 
-void KMeansThread::SortNeighbors(void) {
+void PKMeansThread::SortNeighbors(void) {
   for (unsigned int c = 0; c < num_clusters_; ++c) {
     // Only do work that is mine
     if (c % num_threads_ != thread_index_) continue;
@@ -362,102 +383,51 @@ void KMeansThread::SortNeighbors(void) {
 }
 
 static void *thread_run_assign(void *v_t) {
-  KMeansThread *t = (KMeansThread *)v_t;
+  PKMeansThread *t = (PKMeansThread *)v_t;
   t->Assign();
   return NULL;
 }
 
-void KMeansThread::RunAssign(void) {
+void PKMeansThread::RunAssign(void) {
   pthread_create(&pthread_id_, NULL, thread_run_assign, this);
 }
 
+static void *thread_run_pivot(void *v_t) {
+  PKMeansThread *t = (PKMeansThread *)v_t;
+  t->ComputeCentroidPivotDistances();
+  return NULL;
+}
+
 static void *thread_run_intra(void *v_t) {
-  KMeansThread *t = (KMeansThread *)v_t;
+  PKMeansThread *t = (PKMeansThread *)v_t;
   t->ComputeIntraCentroidDistances();
   return NULL;
 }
 
-void KMeansThread::RunIntra(void) {
+void PKMeansThread::RunPivot(void) {
+  pthread_create(&pthread_id_, NULL, thread_run_pivot, this);
+}
+
+void PKMeansThread::RunIntra(void) {
   pthread_create(&pthread_id_, NULL, thread_run_intra, this);
 }
 
 static void *thread_run_sort(void *v_t) {
-  KMeansThread *t = (KMeansThread *)v_t;
+  PKMeansThread *t = (PKMeansThread *)v_t;
   t->SortNeighbors();
   return NULL;
 }
 
-void KMeansThread::RunSort(void) {
+void PKMeansThread::RunSort(void) {
   pthread_create(&pthread_id_, NULL, thread_run_sort, this);
 }
 
-void KMeansThread::Join(void) {
+void PKMeansThread::Join(void) {
   pthread_join(pthread_id_, NULL); 
 }
 
-unsigned int KMeans::BinarySearch(double r, unsigned int begin,
-				  unsigned int end,
-				  double *cum_sq_distance_to_nearest,
-				  bool *used) {
-  if (end == begin + 1) {
-    // Is it possible that we will select a used object?
-    if (used[begin]) {
-      fprintf(stderr, "Ended up with used object?!?\n");
-      fprintf(stderr, "r %f cum_sq_distance_to_nearest %f %f %f %f\n", r,
-	      cum_sq_distance_to_nearest[begin - 2],
-	      cum_sq_distance_to_nearest[begin - 1],
-	      cum_sq_distance_to_nearest[begin],
-	      cum_sq_distance_to_nearest[end]);
-      exit(-1);
-    }
-    return begin;
-  } else {
-    // The median may be an already used object, but cum_sq_distance_to_nearest
-    // is set appropriately.
-    unsigned int median = (end + begin) / 2;
-    double median_val = cum_sq_distance_to_nearest[median];
-    if (r < median_val) {
-      if (median == 0) return 0;
-      // Find the previous object that is not used
-      int prev;
-      for (prev = median - 1; prev >= 0; --prev) {
-	if (! used[prev]) {
-	  if (r >= cum_sq_distance_to_nearest[prev]) {
-	    return median;
-	  } else {
-	    return BinarySearch(r, begin, median, cum_sq_distance_to_nearest,
-				used);
-	  }
-	}
-      }
-      // If we get here, median is the first unused object
-      return median;
-    } else if (r > median_val) {
-      return BinarySearch(r, median + 1, end, cum_sq_distance_to_nearest, used);
-      // r is >= median_val
-    } else {
-      // r is exactly equal to median_val!  (Quite a coincidence.)
-      // First look for the first unused object and or before median.  If
-      // we find one, return it.
-      for (int i = median; i >= 0; --i) {
-	if (! used[i]) return i;
-      }
-      // Coincidences on top of coincidences!  There was no prior object.
-      // Look for a later object.
-      for (int i = median + 1; i < (int)end; ++i) {
-	if (! used[i]) return i;
-      }
-      fprintf(stderr, "Shouldn't get here\n");
-      exit(-1);
-    }
-  }
-}
-
 // Use the KMeans++ method of seeding
-// Should maintain cum_sq_distance_to_nearest, do binary search on it
-// for lookup.  Still need O(n) update to sq_distance_to_nearest though.
-// Can we update sq_distance_to_nearest only occasionally?
-void KMeans::SeedPlusPlus(void) {
+void PKMeans::SeedPlusPlus(void) {
   bool *used = new bool[num_objects_];
   for (unsigned int o = 0; o < num_objects_; ++o) used[o] = false;
   // For the first centroid, choose one of the input objects at random
@@ -467,14 +437,8 @@ void KMeans::SeedPlusPlus(void) {
     means_[0][f] = objects_[o][f];
   }
   double *sq_distance_to_nearest = new double[num_objects_];
-  double *cum_sq_distance_to_nearest = new double[num_objects_];
-  double sum_min_sq_dist = 0;
-  double cum_sq_dist = 0;
   for (unsigned int o = 0; o < num_objects_; ++o) {
-    if (used[o]) {
-      cum_sq_distance_to_nearest[o] = cum_sq_dist;
-      continue;
-    }
+    if (used[o]) continue;
     double sq_dist = 0;
     float *obj = objects_[o];
     for (unsigned int d = 0; d < dim_; ++d) {
@@ -484,39 +448,30 @@ void KMeans::SeedPlusPlus(void) {
       sq_dist += dim_delta * dim_delta;
     }
     sq_distance_to_nearest[o] = sq_dist;
-    cum_sq_dist += sq_dist;
-    cum_sq_distance_to_nearest[o] = cum_sq_dist;
-    sum_min_sq_dist += sq_dist;
   }
   for (unsigned int c = 1; c < num_clusters_; ++c) {
     if (c % 1000 == 0) {
       fprintf(stderr, "SeedPlusPlus: c %u/%u\n", c, num_clusters_);
     }
+    double sum_min_sq_dist = 0;
+    for (unsigned int o = 0; o < num_objects_; ++o) {
+      if (used[o]) continue;
+      sum_min_sq_dist += sq_distance_to_nearest[o];
+    }
     double x = RandZeroToOne() * sum_min_sq_dist;
-    unsigned int o;
-#if 1
-    o = BinarySearch(x, 0, num_objects_, cum_sq_distance_to_nearest, used);
-#else
     double cum = 0;
+    unsigned int o;
     for (o = 0; o < num_objects_; ++o) {
       if (used[o]) continue;
       cum += sq_distance_to_nearest[o];
       if (x <= cum) break;
     }
-#endif
     used[o] = true;
-    // Helps with old version of search
-    sq_distance_to_nearest[o] = 0;
     for (unsigned int f = 0; f < dim_; ++f) {
       means_[c][f] = objects_[o][f];
     }
-    sum_min_sq_dist = 0;
-    double cum_sq_dist = 0;
     for (unsigned int o = 0; o < num_objects_; ++o) {
-      if (used[o]) {
-	cum_sq_distance_to_nearest[o] = cum_sq_dist;
-	continue;
-      }
+      if (used[o]) continue;
       float *obj = objects_[o];
       double sq_dist = 0;
       for (unsigned int d = 0; d < dim_; ++d) {
@@ -528,18 +483,14 @@ void KMeans::SeedPlusPlus(void) {
       if (sq_dist < sq_distance_to_nearest[o]) {
 	sq_distance_to_nearest[o] = sq_dist;
       }
-      sum_min_sq_dist += sq_distance_to_nearest[o];
-      cum_sq_dist += sq_distance_to_nearest[o];
-      cum_sq_distance_to_nearest[o] = cum_sq_dist;
     }
   }
   delete [] sq_distance_to_nearest;
-  delete [] cum_sq_distance_to_nearest;
   delete [] used;
 }
 
 // Choose one item at random to serve as the seed of each cluster
-void KMeans::Seed1(void) {
+void PKMeans::Seed1(void) {
   bool *used = new bool[num_objects_];
   for (unsigned int o = 0; o < num_objects_; ++o) used[o] = false;
   for (unsigned int c = 0; c < num_clusters_; ++c) {
@@ -558,7 +509,7 @@ void KMeans::Seed1(void) {
 // Seed each cluster with the average of 10 randomly selected points
 // I saw a lot of empty clusters after seeding this way.  Switching to
 // Seed1() method.
-void KMeans::Seed2(void) {
+void PKMeans::Seed2(void) {
   double *sums = new double[dim_];
   unsigned int num_sample = 10;
   for (unsigned int c = 0; c < num_clusters_; ++c) {
@@ -577,8 +528,8 @@ void KMeans::Seed2(void) {
 }
 
 // Should I assume dups have been removed?
-void KMeans::SingleObjectClusters(unsigned int num_clusters, unsigned int dim,
-				  unsigned int num_objects, float **objects) {
+void PKMeans::SingleObjectClusters(unsigned int num_clusters, unsigned int dim,
+				   unsigned int num_objects, float **objects) {
   num_clusters_ = num_objects;
   dim_ = dim;
   num_objects_ = num_objects;
@@ -602,11 +553,11 @@ void KMeans::SingleObjectClusters(unsigned int num_clusters, unsigned int dim,
   num_threads_ = 0;
 }
 
-KMeans::KMeans(unsigned int num_clusters, unsigned int dim,
-	       unsigned int num_objects, float **objects,
-	       double neighbor_thresh, unsigned int num_threads) {
+PKMeans::PKMeans(unsigned int num_clusters, unsigned int dim,
+		 unsigned int num_objects, float **objects,
+		 double neighbor_thresh, unsigned int num_pivots,
+		 unsigned int num_threads) {
   nearest_centroids_ = NULL;
-  neighbor_ptrs_ = NULL;
   neighbor_vectors_ = NULL;
   cluster_sizes_ = NULL;
   means_ = NULL;
@@ -618,6 +569,11 @@ KMeans::KMeans(unsigned int num_clusters, unsigned int dim,
     return;
   }
   num_clusters_ = num_clusters;
+  num_pivots_ = num_pivots;
+  if (num_pivots_ > num_clusters_) {
+    fprintf(stderr, "Cannot have more pivots than clusters\n");
+    exit(-1);
+  }
   fprintf(stderr, "%i objects\n", num_objects);
   fprintf(stderr, "Using target num clusters: %i\n", num_clusters_);
   dim_ = dim;
@@ -632,13 +588,14 @@ KMeans::KMeans(unsigned int num_clusters, unsigned int dim,
   assignments_ = new unsigned int[num_objects_];
   for (unsigned int o = 0; o < num_objects_; ++o) assignments_[o] = kMaxUInt;
 
+  pivot_time_ = 0;
   intra_time_ = 0;
   assign_time_ = 0;
 
   // SeedPlusPlus() is pretty slow.  For now don't use when >= 10,000
   // clusters and more than 1m objects.  Could do 10k clusters and 3m objects
   // OK.
-  if (num_clusters >= 10000 && num_objects >= 1000000) {
+  if (num_clusters >= 10000 && num_objects > 1000000) {
     fprintf(stderr, "Calling Seed1\n");
     Seed1();
     fprintf(stderr, "Back from Seed1\n");
@@ -648,12 +605,25 @@ KMeans::KMeans(unsigned int num_clusters, unsigned int dim,
     fprintf(stderr, "Back from SeedPlusPlus\n");
   }
 
+  // Use the first N clusters as the pivots.  I think this will be suitably
+  // random.
+  pivot_means_ = new float *[num_pivots_];
+  for (unsigned int p = 0; p < num_pivots_; ++p) {
+    pivot_means_[p] = new float[dim_];
+    for (unsigned int d = 0; d < dim_; ++d) {
+      pivot_means_[p][d] = means_[p][d];
+    }
+  }
+
   // This is a hack.  Nearest() ignores clusters with zero-size.  But for the
   // initial assignment, we don't want this.  Cluster sizes will get set
   // properly in Update().
   for (unsigned int c = 0; c < num_clusters_; ++c) {
     cluster_sizes_[c] = 1;
   }
+
+  centroid_pivot_distances_ = new float[num_clusters_ * num_pivots_];
+  best_pivots_ = new unsigned int[num_clusters_];
 
   // If neighbor_thresh_ is zero, don't compute neighbors lists.
   if (neighbor_thresh_ > 0) {
@@ -667,7 +637,6 @@ KMeans::KMeans(unsigned int num_clusters, unsigned int dim,
     for (unsigned int c = 0; c < num_clusters_; ++c) {
       nearest_centroids_[c] = new unsigned char[len];
     }
-    neighbor_ptrs_ = new unsigned char *[num_clusters_];
 #endif
     neighbor_vectors_ = new vector< pair<float, unsigned int> >[num_clusters_];
   } else {
@@ -675,18 +644,22 @@ KMeans::KMeans(unsigned int num_clusters, unsigned int dim,
   }
 
   num_threads_ = num_threads;
-  threads_ = new KMeansThread *[num_threads_];
+  threads_ = new PKMeansThread *[num_threads_];
   for (unsigned int t = 0; t < num_threads_; ++t) {
-    threads_[t] = new KMeansThread(num_objects_, num_clusters_, objects_,
-				   dim_, neighbor_thresh_, cluster_sizes_,
-				   means_, assignments_, nearest_centroids_,
-				   neighbor_ptrs_, neighbor_vectors_,
-				   t, num_threads_);
+    threads_[t] = new PKMeansThread(num_objects_, num_clusters_, objects_,
+				    dim_, neighbor_thresh_, cluster_sizes_,
+				    means_, num_pivots_, pivot_means_,
+				    assignments_, nearest_centroids_,
+				    centroid_pivot_distances_, best_pivots_, 
+				    neighbor_vectors_, 0, t, num_threads_);
   }
 
+  g_it = 0;
   // Normally we call this at the end of each iteration.  Call it once now
   // before the first iteration to speed up the first call to Assign().
   if (neighbor_thresh_ > 0) {
+    fprintf(stderr, "Calling initial ComputeCentroidPivotDistances()\n");
+    ComputeCentroidPivotDistances();
     fprintf(stderr, "Calling initial ComputeIntraCentroidDistances()\n");
     ComputeIntraCentroidDistances();
     fprintf(stderr,
@@ -695,7 +668,7 @@ KMeans::KMeans(unsigned int num_clusters, unsigned int dim,
 }
 
 // Assume caller owns objects
-KMeans::~KMeans(void) {
+PKMeans::~PKMeans(void) {
   if (threads_) {
     for (unsigned int t = 0; t < num_threads_; ++t) {
       delete threads_[t];
@@ -708,9 +681,14 @@ KMeans::~KMeans(void) {
     }
     delete [] nearest_centroids_;
   }
-  delete [] neighbor_ptrs_;
+  delete [] centroid_pivot_distances_;
+  delete [] best_pivots_;
   delete [] neighbor_vectors_;
   delete [] cluster_sizes_;
+  for (unsigned int p = 0; p < num_pivots_; ++p) {
+    delete [] pivot_means_[p];
+  }
+  delete [] pivot_means_;
   for (unsigned int c = 0; c < num_clusters_; ++c) {
     delete [] means_[c];
   }
@@ -718,8 +696,26 @@ KMeans::~KMeans(void) {
   delete [] assignments_;
 }
 
+void PKMeans::ComputeCentroidPivotDistances(void) {
+  time_t start_t = time(NULL);
+
+  for (unsigned int i = 1; i < num_threads_; ++i) {
+    threads_[i]->RunPivot();
+  }
+  // Execute thread 0 in main execution thread
+  threads_[0]->ComputeCentroidPivotDistances();
+  for (unsigned int i = 1; i < num_threads_; ++i) {
+    threads_[i]->Join();
+  }
+
+  time_t end_t = time(NULL);
+  double diff_sec = difftime(end_t, start_t);
+  pivot_time_ += diff_sec;
+  fprintf(stderr, "Cum pivot time: %f\n", pivot_time_);
+}
+
 // Assumes cluster means are up-to-date
-void KMeans::ComputeIntraCentroidDistances(void) {
+void PKMeans::ComputeIntraCentroidDistances(void) {
   time_t start_t = time(NULL);
 
   for (unsigned int c = 0; c < num_clusters_; ++c) {
@@ -757,12 +753,10 @@ void KMeans::ComputeIntraCentroidDistances(void) {
 
   unsigned int sum_lens = 0;
   for (unsigned int c = 0; c < num_clusters_; ++c) {
-    // printf("%i\n", (int)neighbor_vectors_[c].size());
     sum_lens += neighbor_vectors_[c].size();
   }
   fprintf(stderr, "Avg neighbor vector length: %.1f\n",
 	  sum_lens / (double)num_clusters_);
-  // exit(0);
 
   time_t end_t = time(NULL);
   double diff_sec = difftime(end_t, start_t);
@@ -770,9 +764,8 @@ void KMeans::ComputeIntraCentroidDistances(void) {
   fprintf(stderr, "Cum intra time: %f\n", intra_time_);
 }
 
-unsigned int KMeans::Assign(double *avg_dist) {
+unsigned int PKMeans::Assign(double *avg_dist) {
   time_t start_t = time(NULL);
-
   for (unsigned int i = 1; i < num_threads_; ++i) {
     threads_[i]->RunAssign();
   }
@@ -797,7 +790,7 @@ unsigned int KMeans::Assign(double *avg_dist) {
   return num_changed;
 }
 
-void KMeans::Update(void) {
+void PKMeans::Update(void) {
   float **sums = new float *[num_clusters_];
   for (unsigned int c = 0; c < num_clusters_; ++c) {
     sums[c] = new float[dim_];
@@ -828,9 +821,18 @@ void KMeans::Update(void) {
     delete [] sums[c];
   }
   delete [] sums;
+
+  // Using the first N clusters as the pivots.  I think this is suitably
+  // random.  Update the pivot means here.  I suppose we could also leave
+  // them unchanged.
+  for (unsigned int p = 0; p < num_pivots_; ++p) {
+    for (unsigned int d = 0; d < dim_; ++d) {
+      pivot_means_[p][d] = means_[p][d];
+    }
+  }
 }
 
-void KMeans::EliminateEmpty(void) {
+void PKMeans::EliminateEmpty(void) {
   unsigned int *mapping = new unsigned int[num_clusters_];
   for (unsigned int j = 0; j < num_clusters_; ++j) {
     mapping[j] = kMaxUInt;
@@ -854,7 +856,7 @@ void KMeans::EliminateEmpty(void) {
   delete [] mapping;
 }
 
-void KMeans::Cluster(unsigned int num_its) {
+void PKMeans::Cluster(unsigned int num_its) {
   if (num_objects_ == num_clusters_) {
     // We already did the "clustering" in the constructor
     return;
@@ -876,6 +878,7 @@ void KMeans::Cluster(unsigned int num_its) {
     }
 
     if (neighbor_thresh_ > 0) {
+      ComputeCentroidPivotDistances();
       ComputeIntraCentroidDistances();
     }
 

@@ -18,13 +18,9 @@ public:
   BettingTreeBuilder(const BettingAbstraction &ba, unsigned int target_player);
   void Build(void);
   void Write(void);
+  shared_ptr<Node> CreateLimitTree(unsigned int *terminal_id);
   shared_ptr<Node>
-    CreateNoLimitTree1(unsigned int street, unsigned int pot_size,
-		       unsigned int last_bet_size,
-		       unsigned int num_street_bets, 
-		       unsigned int player_acting,
-		       unsigned int target_player,
-		       unsigned int *terminal_id);
+    CreateNoLimitTree1(unsigned int target_player, unsigned int *terminal_id);
   shared_ptr<Node>
     CreateNoLimitTree4(unsigned int street, unsigned int pot_size,
 		       unsigned int last_bet_size,
@@ -47,7 +43,7 @@ private:
     CreateCallSucc(unsigned int street, unsigned int last_pot_size,
 		   unsigned int last_bet_size, unsigned int num_street_bets,
 		   unsigned int player_acting, unsigned int target_player,
-		   unsigned int *terminal_id);
+		   unsigned int num_remaining, unsigned int *terminal_id);
   shared_ptr<Node>
     CreateFoldSucc(unsigned int street, unsigned int last_pot_size,
 		   unsigned int player_acting, unsigned int *terminal_id);
@@ -62,13 +58,15 @@ private:
 		 unsigned int old_after_call_pot_size,
 		 unsigned int new_after_call_pot_size,
 		 unsigned int num_street_bets, unsigned int player_acting,
-		 unsigned int target_player, unsigned int *terminal_id,
+		 unsigned int target_player, unsigned int num_remaining,
+		 unsigned int *terminal_id,
 		 vector< shared_ptr<Node> > *bet_succs);
   void CreateNoLimitSuccs(unsigned int street, unsigned int last_pot_size,
 			  unsigned int last_bet_size,
 			  unsigned int num_street_bets,
 			  unsigned int player_acting,
 			  unsigned int target_player,
+			  unsigned int num_remaining,
 			  unsigned int *terminal_id,
 			  shared_ptr<Node> *call_succ,
 			  shared_ptr<Node> *fold_succ,
@@ -79,18 +77,20 @@ private:
 			 unsigned int num_street_bets, 
 			 unsigned int player_acting,
 			 unsigned int target_player,
+			 unsigned int num_remaining,
 			 unsigned int *terminal_id);
   void CreateLimitSuccs(unsigned int street, unsigned int pot_size,
 			unsigned int last_bet_size, unsigned int num_bets,
 			unsigned int last_bettor, unsigned int player_acting,
-			unsigned int *terminal_id, shared_ptr<Node> *call_succ,
+			unsigned int num_remaining, unsigned int *terminal_id,
+			shared_ptr<Node> *call_succ,
 			shared_ptr<Node> *fold_succ,
 			vector< shared_ptr<Node> > *bet_succs);
   shared_ptr<Node>
     CreateLimitSubtree(unsigned int street, unsigned int pot_size,
 		       unsigned int last_bet_size, unsigned int num_bets,
 		       unsigned int last_bettor, unsigned int player_acting,
-		       unsigned int *terminal_id);
+		       unsigned int num_remaining, unsigned int *terminal_id);
 
   void GetNewPotSizes(int old_pot_size, const vector<int> &bet_amounts,
 		      unsigned int player_acting, unsigned int target_player,
@@ -223,19 +223,21 @@ private:
     RCreateCallSucc(unsigned int street, unsigned int last_pot_size,
 		    unsigned int last_bet_size, unsigned int num_street_bets,
 		    unsigned int player_acting, unsigned int target_player,
-		    string *key, unsigned int *terminal_id);
+		    unsigned int num_remaining, string *key,
+		    unsigned int *terminal_id);
   void RHandleBet(unsigned int street, unsigned int last_bet_size,
 		  unsigned int old_after_call_pot_size,
 		  unsigned int new_after_call_pot_size,
 		  unsigned int num_street_bets, unsigned int player_acting,
-		  unsigned int target_player, string *key,
-		  unsigned int *terminal_id,
+		  unsigned int target_player, unsigned int num_remaining,
+		  string *key, unsigned int *terminal_id,
 		  vector< shared_ptr<Node> > *bet_succs);
   void RCreateNoLimitSuccs(unsigned int street, unsigned int last_pot_size,
 			   unsigned int last_bet_size,
 			   unsigned int num_street_bets,
 			   unsigned int player_acting,
-			   unsigned int target_player, string *key,
+			   unsigned int target_player,
+			   unsigned int num_remaining, string *key,
 			   unsigned int *terminal_id,
 			   shared_ptr<Node> *call_succ,
 			   shared_ptr<Node> *fold_succ,
@@ -245,16 +247,64 @@ private:
 			  unsigned int last_bet_size,
 			  unsigned int num_street_bets,
 			  unsigned int player_acting,
-			  unsigned int target_player, string *key,
+			  unsigned int target_player,
+			  unsigned int num_remaining, string *key,
 			  unsigned int *terminal_id);
   bool FindReentrantNode(const string &key, shared_ptr<Node> *node);
   void AddReentrantNode(const string &key, shared_ptr<Node> node);
   shared_ptr<Node>
     CreateReentrantStreet(unsigned int street, unsigned int pot_size,
-			  unsigned int target_player, string *key,
+			  unsigned int target_player,
+			  unsigned int num_remaining, string *key,
 			  unsigned int *terminal_id);
   shared_ptr<Node>
     CreateNoLimitTree2(unsigned int target_player, unsigned int *terminal_id);
+
+  void GetNewBetTos(unsigned int old_bet_to, const vector<double> &pot_fracs,
+		    unsigned int player_acting, unsigned int target_player,
+		    bool *bet_to_seen);
+  shared_ptr<Node>
+    CreateMPFoldSucc(unsigned int street, unsigned int last_bet_size,
+		     unsigned int bet_to, unsigned int num_street_bets,
+		     unsigned int player_acting,
+		     unsigned int num_players_to_act, bool *folded,
+		     unsigned int target_player, string *key,
+		     unsigned int *terminal_id);
+  shared_ptr<Node>
+    CreateMPCallSucc(unsigned int street, unsigned int last_bet_size,
+		     unsigned int bet_to, unsigned int num_street_bets,
+		     unsigned int player_acting,
+		     unsigned int num_players_to_act, bool *folded,
+		     unsigned int target_player, string *key,
+		     unsigned int *terminal_id);
+  void MPHandleBet(unsigned int street, unsigned int last_bet_size,
+		   unsigned int last_bet_to, unsigned int new_bet_to,
+		   unsigned int num_street_bets, unsigned int player_acting,
+		   unsigned int num_players_to_act, bool *folded,
+		   unsigned int target_player, string *key,
+		   unsigned int *terminal_id,
+		   vector< shared_ptr<Node> > *bet_succs);
+  void CreateMPSuccs(unsigned int street, unsigned int last_bet_size,
+		     unsigned int bet_to, unsigned int num_street_bets,
+		     unsigned int player_acting,
+		     unsigned int num_players_to_act, bool *folded,
+		     unsigned int target_player, string *key, 
+		     unsigned int *terminal_id, shared_ptr<Node> *call_succ,
+		     shared_ptr<Node> *fold_succ,
+		     vector< shared_ptr<Node> > *bet_succs);
+  shared_ptr<Node>
+    CreateMPSubtree(unsigned int street, unsigned int last_bet_size,
+		    unsigned int bet_to, unsigned int num_street_bets,
+		    unsigned int player_acting,
+		    unsigned int num_players_to_act, bool *folded,
+		    unsigned int target_player, string *key,
+		    unsigned int *terminal_id);
+  shared_ptr<Node>
+    CreateMPStreet(unsigned int street, unsigned int bet_to, bool *folded,
+		   unsigned int target_player, string *key,
+		   unsigned int *terminal_id);
+  shared_ptr<Node>
+    CreateMPTree(unsigned int target_player, unsigned int *terminal_id);
   
   void Initialize(void);
   void Write(Node *node, unsigned int **num_nonterminals, Writer *writer);
@@ -273,5 +323,9 @@ private:
   unique_ptr< unordered_map< unsigned long long int, shared_ptr<Node> > >
     node_map_;
 };
+
+void AddStringToKey(const string &s, string *key);
+void AddUnsignedIntToKey(unsigned int ui, string *key);
+unsigned long long int HashKey(const string &key);
 
 #endif

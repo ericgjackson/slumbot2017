@@ -2,6 +2,7 @@
 // included in the VCFR class because they have use in CFR implementations
 // that do not derive from VCFR (e.g., PCS).
 
+#include <math.h> // lrint()
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -77,10 +78,14 @@ double *Fold(Node *node, unsigned int p, const CanonicalCards *hands,
 	     double *opp_probs, double sum_opp_probs,
 	     double *total_card_probs) {
   unsigned int max_card1 = Game::MaxCard() + 1;
-  double half_pot = (node->PotSize() / 2);
-  bool we_fold = (p == node->PlayerFolding());
-  // Sign of half_pot reflects who folds
-  if (we_fold) half_pot = -half_pot;
+  // Sign of half_pot reflects who wins the pot
+  double half_pot;
+  // Player acting encodes player remaining at fold nodes
+  if (p == node->PlayerActing()) {
+    half_pot = (node->PotSize() / 2);
+  } else {
+    half_pot = -(double)(node->PotSize() / 2);
+  }
   unsigned int num_hole_card_pairs = hands->NumRaw();
   double *vals = new double[num_hole_card_pairs];
 
@@ -117,6 +122,358 @@ void CommonBetResponseCalcs(unsigned int st, const CanonicalCards *hands,
     total_card_probs[lo] += opp_prob;
   }
   *ret_sum_opp_probs = sum_opp_probs;
+}
+
+// Abstracted, int sumprobs
+void ProcessOppProbsBucketed(Node *node, unsigned int **street_buckets,
+			     const CanonicalCards *hands, bool nonneg,
+			     unsigned int it, unsigned int soft_warmup,
+			     unsigned int hard_warmup, bool update_sumprobs,
+			     double *sumprob_scaling, double *opp_probs,
+			     double **succ_opp_probs, double *current_probs,
+			     int *sumprobs) {
+  unsigned int st = node->Street();
+  unsigned int num_succs = node->NumSuccs();
+  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
+  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
+  unsigned int max_card1 = Game::MaxCard() + 1;
+  for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
+    const Card *cards = hands->Cards(i);
+    Card hi = cards[0];
+    unsigned int enc;
+    if (num_hole_cards == 1) {
+      enc = hi;
+    } else {
+      Card lo = cards[1];
+      enc = hi * max_card1 + lo;
+    }
+    double opp_prob = opp_probs[enc];
+    if (opp_prob == 0) {
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	succ_opp_probs[s][enc] = 0;
+      }
+    } else {
+      unsigned int b = street_buckets[st][i];
+      double *my_current_probs = current_probs + b * num_succs;
+      int *my_sumprobs = nullptr;
+      if (sumprobs) my_sumprobs = sumprobs + b * num_succs;
+      bool downscale = false;
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	double succ_opp_prob = opp_prob * my_current_probs[s];
+	succ_opp_probs[s][enc] = succ_opp_prob;
+	if (update_sumprobs) {
+	  if ((hard_warmup == 0 && soft_warmup == 0) ||
+	      (soft_warmup > 0 && it <= soft_warmup)) {
+	    // Update sumprobs with weight of 1.  Do this when either:
+	    // a) There is no warmup (hard or soft), or
+	    // b) We are during the soft warmup period.
+	    my_sumprobs[s] += lrint(succ_opp_prob * sumprob_scaling[st]);
+	  } else if (hard_warmup > 0) {
+	    // Use a weight of (it - hard_warmup)
+	    my_sumprobs[s] += lrint(succ_opp_prob * (it - hard_warmup) *
+				    sumprob_scaling[st]);
+	  } else {
+	    // Use a weight of (it - soft_warmup)
+	    my_sumprobs[s] += lrint(succ_opp_prob * (it - soft_warmup) *
+				    sumprob_scaling[st]);
+	  }
+	  if (my_sumprobs[s] > 2000000000) {
+	    downscale = true;
+	  }
+	}
+      }
+      if (downscale) {
+	for (unsigned int s = 0; s < num_succs; ++s) {
+	  my_sumprobs[s] /= 2;
+	}
+      }
+    }
+  }
+}
+
+// Abstracted, double sumprobs
+void ProcessOppProbsBucketed(Node *node, unsigned int **street_buckets,
+			     const CanonicalCards *hands, bool nonneg,
+			     unsigned int it, unsigned int soft_warmup,
+			     unsigned int hard_warmup, bool update_sumprobs,
+			     double *opp_probs, double **succ_opp_probs,
+			     double *current_probs, double *sumprobs) {
+  unsigned int st = node->Street();
+  unsigned int num_succs = node->NumSuccs();
+  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
+  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
+  unsigned int max_card1 = Game::MaxCard() + 1;
+  for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
+    const Card *cards = hands->Cards(i);
+    Card hi = cards[0];
+    unsigned int enc;
+    if (num_hole_cards == 1) {
+      enc = hi;
+    } else {
+      Card lo = cards[1];
+      enc = hi * max_card1 + lo;
+    }
+    double opp_prob = opp_probs[enc];
+    if (opp_prob == 0) {
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	succ_opp_probs[s][enc] = 0;
+      }
+    } else {
+      unsigned int b = street_buckets[st][i];
+      double *my_current_probs = current_probs + b * num_succs;
+      double *my_sumprobs = nullptr;
+      if (sumprobs) my_sumprobs = sumprobs + b * num_succs;
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	double succ_opp_prob = opp_prob * my_current_probs[s];
+	succ_opp_probs[s][enc] = succ_opp_prob;
+	if (update_sumprobs) {
+	  if ((hard_warmup == 0 && soft_warmup == 0) ||
+	      (soft_warmup > 0 && it <= soft_warmup)) {
+	    // Update sumprobs with weight of 1.  Do this when either:
+	    // a) There is no warmup (hard or soft), or
+	    // b) We are during the soft warmup period.
+	    my_sumprobs[s] += succ_opp_prob;
+	  } else if (hard_warmup > 0) {
+	    // Use a weight of (it - hard_warmup)
+	    my_sumprobs[s] += succ_opp_prob * (it - hard_warmup);
+	  } else {
+	    // Use a weight of (it - soft_warmup)
+	    my_sumprobs[s] += succ_opp_prob * (it - soft_warmup);
+	  }
+	}
+      }
+    }
+  }
+}
+
+// Unabstracted, int cs_vals, int sumprobs
+void ProcessOppProbs(Node *node, const CanonicalCards *hands,
+		     bool nonneg, bool uniform, double explore,
+		     unsigned int it, unsigned int soft_warmup,
+		     unsigned int hard_warmup, bool update_sumprobs,
+		     double *sumprob_scaling, double *opp_probs,
+		     double **succ_opp_probs, int *cs_vals, int *sumprobs) {
+  unsigned int st = node->Street();
+  unsigned int num_succs = node->NumSuccs();
+  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
+  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
+  unsigned int default_succ_index = node->DefaultSuccIndex();
+  unsigned int max_card1 = Game::MaxCard() + 1;
+  double *current_probs = new double[num_succs];
+  unsigned int num_nonterminal_succs = 0;
+  bool *nonterminal_succs = new bool[num_succs];
+  for (unsigned int s = 0; s < num_succs; ++s) {
+    if (node->IthSucc(s)->Terminal()) {
+      nonterminal_succs[s] = false;
+    } else {
+      nonterminal_succs[s] = true;
+      ++num_nonterminal_succs;
+    }
+  }
+  for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
+    const Card *cards = hands->Cards(i);
+    Card lo, hi = cards[0];
+    unsigned int enc;
+    if (num_hole_cards == 1) {
+      enc = hi;
+    } else {
+      lo = cards[1];
+      enc = hi * max_card1 + lo;
+    }
+    double opp_prob = opp_probs[enc];
+    if (opp_prob == 0) {
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	succ_opp_probs[s][enc] = 0;
+      }
+    } else {
+      int *my_cs_vals = cs_vals + i * num_succs;
+      int *my_sumprobs = nullptr;
+      if (update_sumprobs) {
+	my_sumprobs = sumprobs + i * num_succs;
+      }
+      RegretsToProbs(my_cs_vals, num_succs, nonneg, uniform,
+		     default_succ_index, explore, num_nonterminal_succs,
+		     nonterminal_succs, current_probs);
+      bool downscale = false;
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	double succ_opp_prob = opp_prob * current_probs[s];
+	succ_opp_probs[s][enc] = succ_opp_prob;
+	if (update_sumprobs) {
+	  if ((hard_warmup == 0 && soft_warmup == 0) ||
+	      (soft_warmup > 0 && it <= soft_warmup)) {
+	    // Update sumprobs with weight of 1.  Do this when either:
+	    // a) There is no warmup (hard or soft), or
+	    // b) We are during the soft warmup period.
+	    my_sumprobs[s] += lrint(succ_opp_prob * sumprob_scaling[st]);
+	  } else if (hard_warmup > 0) {
+	    // Use a weight of (it - hard_warmup)
+	    my_sumprobs[s] += lrint(succ_opp_prob * (it - hard_warmup) *
+				    sumprob_scaling[st]);
+	  } else {
+	    // Use a weight of (it - soft_warmup)
+	    my_sumprobs[s] += lrint(succ_opp_prob * (it - soft_warmup) *
+				    sumprob_scaling[st]);
+	  }
+	  if (my_sumprobs[s] > 2000000000) {
+	    downscale = true;
+	  }
+	}
+      }
+      if (downscale) {
+	for (unsigned int s = 0; s < num_succs; ++s) {
+	  my_sumprobs[s] /= 2;
+	}
+      }
+    }
+  }
+  delete [] current_probs;
+  delete [] nonterminal_succs;
+}
+
+// Unabstracted, double cs_vals, double sumprobs
+void ProcessOppProbs(Node *node, const CanonicalCards *hands,
+		     bool nonneg, bool uniform, double explore, 
+		     unsigned int it, unsigned int soft_warmup,
+		     unsigned int hard_warmup, bool update_sumprobs,
+		     double *opp_probs, double **succ_opp_probs,
+		     double *cs_vals, double *sumprobs) {
+  unsigned int st = node->Street();
+  unsigned int num_succs = node->NumSuccs();
+  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
+  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
+  unsigned int default_succ_index = node->DefaultSuccIndex();
+  unsigned int max_card1 = Game::MaxCard() + 1;
+  double *current_probs = new double[num_succs];
+  unsigned int num_nonterminal_succs = 0;
+  bool *nonterminal_succs = new bool[num_succs];
+  for (unsigned int s = 0; s < num_succs; ++s) {
+    if (node->IthSucc(s)->Terminal()) {
+      nonterminal_succs[s] = false;
+    } else {
+      nonterminal_succs[s] = true;
+      ++num_nonterminal_succs;
+    }
+  }
+  for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
+    const Card *cards = hands->Cards(i);
+    Card lo, hi = cards[0];
+    unsigned int enc;
+    if (num_hole_cards == 1) {
+      enc = hi;
+    } else {
+      lo = cards[1];
+      enc = hi * max_card1 + lo;
+    }
+    double opp_prob = opp_probs[enc];
+    if (opp_prob == 0) {
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	succ_opp_probs[s][enc] = 0;
+      }
+    } else {
+      double *my_cs_vals = cs_vals + i * num_succs;
+      double *my_sumprobs = nullptr;
+      if (update_sumprobs) {
+	my_sumprobs = sumprobs + i * num_succs;
+      }
+      RegretsToProbs(my_cs_vals, num_succs, nonneg, uniform,
+		     default_succ_index, explore, num_nonterminal_succs,
+		     nonterminal_succs, current_probs);
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	double succ_opp_prob = opp_prob * current_probs[s];
+	succ_opp_probs[s][enc] = succ_opp_prob;
+	if (update_sumprobs) {
+	  if ((hard_warmup == 0 && soft_warmup == 0) ||
+	      (soft_warmup > 0 && it <= soft_warmup)) {
+	    // Update sumprobs with weight of 1.  Do this when either:
+	    // a) There is no warmup (hard or soft), or
+	    // b) We are during the soft warmup period.
+	    my_sumprobs[s] += succ_opp_prob;
+	  } else if (hard_warmup > 0) {
+	    // Use a weight of (it - hard_warmup)
+	    my_sumprobs[s] += succ_opp_prob * (it - hard_warmup);
+	  } else {
+	    // Use a weight of (it - soft_warmup)
+	    my_sumprobs[s] += succ_opp_prob * (it - soft_warmup);
+	  }
+	}
+      }
+    }
+  }
+  delete [] current_probs;
+  delete [] nonterminal_succs;
+}
+
+// Unabstracted, int cs_vals, double sumprobs
+void ProcessOppProbs(Node *node, const CanonicalCards *hands,
+		     bool nonneg, bool uniform, double explore, 
+		     unsigned int it, unsigned int soft_warmup,
+		     unsigned int hard_warmup, bool update_sumprobs,
+		     double *opp_probs, double **succ_opp_probs,
+		     int *cs_vals, double *sumprobs) {
+  unsigned int st = node->Street();
+  unsigned int num_succs = node->NumSuccs();
+  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
+  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
+  unsigned int default_succ_index = node->DefaultSuccIndex();
+  unsigned int max_card1 = Game::MaxCard() + 1;
+  double *current_probs = new double[num_succs];
+  unsigned int num_nonterminal_succs = 0;
+  bool *nonterminal_succs = new bool[num_succs];
+  for (unsigned int s = 0; s < num_succs; ++s) {
+    if (node->IthSucc(s)->Terminal()) {
+      nonterminal_succs[s] = false;
+    } else {
+      nonterminal_succs[s] = true;
+      ++num_nonterminal_succs;
+    }
+  }
+  for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
+    const Card *cards = hands->Cards(i);
+    Card hi = cards[0];
+    unsigned int enc;
+    if (num_hole_cards == 1) {
+      enc = hi;
+    } else {
+      Card lo = cards[1];
+      enc = hi * max_card1 + lo;
+    }
+    double opp_prob = opp_probs[enc];
+    if (opp_prob == 0) {
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	succ_opp_probs[s][enc] = 0;
+      }
+    } else {
+      int *my_cs_vals = cs_vals + i * num_succs;
+      double *my_sumprobs = nullptr;
+      if (update_sumprobs) {
+	my_sumprobs = sumprobs + i * num_succs;
+      }
+      RegretsToProbs(my_cs_vals, num_succs, nonneg, uniform,
+		     default_succ_index, explore, num_nonterminal_succs,
+		     nonterminal_succs, current_probs);
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	double succ_opp_prob = opp_prob * current_probs[s];
+	succ_opp_probs[s][enc] = succ_opp_prob;
+	if (update_sumprobs) {
+	  if ((hard_warmup == 0 && soft_warmup == 0) ||
+	      (soft_warmup > 0 && it <= soft_warmup)) {
+	    // Update sumprobs with weight of 1.  Do this when either:
+	    // a) There is no warmup (hard or soft), or
+	    // b) We are during the soft warmup period.
+	    my_sumprobs[s] += succ_opp_prob;
+	  } else if (hard_warmup > 0) {
+	    // Use a weight of (it - hard_warmup)
+	    my_sumprobs[s] += succ_opp_prob * (it - hard_warmup);
+	  } else {
+	    // Use a weight of (it - soft_warmup)
+	    my_sumprobs[s] += succ_opp_prob * (it - soft_warmup);
+	  }
+	}
+      }
+    }
+  }
+  delete [] current_probs;
+  delete [] nonterminal_succs;
 }
 
 void DeleteOldFiles(const CardAbstraction &ca, const BettingAbstraction &ba,
@@ -162,3 +519,109 @@ void DeleteOldFiles(const CardAbstraction &ca, const BettingAbstraction &ba,
   }
   fprintf(stderr, "%u files deleted\n", num_deleted);
 }
+
+static void MPTerminalVal(const Card *our_hole_cards, Card *opp_hole_cards,
+			  double joint_prob, unsigned int our_hv, bool lost,
+			  bool num_chop, unsigned int *choppers, unsigned int p,
+			  unsigned int opp, unsigned int *contributions,
+			  double **opp_probs, const CanonicalCards *hands,
+			  double *showdown_val, double *fold_val,
+			  double *sum_weights) {
+  if (opp == Game::NumPlayers()) {
+    *sum_weights = joint_prob;
+    unsigned int num_players = Game::NumPlayers();
+    unsigned int sum_contributions = 0;
+    for (unsigned int opp = 0; opp < num_players; ++opp) {
+      if (opp != p) sum_contributions += contributions[p];
+    }
+    *fold_val = joint_prob * sum_contributions;
+    if (lost) {
+      *showdown_val = joint_prob * -(double)contributions[p];
+    } else if (num_chop > 0) {
+      unsigned int sum_loser_contributions = 0;
+      unsigned int num_players = Game::NumPlayers();
+      for (unsigned int opp = 0; opp < num_players; ++opp) {
+	if (opp == p) continue;
+	unsigned int i;
+	for (i = 0; i < num_chop; ++i) {
+	  if (choppers[i] == opp) break;
+	}
+	if (i == num_chop) {
+	  sum_loser_contributions += contributions[opp];
+	}
+      }
+      *showdown_val = joint_prob *
+	(((double)sum_loser_contributions) / (double)(num_chop + 1));
+    } else {
+      *showdown_val = joint_prob * sum_contributions;
+    }
+  } else if (opp == p) {
+    MPTerminalVal(our_hole_cards, opp_hole_cards, joint_prob, our_hv, lost,
+		  num_chop, choppers, p, opp + 1, contributions, opp_probs,
+		  hands, showdown_val, fold_val, sum_weights);
+  } else {
+    unsigned int num_hole_card_pairs = hands->NumRaw();
+    *showdown_val = 0;
+    *fold_val = 0;
+    *sum_weights = 0;
+    for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
+      const Card *hole_cards = hands->Cards(i);
+      Card opp_hi = hole_cards[0];
+      if (InCards(opp_hi, our_hole_cards, 2)) continue;
+      Card opp_lo = hole_cards[1];
+      if (InCards(opp_lo, our_hole_cards, 2)) continue;
+      unsigned int opp_hv = hands->HandValue(i);
+      bool new_lost = lost || opp_hv > our_hv;
+      unsigned int new_num_chop;
+      if (new_lost) {
+	new_num_chop = 0;
+      } else if (opp_hv == our_hv) {
+	choppers[num_chop] = opp;
+	new_num_chop = num_chop + 1;
+      } else {
+	new_num_chop = num_chop;
+      }
+      if (opp > p) {
+	opp_hole_cards[(opp - 1) * 2] = opp_hi;
+	opp_hole_cards[(opp - 1) * 2 + 1] = opp_lo;
+      } else {
+	opp_hole_cards[opp * 2] = opp_hi;
+	opp_hole_cards[opp * 2 + 1] = opp_lo;
+      }
+      unsigned int max_card1 = Game::MaxCard() + 1;
+      unsigned int enc = opp_hi * max_card1 + opp_lo;
+      double new_joint_prob = joint_prob * opp_probs[opp][enc];
+      double this_showdown_val, this_fold_val, this_sum_weights;
+      MPTerminalVal(our_hole_cards, opp_hole_cards, new_joint_prob, our_hv,
+		    new_lost, new_num_chop, choppers, p, opp + 1,
+		    contributions, opp_probs, hands, &this_showdown_val,
+		    &this_fold_val, &this_sum_weights);
+      *showdown_val += this_showdown_val;
+      *fold_val += this_fold_val;
+      *sum_weights += this_sum_weights;
+    }
+  }
+}
+
+// We should take into account who has folded.
+void MPTerminal(unsigned int p, const CanonicalCards *hands,
+		unsigned int *contributions, double **opp_probs,
+		double **showdown_vals, double **fold_vals) {
+  unsigned int num_hole_card_pairs = hands->NumRaw();
+  *showdown_vals = new double[num_hole_card_pairs];
+  *fold_vals = new double[num_hole_card_pairs];
+  unsigned int num_players = Game::NumPlayers();
+  unique_ptr<Card []> opp_hole_cards(new Card[(num_players - 1) * 2]);
+  unique_ptr<unsigned int []> choppers(new unsigned int[num_players - 1]);
+  for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
+    unsigned int our_hv = hands->HandValue(i);
+    const Card *our_hole_cards = hands->Cards(i);
+    double sum_showdown_vals = 0, sum_fold_vals = 0, sum_weights = 0;
+    MPTerminalVal(our_hole_cards, opp_hole_cards.get(), 1.0, our_hv, false, 0,
+		  choppers.get(), p, 0, contributions, opp_probs, hands,
+		  &sum_showdown_vals, &sum_fold_vals, &sum_weights);
+    (*showdown_vals)[i] = sum_showdown_vals / sum_weights;
+    (*fold_vals)[i] = sum_fold_vals / sum_weights;
+  }
+}
+

@@ -92,6 +92,9 @@ class BettingAbstraction {
       return 0;
     }
   }
+  bool ReentrantStreet(unsigned int st) const {
+    return reentrant_streets_[st];
+  }
   bool BettingKey(unsigned int st) const {
     return betting_key_[st];
   }
@@ -136,6 +139,7 @@ class BettingAbstraction {
   double close_to_all_in_frac_;
   vector<vector<double> *> *our_bet_size_multipliers_;
   vector<vector<double> *> *opp_bet_size_multipliers_;
+  unique_ptr<bool []> reentrant_streets_;
   unique_ptr<bool []> betting_key_;
   unsigned int min_reentrant_pot_;
 };

@@ -113,6 +113,7 @@ double *EGCFR::HalfIteration(BettingTree *subtree, unsigned int p,
     for (unsigned int i = 0; i < num_hole_card_pairs; ++i) vals[i] = 0;
     return vals;
   }
+  // We're not passing in the right action sequence but it doesn't matter
   double *vals = Process(subtree_root, 0, opp_probs, sum_opp_probs,
 			 total_card_probs, street_buckets, "",
 			 subtree_root->Street());

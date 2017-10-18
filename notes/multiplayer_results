@@ -1,0 +1,204 @@
+p3ms3f1t1r1h5
+hshshshsbc3
+mb1b1
+tcfr
+
+Batch 0 (30m):
+  Batch 0 avg P0 val -0.446931
+  Batch 0 avg P1 val -0.553831
+  Batch 0 avg P2 val 0.934410
+Batch 8 (29m):
+  Batch 8 avg P0 val -0.436017
+  Batch 8 avg P1 val -0.538043
+  Batch 8 avg P2 val 0.956264
+Batch 24
+  Batch 24 avg P0 val -0.437904
+  Batch 24 avg P1 val -0.540607
+  Batch 24 avg P2 val 0.969036
+Batch 32
+  Batch 32 avg P0 val -0.437887
+  Batch 32 avg P1 val -0.535418
+  Batch 32 avg P2 val 0.966044
+Batch 40
+  Batch 40 avg P0 val -0.434692
+  Batch 40 avg P1 val -0.537871
+  Batch 40 avg P2 val 0.966037
+
+
+0 vs. 8 (10m hands; )
+  Avg B outcome: 0.007730 (3.9 mbb/g) over 10000000 dup hands
+  MBB confidence interval: -0.608527-8.338561
+  Avg P0 outcome: -0.433211
+  Avg P1 outcome: -0.518837
+  Avg P2 outcome: 0.945867
+0 vs. 24 (10m hands; 30s)
+  Avg B outcome: 0.009625 (4.8 mbb/g) over 10000000 dup hands
+  MBB confidence interval: 0.324325-9.300942
+  Avg P0 outcome: -0.432835
+  Avg P1 outcome: -0.520120
+  Avg P2 outcome: 0.946791
+0 vs. 24 (100m hands; 4m54s)
+  Avg B outcome: 0.012998 (6.5 mbb/g) over 100000000 dup hands
+  MBB confidence interval: 5.080744-7.917742
+  Avg P0 outcome: -0.431797
+  Avg P1 outcome: -0.531122
+  Avg P2 outcome: 0.956732
+16 vs. 24 (100m hands; 4m56s)
+  Avg B outcome: 0.004890 (2.4 mbb/g) over 100000000 dup hands
+  MBB confidence interval: 1.027278-3.863042
+  Avg P0 outcome: -0.432746
+  Avg P1 outcome: -0.533861
+  Avg P2 outcome: 0.960494
+24 vs. 32 (100m hands; 5m)
+  Avg B outcome: 0.002467 (1.2 mbb/g) over 100000000 dup hands
+  MBB confidence interval: -0.183581-2.650111
+  Avg P0 outcome: -0.432101
+  Avg P1 outcome: -0.533121
+  Avg P2 outcome: 0.959103
+32 vs. 40 (100m hands; 5m39s)
+  Avg B outcome: 0.001743 (0.9 mbb/g) over 100000000 dup hands
+  MBB confidence interval: -0.545590-2.288226
+  Avg P0 outcome: -0.432188
+  Avg P1 outcome: -0.531431
+  Avg P2 outcome: 0.957491
+
+---------------------------------------------------------
+
+p6ms0h5
+null
+mb4b1ss162
+tcfrp
+Batch 16 avg P0 val -0.340694
+Batch 16 avg P1 val -1.034976
+Batch 16 avg P2 val 0.255728
+Batch 16 avg P3 val 0.304623
+Batch 16 avg P4 val 0.370918
+Batch 16 avg P5 val 0.444336
+Wasn't saving sumprobs
+
+1m vs. 2m (10m): 
+  Avg B outcome: -0.001759 (-0.9 mbb/g) over 10000000 dup hands
+2m vs. 3m (10m): 
+  Avg B outcome: -0.002702 (-1.4 mbb/g) over 10000000 dup hands
+3m vs. 4m (10m): 
+  Avg B outcome: -0.002834 (-1.4 mbb/g) over 10000000 dup hands
+4m vs. 5m (10m):
+  Avg B outcome: -0.002950 (-1.5 mbb/g) over 10000000 dup hands
+0m vs. 5m (10m):
+  Avg B outcome: -0.000990 (-0.5 mbb/g) over 10000000 dup hands
+0m vs. 10m (10m):
+  Avg B outcome: -0.000671 (-0.3 mbb/g) over 10000000 dup hands
+
+Weird.  Head-to-head gets worse over time, but not by much.
+
+---------------------------------------------------------
+
+p6ms1h5
+null
+mb2b1
+tcfrf
+
+Batch 120 avg P0 val -0.435837
+Batch 120 avg P1 val -0.792112
+Batch 120 avg P2 val 0.241169
+Batch 120 avg P3 val 0.277561
+Batch 120 avg P4 val 0.322660
+Batch 120 avg P5 val 0.386253
+
+0 vs. 120 (10m hands):
+  Avg B outcome: -0.001952 (-1.0 mbb/g) over 10000000 dup hands
+0 vs. 8 (10m hands):
+  Avg B outcome: -0.001895 (-0.9 mbb/g) over 10000000 dup hands
+
+Batches 120 and 8 no better than batch 0?!?  Seems like a bug.  But could it
+just be that we already asymptoted?!?  Seems awfully fast, mainly because the
+betting tree is so big.
+
+100m vs. 1b (10m):
+  Avg B outcome: -0.000726 (-0.4 mbb/g) over 10000000 dup hands
+
+10m vs. 100m (10m):
+  Avg B outcome: 0.005614 (2.8 mbb/g) over 10000000 dup hands
+10m vs. 20m (10m):
+  Avg B outcome: 0.002929 (1.5 mbb/g) over 10000000 dup hands
+
+1m vs. 10m (10m):
+  Avg B outcome: 0.027148 (13.6 mbb/g) over 10000000 dup hands
+1m vs. 2m (10m):
+  Avg B outcome: 0.019090 (9.5 mbb/g) over 10000000 dup hands
+2m vs. 3m (10m):
+  Avg B outcome: 0.008048 (4.0 mbb/g) over 10000000 dup hands
+3m vs. 4m (10m):
+  Avg B outcome: 0.003639 (1.8 mbb/g) over 10000000 dup hands
+4m vs. 5m (10m):
+  Avg B outcome: 0.002147 (1.1 mbb/g) over 10000000 dup hands
+5m vs. 6m (10m):
+  Avg B outcome: 0.000791 (0.4 mbb/g) over 10000000 dup hands
+6m vs. 7m (10m):
+  Avg B outcome: 0.000365 (0.2 mbb/g) over 10000000 dup hands
+7m vs. 8m (10m):
+  Avg B outcome: -0.000202 (-0.1 mbb/g) over 10000000 dup hands
+8m vs. 9m (10m):
+  Avg B outcome: -0.001158 (-0.6 mbb/g) over 10000000 dup hands
+9m vs. 10m (10m):
+  Avg B outcome: -0.001095 (-0.5 mbb/g) over 10000000 dup hands
+9m vs. 10m (100m):
+  Avg B outcome: -0.000257 (-0.1 mbb/g) over 100000000 dup hands
+
+-----------------------------------------------------------------
+
+p6ms3h5
+hs3
+mb1b1
+tcfr: 100m
+tcfr2: 1b
+
+100m: 9m17s
+1b:   85m
+
+1m vs. 10m:   Avg B outcome: 0.433074 (216.5 mbb/g) over 10000000 dup hands
+10m vs. 100m: Avg B outcome: 0.250052 (125.0 mbb/g) over 10000000 dup hands
+100m vs. 1b:  Avg B outcome: 0.117541 (58.8 mbb/g) over 10000000 dup hands
+10b vs. 11b:  Avg B outcome: 0.005797 (2.9 mbb/g) over 10000000 dup hands
+11b vs. 12b:  Avg B outcome: 0.005827 (2.9 mbb/g) over 10000000 dup hands
+
+
+Batch 88:
+  Batch 88 avg P0 val -0.667325
+  Batch 88 avg P1 val -1.029668
+  Batch 88 avg P2 val 0.318947
+  Batch 88 avg P3 val 0.430462
+  Batch 88 avg P4 val 0.291217
+  Batch 88 avg P5 val 0.602028
+
+p5ms3h5
+hs3
+mb1b1
+
+-----------------------------------------------------------------
+
+p6ms3h5
+hshs3
+mb1b1
+19.5g process size
+tcfr: 100m
+
+300m:
+  Batch 16 avg P0 val -0.720696
+  Batch 16 avg P1 val -1.204425
+  Batch 16 avg P2 val 0.261188
+  Batch 16 avg P3 val 0.353324
+  Batch 16 avg P4 val 0.308134
+  Batch 16 avg P5 val 0.473592
+400m:
+  Batch 24 avg P0 val -0.718553
+  Batch 24 avg P1 val -1.189446
+  Batch 24 avg P2 val 0.268789
+  Batch 24 avg P3 val 0.363833
+  Batch 24 avg P4 val 0.316150
+  Batch 24 avg P5 val 0.506511
+
+
+100m vs. 200m: Avg B outcome: 0.079889 (39.9 mbb/g) over 10000000 dup hands
+200m vs. 300m: Avg B outcome: 0.042470 (21.2 mbb/g) over 10000000 dup hands
+300m vs. 400m: Avg B outcome: 0.027276 (13.6 mbb/g) over 10000000 dup hands

@@ -59,30 +59,6 @@ class VCFR {
 			    double sum_opp_probs, double *total_card_probs,
 			    unsigned int **street_buckets,
 			    const string &action_sequence);
-  virtual void ProcessOppProbsBucketed(Node *node,
-				       unsigned int **street_buckets,
-				       const CanonicalCards *hands,
-				       bool nonneg, double *opp_probs,
-				       double **succ_opp_probs,
-				       double *current_probs, int *sumprobs);
-  virtual void ProcessOppProbsBucketed(Node *node,
-				       unsigned int **street_buckets,
-				       const CanonicalCards *hands,
-				       bool nonneg, double *opp_probs,
-				       double **succ_opp_probs,
-				       double *current_probs, double *sumprobs);
-  virtual void ProcessOppProbs(Node *node, const CanonicalCards *hands,
-			       bool nonneg, double explore, 
-			       double *opp_probs, double **succ_opp_probs,
-			       int *cs_vals, int *sumprobs);
-  virtual void ProcessOppProbs(Node *node, const CanonicalCards *hands,
-			       bool nonneg, double explore, 
-			       double *opp_probs, double **succ_opp_probs,
-			       double *cs_vals, double *sumprobs);
-  virtual void ProcessOppProbs(Node *node, const CanonicalCards *hands,
-			       bool nonneg, double explore, 
-			       double *opp_probs, double **succ_opp_probs,
-			       int *cs_vals, double *sumprobs);
   virtual double *OppChoice(Node *node, unsigned int lbd, double *opp_probs,
 			    double sum_opp_probs, double *total_card_probs,
 			    unsigned int **street_buckets,

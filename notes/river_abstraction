@@ -1,0 +1,93 @@
+holdem
+onem
+mb1b1
+tcfr
+
+Always using sample prob 0.001 except where noted otherwise.
+Always using determ.
+
+onem
+Process size 16.1g
+Batch 0:   Est. expl: 344.756617 mbb/g
+  SP 0.01: Est. expl: 359.286492 mbb/g
+Batch 16:  Est. expl: 312.301112 mbb/g
+Batch 24:  Est. expl: 309.225058 mbb/g
+Batch 32:  Est. expl: 309.564484 mbb/g
+Batch 96:  Est. expl: 321.867723 mbb/g
+
+two7m
+Process size 18.3g
+Batch 0:   Est. expl: 378.491070 mbb/g
+Batch 8:   Est. expl: 342.084617 mbb/g
+Batch 16:  Est. expl: 332.395125 mbb/g
+Batch 24:  Est. expl: 327.602040 mbb/g
+Batch 32:  Est. expl: 326.782985 mbb/g
+Batch 40:  Est. expl: 326.681153 mbb/g
+Batch 48:  Est. expl: 327.664384 mbb/g
+Batch 64:  Est. expl: 328.271723 mbb/g
+Batch 128: Est. expl: 335.309640 mbb/g
+
+r900k
+Batch 0:  Est. expl: 364.185025 mbb/g
+Batch 8:  Est. expl: 346.278458 mbb/g
+Batch 16: Est. expl: 340.572936 mbb/g
+Batch 24: Est. expl: 339.968859 mbb/g
+
+hsone0.5hshc
+Batch 0:  Est. expl: 345.057093 mbb/g
+Batch 8:  Est. expl: 326.475955 mbb/g
+Batch 16: Est. expl: 325.308795 mbb/g
+Batch 24: Est. expl: 324.605740 mbb/g
+Batch 32: Est. expl: 325.769104 mbb/g
+Batch 40: Est. expl: 328.013678 mbb/g
+
+tenm_params
+Process size: ~28.5g
+615m for 12 batches
+Batch 48: Est. expl: 259.132532 mbb/g
+Batch 56: Est. expl: 255.591069 mbb/g
+Batch 64: Est. expl: 252.235722 mbb/g
+Batch 72: Est. expl: 249.656416 mbb/g
+Batch 80: Est. expl: 247.882162 mbb/g
+Batch 88: Est. expl: 246.711539 mbb/g
+
+r100k_params
+Batch 0:  Est. expl: 402.021686 mbb/g
+Batch 8:  Est. expl: 392.981103 mbb/g
+Batch 16: Est. expl: 393.935311 mbb/g
+
+
+hstwo0.5hsone0.8: 221,859 buckets
+hsone0.5hsone0.8: 13,394 buckets
+hsone0.5hs:       47,578 buckets
+hsone0.6hs:       100,915 buckets
+
+rk100k
+100k bucketing built with k-means
+Batch 0:  Est. expl: 368.319188 mbb/g
+Batch 8:  Est. expl: 356.815830 mbb/g
+Batch 16: Est. expl: 355.516382 mbb/g
+Batch 24: Est. expl: 354.614248 mbb/g
+Batch 32: Est. expl: 355.032254 mbb/g
+
+rk10k
+10k bucketing built with k-means
+Batch 0:  Est. expl: 436.067058 mbb/g
+Batch 8:  Est. expl: 435.419493 mbb/g
+Batch 16: Est. expl: 438.333012 mbb/g
+Batch 24: Est. expl: 443.017317 mbb/g
+Batch 32: Est. expl: 448.363463 mbb/g
+
+rk100kbc1s1
+100k kmeans bucketing crossproducted with bc1 and s1
+About 1.1m river buckets
+Batch 0 (48m):   Est. expl: 350.277039 mbb/g
+Batch 8 (+49m):  Est. expl: 323.229673 mbb/g
+Batch 16 (+50m): Est. expl: 317.439875 mbb/g
+Batch 24 (+51m): Est. expl: 313.080618 mbb/g
+Batch 32 (+49m): Est. expl: 311.220294 mbb/g
+
+
+10k->100k: 10x buckets, gain 81 mbb/g exploitability
+100k->1m:  10x buckets, gain 45 mbb/g exploitability (but 1m not kmeans)
+1m->10m:   10x buckets, gain 63 mbb/g exploitability (neither kmeans)

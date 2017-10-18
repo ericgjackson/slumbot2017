@@ -129,8 +129,8 @@ int main(int argc, char *argv[]) {
   CFRValues sumprobs(nullptr, true, streets.get(), betting_tree.get(), 0, 0,
 		     *card_abstraction, buckets, nullptr);
   char dir[500];
-  sprintf(dir, "%s/%s.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
-	  Game::GameName().c_str(),
+  sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
 	  card_abstraction->CardAbstractionName().c_str(),
 	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
 	  betting_abstraction->BettingAbstractionName().c_str(),

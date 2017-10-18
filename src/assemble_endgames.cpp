@@ -135,15 +135,17 @@ Assembler::Assembler(BettingTree *base_betting_tree,
   delete [] base_streets;
   
   char read_dir[500], write_dir[500];
-  sprintf(read_dir, "%s/%s.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
-	  Game::GameName().c_str(), base_ca.CardAbstractionName().c_str(),
+  sprintf(read_dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
+	  base_ca.CardAbstractionName().c_str(),
 	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
 	  base_ba_.BettingAbstractionName().c_str(),
 	  base_cc_.CFRConfigName().c_str());
   base_sumprobs.Read(read_dir, base_it, base_betting_tree_->Root(), "x",
 		     kMaxUInt);
-  sprintf(write_dir, "%s/%s.%s.%u.%u.%u.%s.%s", Files::NewCFRBase(),
-	  Game::GameName().c_str(), merged_ca_.CardAbstractionName().c_str(),
+  sprintf(write_dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::NewCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
+	  merged_ca_.CardAbstractionName().c_str(),
 	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
 	  endgame_ba_.BettingAbstractionName().c_str(),
 	  merged_cc_.CFRConfigName().c_str());
@@ -207,8 +209,8 @@ void Assembler::WalkTrunk(Node *base_node, Node *endgame_node,
       endgame_compressed_streets[st] = true;
     }
     char read_dir[500];
-    sprintf(read_dir, "%s/%s.%s.%u.%u.%u.%s.%s/endgames.%s.%s.%s.%s.%u.%u",
-	    Files::OldCFRBase(), Game::GameName().c_str(),
+    sprintf(read_dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s/endgames.%s.%s.%s.%s.%u.%u",
+	    Files::OldCFRBase(), Game::GameName().c_str(), Game::NumPlayers(),
 	    base_ca_.CardAbstractionName().c_str(),
 	    Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
 	    base_ba_.BettingAbstractionName().c_str(),

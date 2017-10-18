@@ -147,8 +147,8 @@ ApproxRGBR::ApproxRGBR(const CardAbstraction &ca, const BettingAbstraction &ba,
 				      card_abstraction_, buckets_,
 				      compressed_streets.get()));
   char dir[500];
-  sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s", Files::OldCFRBase(),
-	  Game::GameName().c_str(),
+  sprintf(dir, "%s/%s.%u.%s.%i.%i.%i.%s.%s", Files::OldCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
 	  card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	  Game::NumSuits(), Game::MaxStreet(),
 	  betting_abstraction_.BettingAbstractionName().c_str(),
@@ -247,8 +247,8 @@ CFRValues *ApproxRGBR::GetSumprobs(void) {
   fprintf(stderr, "Reading sumprobs\n");
   unsigned int max_street = Game::MaxStreet();
   char dir[500];
-  sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s", Files::OldCFRBase(),
-	  Game::GameName().c_str(),
+  sprintf(dir, "%s/%s.%u.%s.%i.%i.%i.%s.%s", Files::OldCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
 	  card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	  Game::NumSuits(), max_street,
 	  betting_abstraction_.BettingAbstractionName().c_str(),

@@ -37,3 +37,8 @@ r400k
 400k river buckets
 28.5g process size
 
+1b
+  Sample prob 0.001 (30m):
+    Est. P0 BR val: -0.047168 (norm 25425120.000000)
+    Est. P1 BR val: 0.113509 (norm 25425120.000000)
+    Est. expl: 16.585108 mbb/g

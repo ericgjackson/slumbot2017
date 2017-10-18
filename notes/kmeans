@@ -1,0 +1,182 @@
+10k buckets, 4 features
+An hour or two for SeedPlusPlus().
+Neighbor threshold 200
+Is that a good length?  Too short?
+First iteration starts around 5:40.
+
+Avg neighbor vector length: 5.2
+Cum intra time: 5.000000
+Abbreviated: 33.78% (22056928/65291712)
+Dist count: 57217100177
+Dist pct: 70.11%
+Cum assign time: 1054.000000
+It 0 num_changed 65291707 avg dist 98.965370
+It 25
+  Abbreviated: 66.79% (43609768/65291712)
+  Dist count: 27130894750
+  Dist pct: 33.24%
+
+-----------
+
+Smaller abstractions (1k, 10k)
+No SeedPlusPlus().
+Neighbor threshold of 1000.0
+
+1k buckets in 9m
+Avg neighbor vector length: 64.1
+Cum intra time: 3.000000
+Abbreviated: 99.68% (65084448/65291712)
+Dist count: 68286634
+Dist pct: 0.84%
+Cum assign time: 181.000000
+It 99 num_changed 160413 avg dist 162.905098
+
+10k buckets in 22m
+Avg neighbor vector length: 710.3
+Cum intra time: 51.000000
+Abbreviated: 100.00% (65290000/65291712)
+Dist count: 51675674
+Dist pct: 0.06%
+Cum assign time: 899.000000
+It 99 num_changed 162652 avg dist 82.535845
+Num actual buckets: 10000
+
+First iteration:
+Avg neighbor vector length: 745.5
+Cum intra time: 6.000000
+Abbreviated: 99.90% (65225368/65291712)
+Dist count: 34359493931
+Dist pct: 42.10%
+Cum assign time: 724.000000
+It 0 num_changed 65291707 avg dist 104.132982
+
+Try 10k again with exhaustive on first iteration
+Slower.  35m23s.
+
+Why is dist pct so high when abbreviated is so high?
+Normally they are inverses.  It's because we start with a random
+cluster assigned.  We will typically go through multiple neighbors
+lists.  But we will normally stumble on the best cluster about half
+way through and then we will likely stop when we get to the end of
+the neighbors list.
+
+Try a new more squashed set of features.
+combo1: squash preflop, flop and turn.  No multiplier on river.
+Neighbor thresh 1000, 200 its, 100k clusters.
+14,298,325 unique objects
+1:42 at start of ComputeIntraCentroidDistances().
+Out of memory.
+Neighbor thresh 100, 200 its, 100k clusters.
+Avg. neighbor vector length 12207.7
+Cum intra time 106.
+106m and hadn't finished first call to Assign().
+
+Try a new more squashed set of features.
+combo1: squash all features by 0.5.  Two hs features on turn.
+Multiplier of ten on river.
+Neighbor thresh 25, 200 its, 100k clusters.
+2,993,410 unique objects
+107m total
+Avg neighbor vector length: 7255.2
+Cum intra time: 5284.000000
+Cum assign time: 786.000000
+
+10k buckets (k10k)
+combo1 features
+Neighbor threshold 100.0
+200 iterations in 9m17s
+Avg neighbor vector length: 4493.9
+Cum intra time: 226.000000
+Abbreviated: 100.00% (2993416/2993416)
+Dist count: 2263703
+Dist pct: 0.06%
+Cum assign time: 83.000000
+
+----------------------------
+
+If I want 1m bucketing, I think I will need pivots or some other algorithmic
+improvement.
+
+----------------------------
+
+Create turn bucketing.
+../bin/combine_features holdem_params 2 hs hs hstwo null combo1 2
+k100k
+5,205,962 unique objects
+Trying with intra-centroid distances.  Neighbor threshold 100.
+Avg neighbor vector length: 209.2
+Cum intra time: 40.000000
+Abbreviated: 57.13% (2973944/5205968)
+Dist count: 28269364532
+Dist pct: 43.44%
+Cum assign time: 1146.000000
+It 0 num_changed 5205962 avg dist 23.122506
+
+125m
+Avg neighbor vector length: 194.2
+Cum intra time: 3011.000000
+Abbreviated: 98.19% (5111520/5205968)
+Dist count: 1183635716
+Dist pct: 1.82%
+Cum assign time: 4491.000000
+It 79 num_changed 1 avg dist 18.090050
+Num actual buckets: 99999
+
+----------------------------
+
+Redo 10k bucketing with pkmeans
+20 pivots
+Neighbor thresh 100.0
+2,993,410 unique objects
+200 iterations in 9m4s
+Identical buckets to kmeans
+Cum pivot time: 1.000000
+Cum intra time: 226.000000
+IC pruned: 44.60%
+
+Try 1m clusters
+20 pivots
+Neighbor thresh 10.0
+2,993,410 unique objects
+How long is the first assign going to take?
+83m and ran out of memory at cluster 842k
+1000 pivots
+Neighbor thresh 5.0
+5:36 when we call ComputeIntraCentroidDistances()
+Process size 14.8g at beginning of initial ComputeIntraCentroidDistances()
+99.24% pruned
+Process size 16.4g at cluster 820k
+Why are we so much slower?  It's been two hours, but first run took only
+83m to get to this point.  Lower neighbor thresh should be faster.
+More pivots shouldn't matter, should it?
+It 0: Cum intra time: 7066.000000
+Abbreviated: 2.93% (87696/2993416)
+Dist count: 364144756524
+Dist pct: 97.32%
+Cum assign time: 15395.000000
+It 0 num_changed 2993410 avg dist 0.728226
+Cum pivot time: 7.000000
+First assign was super slow.
+
+Seems like ComputeIntraCentroidDistances() is going to take a long time
+on each iteration even with pivots.  Still have 10^6^2 executions of inner
+loop.
+
+Can I get rid of intra-centroid distances altogether and just use pivots?
+
+Can k-means avoid step of computing n^2 intra-centroid distances?  Replace
+centroids with pivots; i.e., centroids from a smaller clustering?
+We currently use the neighbors lists for each centroid.  Start with
+a good guess c for object o.  Go down the sorted neighbors c' of c.
+When dist(c', c) >= 2 * dist(c, o) can quit.  What would we do instead?
+Go from object o to cluster c to pivot p.  Iterate through neighboring
+pivots p'.  Problem is that even if dist(p,p') is very large, that tells
+us nothing about distance from o to some cluster in p'.  Suppose I know
+dist(o, c), dist(o, p), dist(p, p'), dist(p', c').  If dist(p, p') >=
+dist(o, p) + dist(p', c') then we can ignore c'.  But this method only
+filters individual clusters.  Suppose we know the max distance between
+any pivot p and any cluster c that belongs to p.  Call that max(p).
+Sort neighbors p' of p by dist(p, p') + max(p').  This is basically
+the closest a cluster c' in p' could be to p.  Go down the neighbors p'
+until dist(p, p') >= dist(o, p) + max(p').  Have to consider every
+cluster c' in every suitably close pivot p'.  Is that a problem?

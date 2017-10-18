@@ -185,13 +185,13 @@ void CFRP::HalfIteration(unsigned int p) {
 
   if (subgame_street_ <= Game::MaxStreet()) pre_phase_ = true;
   double *vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-			 total_card_probs, street_buckets, "", 0);
+			 total_card_probs, street_buckets, "x", 0);
   if (subgame_street_ <= Game::MaxStreet()) {
     delete [] vals;
     WaitForFinalSubgames();
     pre_phase_ = false;
     vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-		   total_card_probs, street_buckets, "", 0);
+		   total_card_probs, street_buckets, "x", 0);
   }
   DeleteStreetBuckets(street_buckets);
 #if 0
@@ -223,8 +223,8 @@ void CFRP::HalfIteration(unsigned int p) {
 
 void CFRP::Checkpoint(unsigned int it) {
   char dir[500];
-  sprintf(dir, "%s/%s.%s.%u.%u.%u.%s.%s", Files::NewCFRBase(),
-	  Game::GameName().c_str(),
+  sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::NewCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
 	  card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	  Game::NumSuits(), Game::MaxStreet(),
 	  betting_abstraction_.BettingAbstractionName().c_str(),
@@ -241,8 +241,8 @@ void CFRP::Checkpoint(unsigned int it) {
 
 void CFRP::ReadFromCheckpoint(unsigned int it) {
   char dir[500];
-  sprintf(dir, "%s/%s.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
-	  Game::GameName().c_str(),
+  sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
 	  card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	  Game::NumSuits(), Game::MaxStreet(),
 	  betting_abstraction_.BettingAbstractionName().c_str(),

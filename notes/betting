@@ -167,6 +167,17 @@ Don't use multipliers for opp; specify a bunch of bet sizes
 17,252 flop betting sequences
 177,992 turn betting sequences
 1,303,557 river betting sequences
+This might limit us to only 250k river buckets or so:
+1303557 * 250000 * 8 = 2,607,114,000,000 (2.6 TB)
+
+big6asym
+Like above, but:
+1) Only allows 3 pot size bets on river because I assume we will be resolving
+the river.
+2) CloseToAllInFrac 0.5
+350,413 betting sequences in each
+263,412 river actions in each
+
 
 -----------------------------
 

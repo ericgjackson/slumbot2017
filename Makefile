@@ -8,15 +8,16 @@ HEADS =	src/constants.h src/rand.h src/split.h src/files.h \
 	src/betting_abstraction_params.h src/betting_abstraction.h \
 	src/cfr_params.h src/cfr_config.h src/betting_tree.h \
 	src/betting_tree_builder.h src/nonterminal_ids.h \
-	src/cfr_values.h src/cfr_utils.h \
-	src/vcfr.h src/cfrp.h src/rgbr.h src/eg_cfr.h src/endgames.h \
-	src/cbr_thread.h src/cbr_builder.h src/path.h src/sorting.h \
-	src/rollout.h src/univariate_kmeans.h src/buckets.h src/fast_hash.h \
-	src/sparse_and_dense.h src/bcbr_thread.h \
-	src/bcfr_thread.h src/bcbr_builder.h src/vcfr_subgame.h src/kmeans.h \
-	src/dynamic_cbr.h src/endgame_utils.h \
-	src/compression_utils.h src/regret_compression.h src/tcfr.h src/ols.h \
-	src/ej_compress.h src/pcs_cfr.h
+	src/cfr_values.h src/cfr_utils.h src/vcfr.h src/cfrp.h src/rgbr.h \
+	src/eg_cfr.h src/endgames.h src/cbr_thread.h src/cbr_builder.h \
+	src/path.h src/sorting.h src/rollout.h src/univariate_kmeans.h \
+	src/buckets.h src/fast_hash.h src/sparse_and_dense.h \
+	src/bcbr_thread.h src/bcfr_thread.h src/bcbr_builder.h \
+	src/vcfr_subgame.h src/kmeans.h src/pkmeans.h src/dynamic_cbr.h \
+	src/endgame_utils.h src/compression_utils.h src/regret_compression.h \
+	src/tcfr.h src/ols.h src/ej_compress.h src/pcs_cfr.h src/canonical.h \
+	src/mp_vcfr.h
+#	src/heads_up_tcfr.h \
 
 # -Wl,--no-as-needed fixes my problem of undefined reference to
 # pthread_create (and pthread_join).  Comments I found on the web indicate
@@ -39,21 +40,27 @@ OBJS =	obj/rand.o obj/split.o obj/files.o obj/cards.o obj/io.o \
 	obj/hand_tree.o obj/card_abstraction_params.o obj/card_abstraction.o \
 	obj/betting_abstraction_params.o obj/betting_abstraction.o \
 	obj/cfr_params.o obj/cfr_config.o obj/betting_tree.o \
-	obj/betting_tree_builder.o obj/no_limit_tree.o obj/reentrant_tree.o \
-	obj/nonterminal_ids.o \
+	obj/betting_tree_builder.o obj/limit_tree.o obj/no_limit_tree.o \
+	obj/reentrant_tree.o obj/mp_betting_tree.o obj/nonterminal_ids.o \
 	obj/cfr_values.o obj/cfr_utils.o obj/cfr.o obj/vcfr.o obj/cfrp.o \
 	obj/rgbr.o obj/eg_cfr.o obj/endgames.o obj/cbr_thread.o \
 	obj/cbr_builder.o obj/path.o obj/sorting.o obj/rollout.o \
 	obj/univariate_kmeans.o obj/buckets.o obj/fast_hash.o \
 	obj/sparse_and_dense.o obj/bcbr_thread.o \
 	obj/bcfr_thread.o obj/bcbr_builder.o obj/vcfr_subgame.o obj/kmeans.o \
-	obj/dynamic_cbr.o obj/endgame_utils.o \
-	obj/compression_utils.o obj/regret_compression.o obj/tcfr.o obj/ols.o \
-	obj/ej_compress.o obj/pcs_cfr.o
+	obj/pkmeans.o obj/dynamic_cbr.o obj/endgame_utils.o \
+	obj/compression_utils.o obj/regret_compression.o obj/tcfr.o \
+	obj/ols.o obj/ej_compress.o obj/pcs_cfr.o obj/canonical.o \
+	obj/mp_vcfr.o
+#	obj/heads_up_tcfr.o \
 
 bin/test:	obj/test.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/test obj/test.o $(OBJS) \
 	$(LIBRARIES)
+
+bin/test_canonicalization:	obj/test_canonicalization.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/test_canonicalization \
+	obj/test_canonicalization.o $(OBJS) $(LIBRARIES)
 
 bin/build_hand_value_tree:	obj/build_hand_value_tree.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/build_hand_value_tree \
@@ -127,6 +134,10 @@ bin/play2:	obj/play2.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/play2 obj/play2.o \
 	$(OBJS) $(LIBRARIES)
 
+bin/play3:	obj/play3.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/play3 obj/play3.o \
+	$(OBJS) $(LIBRARIES)
+
 bin/play4:	obj/play4.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/play4 obj/play4.o \
 	$(OBJS) $(LIBRARIES)
@@ -146,6 +157,10 @@ bin/build_unique_buckets:	obj/build_unique_buckets.o $(OBJS) $(HEADS)
 bin/build_kmeans_buckets:	obj/build_kmeans_buckets.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/build_kmeans_buckets \
 	obj/build_kmeans_buckets.o $(OBJS) $(LIBRARIES)
+
+bin/build_pkmeans_buckets:	obj/build_pkmeans_buckets.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/build_pkmeans_buckets \
+	obj/build_pkmeans_buckets.o $(OBJS) $(LIBRARIES)
 
 bin/show_buckets:	obj/show_buckets.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/show_buckets obj/show_buckets.o \
@@ -178,6 +193,10 @@ bin/build_hole_card_features:	obj/build_hole_card_features.o $(OBJS) $(HEADS)
 bin/build_board_features:	obj/build_board_features.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/build_board_features \
 	obj/build_board_features.o $(OBJS) $(LIBRARIES)
+
+bin/build_suit_features:	obj/build_suit_features.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/build_suit_features \
+	obj/build_suit_features.o $(OBJS) $(LIBRARIES)
 
 bin/combine_features:	obj/combine_features.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/combine_features \

@@ -305,6 +305,19 @@ BettingAbstraction::BettingAbstraction(const Params &params) {
   } else {
     opp_bet_size_multipliers_ = nullptr;
   }
+  reentrant_streets_.reset(new bool[max_street + 1]);
+  for (unsigned int st = 0; st <= max_street; ++st) {
+    // Default
+    reentrant_streets_[st] = false;
+  }
+  if (params.IsSet("ReentrantStreets")) {
+    vector<unsigned int> v;
+    ParseUnsignedInts(params.GetStringValue("ReentrantStreets"), &v);
+    unsigned int num = v.size();
+    for (unsigned int i = 0; i < num; ++i) {
+      reentrant_streets_[v[i]] = true;
+    }
+  }
   betting_key_.reset(new bool[max_street + 1]);
   for (unsigned int st = 0; st <= max_street; ++st) {
     // Default

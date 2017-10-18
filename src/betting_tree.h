@@ -11,7 +11,6 @@
 using namespace std;
 
 class BettingAbstraction;
-// class Pool;
 class Reader;
 class Writer;
 
@@ -19,17 +18,12 @@ class Node {
 public:
   Node(unsigned int id, unsigned int street, unsigned int player_acting,
        const shared_ptr<Node> &call_succ, const shared_ptr<Node> &fold_succ,
-       vector< shared_ptr<Node> > *bet_succs, unsigned int player_folding,
+       vector< shared_ptr<Node> > *bet_succs, unsigned int num_remaining,
        unsigned int pot_size);
-#if 0
-  Node(unsigned int id, unsigned int street, unsigned int player_acting,
-       Node *call_succ, Node *fold_succ, vector<Node *> *bet_succs,
-       unsigned int player_folding, unsigned int pot_size);
-#endif
   Node(Node *node);
   Node(unsigned int id, unsigned int pot_size, unsigned int num_succs,
        unsigned short flags, unsigned char player_acting,
-       unsigned char player_folding);
+       unsigned char num_remaining);
   ~Node(void);
 
   unsigned int PlayerActing(void) const {return player_acting_;}
@@ -41,10 +35,10 @@ public:
   }
   unsigned int NumSuccs(void) const {return num_succs_;}
   Node *IthSucc(int i) const {return succs_[i].get();}
-  unsigned int PlayerFolding(void) const {return player_folding_;}
-  bool Showdown(void) const {return Terminal() && player_folding_ == 255;}
-  // bool Special(void) const {return (bool)(flags_ & kSpecialFlag);}
+  unsigned int NumRemaining(void) const {return num_remaining_;}
+  bool Showdown(void) const {return Terminal() && num_remaining_ > 1;}
   unsigned int PotSize(void) const {return pot_size_;}
+  unsigned int LastBetTo(void) const {return last_bet_to_;}
   unsigned int CallSuccIndex(void) const;
   unsigned int FoldSuccIndex(void) const;
   unsigned int DefaultSuccIndex(void) const;
@@ -56,7 +50,6 @@ public:
   unsigned short Flags(void) const {return flags_;}
   void SetTerminalID(unsigned int id) {id_ = id;}
   void SetNonterminalID(unsigned int id) {id_ = id;}
-  // void SetSpecial(void) {flags_ |= kSpecialFlag;}
   void SetNumSuccs(unsigned int n) {num_succs_ = n;}
   void SetIthSucc(unsigned int s, shared_ptr<Node> succ) {succs_[s] = succ;}
   void SetHasCallSuccFlag(void) {flags_ |= kHasCallSuccFlag;}
@@ -75,15 +68,19 @@ public:
   static const int kStreetShift = 3;
 
  private:
-  // Node **succs_;
   shared_ptr<Node> *succs_;
   unsigned int id_;
-  // Any pending bets are not included in the pot size
-  unsigned short pot_size_;
+  // For multiplayer it is more convenient to record a last_bet_to
+  // quantity.  Eventually, we should do that for heads-up as well.
+  union {
+    // Any pending bets are not included in the pot size
+    unsigned short pot_size_;
+    unsigned short last_bet_to_;
+  };
   unsigned short num_succs_;
   unsigned short flags_;
   unsigned char player_acting_;
-  unsigned char player_folding_;
+  unsigned char num_remaining_;
 };
 
 class BettingTree {

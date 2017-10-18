@@ -32,88 +32,7 @@
 
 using namespace std;
 
-#define T_REGRET unsigned int
-#define T_VALUE int
-#define T_SUM_PROB unsigned int
-
-static const unsigned int kNumPregenRNGs = 10000000;
-
-class TCFRThread {
-public:
-  TCFRThread(const BettingAbstraction &ba, const CFRConfig &cc,
-	     const Buckets &buckets, unsigned int batch_index,
-	     unsigned int num_threads, unsigned char *data,
-	     unsigned int target_player, float *rngs, unsigned int *uncompress,
-	     unsigned int *short_uncompress, unsigned int *pruning_thresholds,
-	     bool *sumprob_streets, unsigned char *hvb_table,
-	     unsigned char ***cards_to_indices, unsigned int batch_size);
-  ~TCFRThread(void);
-  void RunThread(void);
-  void Join(void);
-  void Run(void);
-  unsigned int BatchIndex(void) const {return batch_index_;}
-  unsigned long long int ProcessCount(void) const {return process_count_;}
-  unsigned long long int FullProcessCount(void) const {
-    return full_process_count_;
-  }
-private:
-  static const unsigned int kStackDepth = 50;
-  static const unsigned int kMaxSuccs = 50;
-
-  T_VALUE Process(unsigned char *ptr);
-  bool HVBDealHand(void);
-  bool NoHVBDealHand(void);
-
-  const BettingAbstraction &betting_abstraction_;
-  const CFRConfig &cfr_config_;
-  const Buckets &buckets_;
-  unsigned int batch_index_;
-  unsigned int num_threads_;
-  unsigned char *data_;
-  bool asymmetric_;
-  unsigned int target_player_;
-  bool p1_phase_;
-  char p1_showdown_;
-  unsigned int *canon_bds_;
-  unsigned int *p1_buckets_;
-  unsigned int *p2_buckets_;
-  int showdown_value_;
-  pthread_t pthread_id_;
-  T_VALUE **succ_value_stack_;
-  int **succ_iregret_stack_;
-  unsigned int stack_index_;
-  double explore_;
-  unsigned int *sumprob_ceilings_;
-  unsigned long long int it_;
-  float *rngs_;
-  unsigned int rng_index_;
-  bool *quantized_streets_;
-  bool *short_quantized_streets_;
-  bool *scaled_streets_;
-  bool full_only_avg_update_;
-  unsigned int *uncompress_;
-  unsigned int *short_uncompress_;
-  unsigned int *pruning_thresholds_;
-  bool *sumprob_streets_;
-  unsigned char *hvb_table_;
-  unsigned long long int bytes_per_hand_;
-  unsigned char ***cards_to_indices_;
-  unsigned int max_street_;
-  bool all_full_;
-  bool *full_;
-  unsigned int close_threshold_;
-  unsigned long long int process_count_;
-  unsigned long long int full_process_count_;
-  unsigned int active_mod_;
-  unsigned int num_active_conditions_;
-  unsigned int *num_active_streets_;
-  unsigned int *num_active_rems_;
-  unsigned int **active_streets_;
-  unsigned int **active_rems_;
-  unsigned int batch_size_;
-  struct drand48_data rand_buf_;
-  int board_count_;
-};
+#define SUCCPTR(ptr) (ptr + 8 + num_players_ * 4)
 
 TCFRThread::TCFRThread(const BettingAbstraction &ba, const CFRConfig &cc,
 		       const Buckets &buckets, unsigned int batch_index,
@@ -129,6 +48,7 @@ TCFRThread::TCFRThread(const BettingAbstraction &ba, const CFRConfig &cc,
   num_threads_ = num_threads;
   data_ = data;
   asymmetric_ = betting_abstraction_.Asymmetric();
+  num_players_ = Game::NumPlayers();
   target_player_ = target_player;
   rngs_ = rngs;
   rng_index_ = RandZeroToOne() * kNumPregenRNGs;
@@ -175,8 +95,12 @@ TCFRThread::TCFRThread(const BettingAbstraction &ba, const CFRConfig &cc,
   full_only_avg_update_ = true; // cfr_config_.FullOnlyAvgUpdate();
   canon_bds_ = new unsigned int[max_street_ + 1];
   canon_bds_[0] = 0;
-  p1_buckets_ = new unsigned int[max_street_ + 1];
-  p2_buckets_ = new unsigned int[max_street_ + 1];
+  hi_cards_ = new unsigned int[num_players_];
+  lo_cards_ = new unsigned int[num_players_];
+  hole_cards_ = new unsigned int[num_players_ * 2];
+  hvs_ = new unsigned int[num_players_];
+  hand_buckets_ = new unsigned int[num_players_ * (max_street_ + 1)];
+  winners_ = new unsigned int[num_players_];
   succ_value_stack_ = new T_VALUE *[kStackDepth];
   succ_iregret_stack_ = new int *[kStackDepth];
   for (unsigned int i = 0; i < kStackDepth; ++i) {
@@ -273,9 +197,13 @@ TCFRThread::~TCFRThread(void) {
   }
   delete [] succ_value_stack_;
   delete [] succ_iregret_stack_;
-  delete [] p1_buckets_;
-  delete [] p2_buckets_;
+  delete [] hand_buckets_;
   delete [] canon_bds_;
+  delete [] hi_cards_;
+  delete [] lo_cards_;
+  delete [] hole_cards_;
+  delete [] hvs_;
+  delete [] winners_;
 }
 
 bool TCFRThread::HVBDealHand(void) {
@@ -292,89 +220,61 @@ bool TCFRThread::HVBDealHand(void) {
   }
   const Card *board = BoardTree::Board(max_street_, msbd);
   unsigned int num_ms_board_cards = Game::NumBoardCards(max_street_);
-  int end_cards = Game::MaxCard() + 1;
+  unsigned int end_cards = Game::MaxCard() + 1;
 
-  Card c1, c2, c3, c4;
-  while (true) {
-    drand48_r(&rand_buf_, &r);
-    c1 = end_cards * r;
-    // c1 = RandBetween(0, max_card);
-    if (InCards(c1, board, num_ms_board_cards)) continue;
-    break;
+  for (unsigned int p = 0; p < num_players_; ++p) {
+    unsigned int c1, c2;
+    while (true) {
+      drand48_r(&rand_buf_, &r);
+      c1 = end_cards * r;
+      if (InCards(c1, board, num_ms_board_cards)) continue;
+      if (InCards(c1, hole_cards_, 2 * p)) continue;
+      break;
+    }
+    hole_cards_[2 * p] = c1;
+    while (true) {
+      drand48_r(&rand_buf_, &r);
+      c2 = end_cards * r;
+      if (InCards(c2, board, num_ms_board_cards)) continue;
+      if (InCards(c2, hole_cards_, 2 * p + 1)) continue;
+      break;
+    }
+    hole_cards_[2 * p + 1] = c2;
+    if (c1 > c2) {hi_cards_[p] = c1; lo_cards_[p] = c2;}
+    else         {hi_cards_[p] = c2; lo_cards_[p] = c1;}
   }
-  while (true) {
-    drand48_r(&rand_buf_, &r);
-    c2 = end_cards * r;
-    // c2 = RandBetween(0, max_card);
-    if (InCards(c2, board, num_ms_board_cards)) continue;
-    if (c2 == c1) continue;
-    break;
-  }
-  while (true) {
-    drand48_r(&rand_buf_, &r);
-    c3 = end_cards * r;
-    // c3 = RandBetween(0, max_card);
-    if (InCards(c3, board, num_ms_board_cards)) continue;
-    if (c3 == c1 || c3 == c2) continue;
-    break;
-  }
-  while (true) {
-    drand48_r(&rand_buf_, &r);
-    c4 = end_cards * r;
-    // c4 = RandBetween(0, max_card);
-    if (InCards(c4, board, num_ms_board_cards)) continue;
-    if (c4 == c1 || c4 == c2 || c4 == c3) continue;
-    break;
-  }
-
-  int p1_hic, p1_loc, p2_hic, p2_loc;
-  if (c1 > c2) {p1_hic = c1; p1_loc = c2;}
-  else         {p1_hic = c2; p1_loc = c1;}
-  if (c3 > c4) {p2_hic = c3; p2_loc = c4;}
-  else         {p2_hic = c4; p2_loc = c3;}
-
-  unsigned int p1_hv = 0, p2_hv = 0;
+  
+  for (unsigned int p = 0; p < num_players_; ++p) hvs_[p] = 0;
 
   for (unsigned int st = 0; st <= max_street_; ++st) {
     unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
     unsigned int bd = canon_bds_[st];
-    unsigned char p1_hi = cards_to_indices_[st][bd][p1_hic];
-    unsigned char p1_li = cards_to_indices_[st][bd][p1_loc];
-    unsigned char p2_hi = cards_to_indices_[st][bd][p2_hic];
-    unsigned char p2_li = cards_to_indices_[st][bd][p2_loc];
     unsigned int base = bd * num_hole_card_pairs;
-    // The sum from 1... hi_index - 1 is the number of hole card pairs
-    // containing a high card less than hi.
-    unsigned int p1_hcp = (p1_hi - 1) * p1_hi / 2 + p1_li;
-    unsigned int p2_hcp = (p2_hi - 1) * p2_hi / 2 + p2_li;
-    unsigned int p1h = base + p1_hcp;
-    unsigned int p2h = base + p2_hcp;
+    for (unsigned int p = 0; p < num_players_; ++p) {
+      unsigned char hi = cards_to_indices_[st][bd][hi_cards_[p]];
+      unsigned char li = cards_to_indices_[st][bd][lo_cards_[p]];
+      // The sum from 1... hi_index - 1 is the number of hole card pairs
+      // containing a high card less than hi.
+      unsigned int hcp = (hi - 1) * hi / 2 + li;
+      unsigned int h = base + hcp;
 
-    if (st == max_street_) {
-      unsigned char *p1_ptr = &hvb_table_[p1h * bytes_per_hand_];
-      unsigned char *p2_ptr = &hvb_table_[p2h * bytes_per_hand_];
-      if (buckets_.NumBuckets(max_street_) <= 65536) {
-	p1_buckets_[max_street_] = *(unsigned short *)p1_ptr;
-	p2_buckets_[max_street_] = *(unsigned short *)p2_ptr;
-	p1_ptr += 2;
-	p2_ptr += 2;
+      if (st == max_street_) {
+	unsigned char *ptr = &hvb_table_[h * bytes_per_hand_];
+	if (buckets_.NumBuckets(max_street_) <= 65536) {
+	  hand_buckets_[p * (max_street_ + 1) + max_street_] =
+	    *(unsigned short *)ptr;
+	  ptr += 2;
+	} else {
+	  hand_buckets_[p * (max_street_ + 1) + max_street_] =
+	    *(unsigned int *)ptr;
+	  ptr += 4;
+	}
+	hvs_[p] = *(unsigned int *)ptr;
       } else {
-	p1_buckets_[max_street_] = *(unsigned int *)p1_ptr;
-	p2_buckets_[max_street_] = *(unsigned int *)p2_ptr;
-	p1_ptr += 4;
-	p2_ptr += 4;
+	hand_buckets_[p * (max_street_ + 1) + st] = buckets_.Bucket(st, h);
       }
-      p1_hv = *(unsigned int *)p1_ptr;
-      p2_hv = *(unsigned int *)p2_ptr;
-    } else {
-      p1_buckets_[st] = buckets_.Bucket(st, p1h);
-      p2_buckets_[st] = buckets_.Bucket(st, p2h);
     }
   }
-
-  if (p1_hv > p2_hv)      p1_showdown_ = 1;
-  else if (p2_hv > p1_hv) p1_showdown_ = -1;
-  else                    p1_showdown_ = 0;
 
   return true;
 }
@@ -389,93 +289,62 @@ bool TCFRThread::NoHVBDealHand(void) {
   unsigned int msbd = r * num_boards;
   canon_bds_[max_street_] = msbd;
   board_count_ = BoardTree::BoardCount(max_street_, msbd);
+  if (board_count_ == 0) {
+    fprintf(stderr, "it_ %llu msbd %u board_count_ %i\n", it_, msbd,
+	    board_count_);
+    fprintf(stderr, "Num boards: %u\n", BoardTree::NumBoards(max_street_));
+    exit(-1);
+  }
   for (unsigned int st = 1; st < max_street_; ++st) {
     canon_bds_[st] = BoardTree::PredBoard(msbd, st);
   }
   const Card *board = BoardTree::Board(max_street_, msbd);
   Card cards[7];
-  unsigned int num_board_cards = Game::NumBoardCards(max_street_);
-  for (unsigned int i = 0; i < num_board_cards; ++i) {
+  unsigned int num_ms_board_cards = Game::NumBoardCards(max_street_);
+  for (unsigned int i = 0; i < num_ms_board_cards; ++i) {
     cards[i+2] = board[i];
   }
   int end_cards = Game::MaxCard() + 1;
-  unsigned int p1_hv = 0, p2_hv = 0;
 
-  Card c1, c2, c3, c4;
-  while (true) {
-    drand48_r(&rand_buf_, &r);
-    c1 = end_cards * r;
-    // c1 = RandBetween(0, max_card);
-    if (InCards(c1, board, num_board_cards)) continue;
-    break;
-  }
-  while (true) {
-    drand48_r(&rand_buf_, &r);
-    c2 = end_cards * r;
-    // c2 = RandBetween(0, max_card);
-    if (InCards(c2, board, num_board_cards)) continue;
-    if (c2 == c1) continue;
-    break;
-  }
-  while (true) {
-    drand48_r(&rand_buf_, &r);
-    c3 = end_cards * r;
-    // c3 = RandBetween(0, max_card);
-    if (InCards(c3, board, num_board_cards)) continue;
-    if (c3 == c1 || c3 == c2) continue;
-    break;
-  }
-  while (true) {
-    drand48_r(&rand_buf_, &r);
-    c4 = end_cards * r;
-    // c4 = RandBetween(0, max_card);
-    if (InCards(c4, board, num_board_cards)) continue;
-    if (c4 == c1 || c4 == c2 || c4 == c3) continue;
-    break;
-  }
-
-  if (c1 > c2) {cards[0] = c1; cards[1] = c2;}
-  else         {cards[0] = c2; cards[1] = c1;}
-
-  for (unsigned int s = 0; s <= max_street_; ++s) {
-    unsigned int bd = canon_bds_[s];
-    unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(s);
-    unsigned int hcp = HCPIndex(s, cards);
-    unsigned int h = bd * num_hole_card_pairs + hcp;
-    p1_buckets_[s] = buckets_.Bucket(s, h);
-    // This is the number of null river buckets for a 52-card deck
-    if (p1_buckets_[s] > 2428287420) {
-      fprintf(stderr, "OOB p1 bucket s %u: bd %u h %u b %u\n", s, bd,
-	      h, p1_buckets_[s]);
-      exit(-1);
+  for (unsigned int p = 0; p < num_players_; ++p) {
+    unsigned int c1, c2;
+    while (true) {
+      drand48_r(&rand_buf_, &r);
+      c1 = end_cards * r;
+      if (InCards(c1, board, num_ms_board_cards)) continue;
+      if (InCards(c1, hole_cards_, 2 * p)) continue;
+      break;
     }
-    if (s == max_street_) {
-      p1_hv = HandValueTree::Val(cards);
+    hole_cards_[2 * p] = c1;
+    while (true) {
+      drand48_r(&rand_buf_, &r);
+      c2 = end_cards * r;
+      if (InCards(c2, board, num_ms_board_cards)) continue;
+      if (InCards(c2, hole_cards_, 2 * p + 1)) continue;
+      break;
+    }
+    hole_cards_[2 * p + 1] = c2;
+    if (c1 > c2) {hi_cards_[p] = c1; lo_cards_[p] = c2;}
+    else         {hi_cards_[p] = c2; lo_cards_[p] = c1;}
+  }
+
+
+  for (unsigned int p = 0; p < num_players_; ++p) hvs_[p] = 0;
+
+  for (unsigned int st = 0; st <= max_street_; ++st) {
+    unsigned int bd = canon_bds_[st];
+    unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
+    for (unsigned int p = 0; p < num_players_; ++p) {
+      cards[0] = hi_cards_[p];
+      cards[1] = lo_cards_[p];
+      unsigned int hcp = HCPIndex(st, cards);
+      unsigned int h = bd * num_hole_card_pairs + hcp;
+      hand_buckets_[p * (max_street_ + 1) + st] = buckets_.Bucket(st, h);
+      if (st == max_street_) {
+	hvs_[p] = HandValueTree::Val(cards);
+      }
     }
   }
-
-  if (c3 > c4) {cards[0] = c3; cards[1] = c4;}
-  else         {cards[0] = c4; cards[1] = c3;}
-
-  for (unsigned int s = 0; s <= max_street_; ++s) {
-    unsigned int bd = canon_bds_[s];
-    unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(s);
-    unsigned int hcp = HCPIndex(s, cards);
-    unsigned int h = bd * num_hole_card_pairs + hcp;
-    p2_buckets_[s] = buckets_.Bucket(s, h);
-    // This is the number of null river buckets for a 52-card deck
-    if (p2_buckets_[s] > 2428287420) {
-      fprintf(stderr, "OOB p2 bucket s %u\n", s);
-      exit(-1);
-    }
-    if (s == max_street_) {
-      p2_hv = HandValueTree::Val(cards);
-    }
-  }
-
-  if (p1_hv > p2_hv)      p1_showdown_ = 1;
-  else if (p2_hv > p1_hv) p1_showdown_ = -1;
-  else                    p1_showdown_ = 0;
 
   return true;
 }
@@ -487,8 +356,12 @@ void TCFRThread::Run(void) {
   process_count_ = 0ULL;
   full_process_count_ = 0ULL;
   it_ = 1;
-  long long int sum_p1_values = 0LL;
-  long long int denom = 0LL;
+  unique_ptr<long long int []> sum_values(new long long int[num_players_]);
+  unique_ptr<long long int []> denoms(new long long int[num_players_]);
+  for (unsigned int p = 0; p < num_players_; ++p) {
+    sum_values[p] = 0LL;
+    denoms[p] = 0LL;
+  }
   
   while (1) {
     bool not_done;
@@ -527,40 +400,30 @@ void TCFRThread::Run(void) {
       }
     }
 
-    p1_phase_ = true;
-    showdown_value_ = p1_showdown_;
-    stack_index_ = 0;
-    T_VALUE p1_val = Process(data_);
-    sum_p1_values += p1_val;
-    denom += board_count_;
-
-    // Temporary?
-    unsigned int b = p1_buckets_[0];
-    g_preflop_vals[b] += p1_val;
-    g_preflop_nums[b] += board_count_;
-    
-    p1_phase_ = false;
-    showdown_value_ = -p1_showdown_;
-    stack_index_ = 0;
-    T_VALUE p2_val = Process(data_);
-    sum_p1_values -= p2_val;
-    denom += board_count_;
-
-    // Temporary?
-    b = p2_buckets_[0];
-    g_preflop_vals[b] += p2_val;
-    g_preflop_nums[b] += board_count_;
+    for (p_ = 0; p_ < num_players_; ++p_) {
+      stack_index_ = 0;
+      T_VALUE val = Process(data_);
+      sum_values[p_] += val;
+      denoms[p_] += board_count_;
+      unsigned int b = hand_buckets_[p_ * (max_street_ + 1)];
+      g_preflop_vals[b] += val;
+      g_preflop_nums[b] += board_count_;
+    }
 
     ++it_;
     if (it_ % 10000000 == 0 && batch_index_ % num_threads_ == 0) {
-      fprintf(stderr, "It %llu avg P1 val %f (%lli / %lli)\n", it_,
-	      sum_p1_values / (double)denom, sum_p1_values, denom);
+      for (unsigned int p = 0; p < num_players_; ++p) {
+	fprintf(stderr, "It %llu avg P%u val %f\n", it_, p,
+		sum_values[p] / (double)denoms[p]);
+      }
     }
   }
   fprintf(stderr, "Batch %i done\n", batch_index_);
   if (batch_index_ % num_threads_ == 0) {
-    fprintf(stderr, "Batch %i avg P1 val %f (%lli / %lli)\n", batch_index_,
-	    sum_p1_values / (double)denom, sum_p1_values, denom);
+    for (unsigned int p = 0; p < num_players_; ++p) {
+      fprintf(stderr, "Batch %i avg P%u val %f\n", batch_index_, p,
+	      sum_values[p] / (double)denoms[p]);
+    }
   }
 }
 
@@ -578,47 +441,118 @@ void TCFRThread::Join(void) {
   pthread_join(pthread_id_, NULL); 
 }
 
+int TCFRThread::Round(double d) {
+  double rnd = rngs_[rng_index_++];
+  if (rng_index_ == kNumPregenRNGs) rng_index_ = 0;
+  if (d < 0) {
+    int below = d;
+    double rem = below - d;
+    if (rnd < rem) {
+      return below - 1;
+    } else {
+      return below;
+    }
+  } else {
+    int below = d;
+    double rem = d - below;
+    if (rnd < rem) {
+      return below + 1;
+    } else {
+      return below;
+    }
+  }
+}
+
+// This is unfinished.  We have nonterminal fold nodes now.  Need to
+// return when current player folds.  Don't continue on until a terminal
+// node.
 T_VALUE TCFRThread::Process(unsigned char *ptr) {
-#if 0
-  fprintf(stderr, "Process depth %u\n", stack_index_);
-  fprintf(stderr, "Process offset %llu\n",
-	  (unsigned long long int)(ptr - data_));
-  if (stack_index_ > 50) exit(0);
-#endif
   ++process_count_;
   if (all_full_) {
     ++full_process_count_;
   }
-  unsigned char node_type = ptr[0];
-  if (node_type == 0) {
+  unsigned char first_byte = ptr[0];
+  if (first_byte > 1) {
     // Showdown
-    T_VALUE half_pot_size = *((int *)(ptr + 4));
-    return showdown_value_ * board_count_ * half_pot_size;
-  } else if (node_type <= 2) {
-    // Fold
-    bool p1_fold = (ptr[0] == (unsigned char)1);
-    bool we_fold = (p1_phase_ && p1_fold) || (! p1_phase_ && ! p1_fold);
-    T_VALUE half_pot_size = *((int *)(ptr + 4));
-    if (we_fold) {
-      return -board_count_ * half_pot_size;
-    } else {
-      return board_count_ * half_pot_size;
+
+    // Find the best hand value of anyone remaining in the hand, and the
+    // total pot size which includes contributions from remaining players
+    // and players who folded earlier.
+    unsigned int best_hv = 0;
+    int pot_size = 0;
+    for (unsigned int p = 0; p < num_players_; ++p) {
+      pot_size += *(int *)(ptr + 8 + p * 4);
+      // fprintf(stderr, "p %u contribution %i offset %llu\n", p,
+      // *(int *)(ptr + 8 + p * 4),
+      // (unsigned long long int)(ptr - data_));
+      if (ptr[p+1] == 1) {
+	unsigned int hv = hvs_[p];
+	if (hv > best_hv) best_hv = hv;
+      }
     }
+
+    // Determine if we won, the number of winners, and the total contribution
+    // of all winners.
+    unsigned int num_winners = 0;
+    int winner_contributions = 0;
+    bool we_win = false;
+    for (unsigned int p = 0; p < num_players_; ++p) {
+      if (ptr[p+1] == 1 && hvs_[p] == best_hv) {
+	winners_[num_winners++] = p;
+	winner_contributions += *(int *)(ptr + 8 + p * 4);
+	we_win |= (p == p_);
+      }
+    }
+
+    int ret;
+    if (we_win) {
+      // Our winnings is:
+      // a) The total pot
+      // b) Minus the contributions of the winners
+      // c) Divided by the number of winners
+      double winnings =
+	(((double)(pot_size - winner_contributions)) /
+	 ((double)num_winners)) * board_count_;
+      // Normally the winnings are a whole number, but not always.
+      ret = Round(winnings);
+#if 0
+      fprintf(stderr, "Winnings %f ps %i bc %i\n", winnings, pot_size,
+	      board_count_);
+#endif
+    } else {
+	// If we lose at showdown, we lose the amount we contributed to the pot.
+      ret = -*(int *)(ptr + 8 + p_ * 4) * board_count_;
+      // fprintf(stderr, "Losses %i board_count_ %i\n", ret, board_count_);
+    }
+    if (ret <= -100000 || ret >= 100000) {
+      fprintf(stderr, "OOB ret %i bc %i\n", ret, board_count_);
+      exit(-1);
+    }
+    return ret;
+  } else if (first_byte == 1) {
+    // Fold
+    // Assume if we get here that we are the winner.
+    // pot_size is contributions of all players other than ourselves.
+    int pot_size = 0;
+    for (unsigned int p = 0; p < num_players_; ++p) {
+      if (p != p_) {
+	pot_size += *(int *)(ptr + 8 + p * 4);
+      }
+    }
+    return pot_size * board_count_;
   } else { // Nonterminal node
     unsigned int num_succs = ptr[2];
     if (num_succs == 1) {
       unsigned long long int succ_offset =
-	*((unsigned long long int *)(ptr + 4));
+	*((unsigned long long int *)(SUCCPTR(ptr)));
       return Process(data_ + succ_offset);
     }
-    unsigned int st = ptr[1] & (unsigned char)3;
+    unsigned int st = ptr[1];
     unsigned int default_succ_index = 0;
     unsigned int fold_succ_index = ptr[3];
-    bool p1_choice = (node_type == 3);
-    if (p1_choice == p1_phase_) {
-      unsigned int our_bucket;
-      if (p1_phase_) our_bucket = p1_buckets_[st];
-      else           our_bucket = p2_buckets_[st];
+    unsigned int player_acting = *(unsigned int *)(ptr + 4);
+    if (player_acting == p_) {
+      unsigned int our_bucket = hand_buckets_[p_ * (max_street_ + 1) + st];
 
       unsigned int size_bucket_data;
       if (quantized_streets_[st]) {
@@ -629,11 +563,11 @@ T_VALUE TCFRThread::Process(unsigned char *ptr) {
 	size_bucket_data = num_succs * sizeof(T_REGRET);
       }
       if (sumprob_streets_[st]) {
-	if (! asymmetric_ || target_player_ == p1_choice) {
+	if (! asymmetric_ || target_player_ == player_acting) {
 	  size_bucket_data += num_succs * sizeof(T_SUM_PROB);
 	}
       }
-      unsigned char *ptr1 = ptr + 4 + num_succs * 8;
+      unsigned char *ptr1 = SUCCPTR(ptr) + num_succs * 8;
       ptr1 += our_bucket * size_bucket_data;
       // ptr1 has now skipped past prior buckets
 
@@ -710,13 +644,18 @@ T_VALUE TCFRThread::Process(unsigned char *ptr) {
 	    s = rnd / explore_;
 	  }
 	}
-	unsigned long long int succ_offset =
-	  *((unsigned long long int *)(ptr + 4 + s * 8));
-	val = Process(data_ + succ_offset);
+	if (s == fold_succ_index) {
+	  int contrib = *((int *)(ptr + 8 + p_ * 4));
+	  val = -contrib * board_count_;
+	} else {
+	  unsigned long long int succ_offset =
+	    *((unsigned long long int *)(SUCCPTR(ptr) + s * 8));
+	  val = Process(data_ + succ_offset);
+	}
       } else { // Recursing on all succs
 	for (unsigned int s = 0; s < num_succs; ++s) {
 	  unsigned long long int succ_offset =
-	    *((unsigned long long int *)(ptr + 4 + s * 8));
+	    *((unsigned long long int *)(SUCCPTR(ptr) + s * 8));
 	  
 	  bool prune = false;
 	  if (! quantized_streets_[st] && ! short_quantized_streets_[st]) {
@@ -724,9 +663,14 @@ T_VALUE TCFRThread::Process(unsigned char *ptr) {
 	    prune = (bucket_regrets[s] >= pruning_threshold);
 	  }
 	  if (s == fold_succ_index || ! prune) {
-	    ++stack_index_;
-	    succ_values[s] = Process(data_ + succ_offset);
-	    --stack_index_;
+	    if (s == fold_succ_index) {
+	      int contrib = *((int *)(ptr + 8 + p_ * 4));
+	      succ_values[s] = -contrib * board_count_;
+	    } else {
+	      ++stack_index_;
+	      succ_values[s] = Process(data_ + succ_offset);
+	      --stack_index_;
+	    }
 	  }
 	}
 	  
@@ -806,11 +750,10 @@ T_VALUE TCFRThread::Process(unsigned char *ptr) {
       }
       return val;
     } else {
-      unsigned int opp_bucket;
-      if (p1_phase_) opp_bucket = p2_buckets_[st];
-      else           opp_bucket = p1_buckets_[st];
+      unsigned int opp_bucket =
+	hand_buckets_[player_acting * (max_street_ + 1) + st];
 
-      unsigned char *ptr1 = ptr + 4 + num_succs * 8;
+      unsigned char *ptr1 = SUCCPTR(ptr) + num_succs * 8;
       unsigned int size_bucket_data;
       if (quantized_streets_[st]) {
 	size_bucket_data = num_succs;
@@ -820,7 +763,7 @@ T_VALUE TCFRThread::Process(unsigned char *ptr) {
 	size_bucket_data = num_succs * sizeof(T_REGRET);
       }
       if (sumprob_streets_[st]) {
-	if (! asymmetric_ || target_player_ == p1_choice) {
+	if (! asymmetric_ || target_player_ == player_acting) {
 	  size_bucket_data += num_succs * sizeof(T_SUM_PROB);
 	}
       }
@@ -868,7 +811,7 @@ T_VALUE TCFRThread::Process(unsigned char *ptr) {
 
 	// Update sum-probs
       if (sumprob_streets_[st] && (all_full_ || ! full_only_avg_update_)) {
-	if (! asymmetric_ || p1_choice == target_player_) {
+	if (! asymmetric_ || player_acting == target_player_) {
 	  T_SUM_PROB *these_sum_probs;
 	  if (quantized_streets_[st]) {
 	    these_sum_probs = (T_SUM_PROB *)(ptr1 + num_succs);
@@ -893,7 +836,7 @@ T_VALUE TCFRThread::Process(unsigned char *ptr) {
       }
 
       unsigned long long int succ_offset =
-	*((unsigned long long int *)(ptr + 4 + ss * 8));
+	*((unsigned long long int *)(SUCCPTR(ptr) + ss * 8));
       ++stack_index_;
       T_VALUE ret = Process(data_ + succ_offset);
       --stack_index_;
@@ -904,19 +847,19 @@ T_VALUE TCFRThread::Process(unsigned char *ptr) {
 
 void TCFR::ReadRegrets(unsigned char *ptr, Node *node, Reader ***readers,
 		       bool ***seen) {
-  unsigned char node_type = ptr[0];
+  unsigned char first_byte = ptr[0];
   // Terminal node
-  if (node_type <= 2 || node_type == 5) return;
+  if (first_byte != 0) return;
   unsigned int num_succs = ptr[2];
   if (num_succs > 1) {
-    unsigned int pa = (node_type == 3);
-    unsigned int st = ptr[1] & (unsigned char)3;
+    unsigned int pa = *(unsigned int *)(ptr + 4);
+    unsigned int st = ptr[1];
     unsigned int nt = node->NonterminalID();
     if (seen[st][pa][nt]) return;
     seen[st][pa][nt] = true;
     Reader *reader = readers[pa][st];
     unsigned int num_buckets = buckets_.NumBuckets(st);
-    unsigned char *ptr1 = ptr + 4 + num_succs * 8;
+    unsigned char *ptr1 = SUCCPTR(ptr) + num_succs * 8;
     if (quantized_streets_[st]) {
       for (unsigned int b = 0; b < num_buckets; ++b) {
 	for (unsigned int s = 0; s < num_succs; ++s) {
@@ -959,26 +902,26 @@ void TCFR::ReadRegrets(unsigned char *ptr, Node *node, Reader ***readers,
   }
   for (unsigned int s = 0; s < num_succs; ++s) {
     unsigned long long int succ_offset =
-      *((unsigned long long int *)(ptr + 4 + s * 8));
+      *((unsigned long long int *)(SUCCPTR(ptr) + s * 8));
     ReadRegrets(data_ + succ_offset, node->IthSucc(s), readers, seen);
   }
 }
 
 void TCFR::WriteRegrets(unsigned char *ptr, Node *node, Writer ***writers,
 			bool ***seen) {
-  unsigned char node_type = ptr[0];
+  unsigned char first_byte = ptr[0];
   // Terminal node
-  if (node_type <= 2 || node_type == 5) return;
+  if (first_byte != 0) return;
   unsigned int num_succs = ptr[2];
   if (num_succs > 1) {
-    unsigned int pa = (node_type == 3);
-    unsigned int st = ptr[1] & (unsigned char)3;
+    unsigned int pa = *(unsigned int *)(ptr + 4);
+    unsigned int st = ptr[1];
     unsigned int nt = node->NonterminalID();
     if (seen[st][pa][nt]) return;
     seen[st][pa][nt] = true;
     Writer *writer = writers[pa][st];
     unsigned int num_buckets = buckets_.NumBuckets(st);
-    unsigned char *ptr1 = ptr + 4 + num_succs * 8;
+    unsigned char *ptr1 = SUCCPTR(ptr) + num_succs * 8;
     if (quantized_streets_[st]) {
       for (unsigned int b = 0; b < num_buckets; ++b) {
 	for (unsigned int s = 0; s < num_succs; ++s) {
@@ -1021,25 +964,25 @@ void TCFR::WriteRegrets(unsigned char *ptr, Node *node, Writer ***writers,
   }
   for (unsigned int s = 0; s < num_succs; ++s) {
     unsigned long long int succ_offset =
-      *((unsigned long long int *)(ptr + 4 + s * 8));
+      *((unsigned long long int *)(SUCCPTR(ptr) + s * 8));
     WriteRegrets(data_ + succ_offset, node->IthSucc(s), writers, seen);
   }
 }
 
 void TCFR::ReadSumprobs(unsigned char *ptr, Node *node, Reader ***readers,
 			bool ***seen) {
-  unsigned char node_type = ptr[0];
+  unsigned char first_byte = ptr[0];
   // Terminal node
-  if (node_type <= 2 || node_type == 5) return;
+  if (first_byte != 0) return;
   unsigned int num_succs = ptr[2];
   if (num_succs > 1) {
-    unsigned int pa = (node_type == 3);
-    unsigned int st = ptr[1] & (unsigned char)3;
+    unsigned int pa = *(unsigned int *)(ptr + 4);
+    unsigned int st = ptr[1];
     unsigned int nt = node->NonterminalID();
     if (seen[st][pa][nt]) return;
     seen[st][pa][nt] = true;
     unsigned int num_buckets = buckets_.NumBuckets(st);
-    unsigned char *ptr1 = ptr + 4 + num_succs * 8;
+    unsigned char *ptr1 = SUCCPTR(ptr) + num_succs * 8;
     if (sumprob_streets_[st]) {
       if (! asymmetric_ || target_player_ == pa) {
 	Reader *reader = readers[pa][st];
@@ -1074,20 +1017,20 @@ void TCFR::ReadSumprobs(unsigned char *ptr, Node *node, Reader ***readers,
   }
   for (unsigned int s = 0; s < num_succs; ++s) {
     unsigned long long int succ_offset =
-      *((unsigned long long int *)(ptr + 4 + s * 8));
+      *((unsigned long long int *)(SUCCPTR(ptr) + s * 8));
     ReadSumprobs(data_ + succ_offset, node->IthSucc(s), readers, seen);
   }
 }
 
 void TCFR::WriteSumprobs(unsigned char *ptr, Node *node, Writer ***writers,
 			 bool ***seen) {
-  unsigned char node_type = ptr[0];
+  unsigned char first_byte = ptr[0];
   // Terminal node
-  if (node_type <= 2 || node_type == 5) return;
+  if (first_byte != 0) return;
   unsigned int num_succs = ptr[2];
   if (num_succs > 1) {
-    unsigned int pa = (node_type == 3);
-    unsigned int st = ptr[1] & (unsigned char)3;
+    unsigned int pa = *(unsigned int *)(ptr + 4);
+    unsigned int st = ptr[1];
     unsigned int nt = node->NonterminalID();
     if (seen[st][pa][nt]) return;
     seen[st][pa][nt] = true;
@@ -1095,7 +1038,7 @@ void TCFR::WriteSumprobs(unsigned char *ptr, Node *node, Writer ***writers,
       if (! asymmetric_ || target_player_ == pa) {
 	Writer *writer = writers[pa][st];
 	unsigned int num_buckets = buckets_.NumBuckets(st);
-	unsigned char *ptr1 = ptr + 4 + num_succs * 8;
+	unsigned char *ptr1 = SUCCPTR(ptr) + num_succs * 8;
 	if (quantized_streets_[st]) {
 	  for (unsigned int b = 0; b < num_buckets; ++b) {
 	    T_SUM_PROB *sum_probs = (T_SUM_PROB *)(ptr1 + num_succs);
@@ -1127,15 +1070,15 @@ void TCFR::WriteSumprobs(unsigned char *ptr, Node *node, Writer ***writers,
   }
   for (unsigned int s = 0; s < num_succs; ++s) {
     unsigned long long int succ_offset =
-      *((unsigned long long int *)(ptr + 4 + s * 8));
+      *((unsigned long long int *)(SUCCPTR(ptr) + s * 8));
     WriteSumprobs(data_ + succ_offset, node->IthSucc(s), writers, seen);
   }
 }
 
 void TCFR::Read(unsigned int batch_base) {
   char dir[500], buf[500];
-  sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s", Files::OldCFRBase(),
-	  Game::GameName().c_str(),
+  sprintf(dir, "%s/%s.%u.%s.%i.%i.%i.%s.%s", Files::OldCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
 	  card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	  Game::NumSuits(), Game::MaxStreet(), 
 	  betting_abstraction_.BettingAbstractionName().c_str(),
@@ -1145,8 +1088,9 @@ void TCFR::Read(unsigned int batch_base) {
     sprintf(buf2, ".p%u", target_player_);
     strcat(dir, buf2);
   }
-  Reader ***regret_readers = new Reader **[2];
-  for (unsigned int p = 0; p <= 1; ++p) {
+  unsigned int num_players = Game::NumPlayers();
+  Reader ***regret_readers = new Reader **[num_players];
+  for (unsigned int p = 0; p < num_players; ++p) {
     regret_readers[p] = new Reader *[max_street_ + 1];
     for (unsigned int st = 0; st <= max_street_; ++st) {
       sprintf(buf, "%s/regrets.x.0.0.%u.%u.p%u.i", dir,
@@ -1154,8 +1098,8 @@ void TCFR::Read(unsigned int batch_base) {
       regret_readers[p][st] = new Reader(buf);
     }
   }
-  Reader ***sum_prob_readers = new Reader **[2];
-  for (unsigned int p = 0; p <= 1; ++p) {
+  Reader ***sum_prob_readers = new Reader **[num_players];
+  for (unsigned int p = 0; p < num_players; ++p) {
     if (asymmetric_ && target_player_ != p) {
       sum_prob_readers[p] = NULL;
       continue;
@@ -1176,7 +1120,6 @@ void TCFR::Read(unsigned int batch_base) {
     }
   }
   bool ***seen = new bool **[max_street_ + 1];
-  unsigned int num_players = Game::NumPlayers();
   for (unsigned int st = 0; st <= max_street_; ++st) {
     seen[st] = new bool *[num_players];
     for (unsigned int p = 0; p < num_players; ++p) {
@@ -1232,8 +1175,8 @@ void TCFR::Read(unsigned int batch_base) {
 
 void TCFR::Write(unsigned int batch_base) {
   char dir[500], buf[500];
-  sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s", Files::NewCFRBase(),
-	  Game::GameName().c_str(),
+  sprintf(dir, "%s/%s.%u.%s.%i.%i.%i.%s.%s", Files::NewCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
 	  card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	  Game::NumSuits(), Game::MaxStreet(),
 	  betting_abstraction_.BettingAbstractionName().c_str(), 
@@ -1244,8 +1187,9 @@ void TCFR::Write(unsigned int batch_base) {
     strcat(dir, buf2);
   }
   Mkdir(dir);
-  Writer ***regret_writers = new Writer **[2];
-  for (unsigned int p = 0; p <= 1; ++p) {
+  unsigned int num_players = Game::NumPlayers();
+  Writer ***regret_writers = new Writer **[num_players];
+  for (unsigned int p = 0; p < num_players; ++p) {
     regret_writers[p] = new Writer *[max_street_ + 1];
     for (unsigned int st = 0; st <= max_street_; ++st) {
       sprintf(buf, "%s/regrets.x.0.0.%u.%u.p%u.i", dir,
@@ -1254,7 +1198,6 @@ void TCFR::Write(unsigned int batch_base) {
     }
   }
   bool ***seen = new bool **[max_street_ + 1];
-  unsigned int num_players = Game::NumPlayers();
   for (unsigned int st = 0; st <= max_street_; ++st) {
     seen[st] = new bool *[num_players];
     for (unsigned int p = 0; p < num_players; ++p) {
@@ -1266,7 +1209,7 @@ void TCFR::Write(unsigned int batch_base) {
     }
   }
   WriteRegrets(data_, betting_tree_->Root(), regret_writers, seen);
-  for (unsigned int p = 0; p <= 1; ++p) {
+  for (unsigned int p = 0; p < num_players; ++p) {
     for (unsigned int st = 0; st <= max_street_; ++st) {
       delete regret_writers[p][st];
     }
@@ -1274,8 +1217,8 @@ void TCFR::Write(unsigned int batch_base) {
   }
   delete [] regret_writers;
 
-  Writer ***sum_prob_writers = new Writer **[2];
-  for (unsigned int p = 0; p <= 1; ++p) {
+  Writer ***sum_prob_writers = new Writer **[num_players];
+  for (unsigned int p = 0; p < num_players; ++p) {
     // In asymmetric systems, only save sumprobs for target player
     if (asymmetric_ && p != target_player_) {
       sum_prob_writers[p] = NULL;
@@ -1308,7 +1251,7 @@ void TCFR::Write(unsigned int batch_base) {
     delete [] seen[st];
   }
   delete [] seen;
-  for (unsigned int p = 0; p <= 1; ++p) {
+  for (unsigned int p = 0; p < num_players; ++p) {
     if (asymmetric_ && p != target_player_) continue;
     for (unsigned int st = 0; st <= max_street_; ++st) {
       if (! sumprob_streets_[st]) continue;
@@ -1499,6 +1442,20 @@ void TCFR::Run(unsigned int start_batch_base, unsigned int end_batch_base,
 
 // Returns a pointer to the allocation buffer after this node and all of its
 // descendants.
+// New scheme that supports multiplayer:
+// Terminal
+//   Byte 0:     Number of remaining players
+//   Byte 1-7:   Booleans indicating whether each player remaining
+//   Bytes 8...? Contributions
+// Nonterminal
+//   Byte 0:      0
+//   Byte 1:      Street
+//   Byte 2:      Num succs
+//   Byte 3:      Fold succ index
+//   Bytes 4-7:   Player acting
+//   Bytes 8...?  Contributions
+//   Byte ???:    Beginning of succ ptrs
+// Now:
 // First byte is node type (0=showdown, 1=P1 fold, 2=P2 fold,
 // 3=P1-choice nonterminal,4=P2-choice nonterminal)
 // If nonterminal, second byte is street (bottom two bits) and
@@ -1514,40 +1471,45 @@ void TCFR::Run(unsigned int start_batch_base, unsigned int end_batch_base,
 // A little padding is added at the end if necessary to make the number of
 // bytes for a node be a multiple of 8.
 unsigned char *TCFR::Prepare(unsigned char *ptr, Node *node,
+			     bool *folded, unsigned int *contributions,
+			     unsigned int last_bet_to,
 			     unsigned long long int ***offsets) {
+  unsigned int num_players = Game::NumPlayers();
   if (node->Terminal()) {
-    if (node->Showdown()) {
-      ptr[0] = (unsigned char)0;
-    } else if (node->PlayerFolding() == 1) {
-      ptr[0] = (unsigned char)1;
-    } else if (node->PlayerFolding() == 0) {
-      ptr[0] = (unsigned char)2;
-    } else {
-      fprintf(stderr, "Not folding; player folding no zero or one?!?\n");
+    if (num_players > 7) {
+      fprintf(stderr, "Only support up to 7 players\n");
       exit(-1);
     }
-    *((int *)(ptr + 4)) = node->PotSize() / 2;
-    return ptr + 8;
+    unsigned int num_remaining = 0;
+    for (unsigned int p = 0; p < num_players; ++p) {
+      if (folded[p]) {
+	ptr[p + 1] = 0;
+      } else {
+	ptr[p + 1] = 1;
+	++num_remaining;
+      }
+    }
+    ptr[0] = num_remaining;
+    for (unsigned int p = 0; p < num_players; ++p) {
+      *(unsigned int *)(ptr + 8 + p * 4) = contributions[p];
+    }
+    return ptr + 8 + num_players * 4;
   }
-
   unsigned int st = node->Street();
-  unsigned int pa = node->PlayerActing();
-  if (pa == 1) {
-    ptr[0] = (unsigned char)3;
-  } else if (pa == 0) {
-    ptr[0] = (unsigned char)4;
-  } else {
-    fprintf(stderr, "Player to act not zero or one?!?\n");
-    exit(-1);
-  }
+  ptr[0] = 0;
+  ptr[1] = st;
   unsigned int num_succs = node->NumSuccs();
-  ptr[1] = (unsigned char)st & (unsigned char)3;
-  ptr[2] = (unsigned char)num_succs;
-  // Note: now storing fold-succ-index here.  Used to store default-succ-index.
-  // Now assume default-succ-index is always 0.
-  ptr[3] = (unsigned char)node->FoldSuccIndex();
-  // This is where we will place the succ ptrs
-  unsigned char *succ_ptr = ptr + 4;
+  ptr[2] = num_succs;
+  unsigned int fsi = 255;
+  if (node->HasFoldSucc()) fsi = node->FoldSuccIndex();
+  ptr[3] = fsi;
+  unsigned int pa = node->PlayerActing();
+  *((unsigned int *)(ptr + 4)) = pa;
+  for (unsigned int p = 0; p < num_players; ++p) {
+    *(unsigned int *)(ptr + 8 + p * 4) = contributions[p];
+  }
+  unsigned char *succ_ptr = ptr + 8 + num_players * 4;
+
   unsigned char *ptr1 = succ_ptr + num_succs * 8;
   if (num_succs > 1) {
     unsigned int num_buckets = buckets_.NumBuckets(st);
@@ -1581,19 +1543,8 @@ unsigned char *TCFR::Prepare(unsigned char *ptr, Node *node,
     }
   }
 
-  // ptr1 now points to the end of the data for the current node
-  unsigned long long int num_bytes = ptr1 - ptr;
-  // Round up so that ptr1 - ptr is a multiple of 8
-  unsigned long long int rounded_up = ((num_bytes - 1ULL) / 8ULL + 1ULL) * 8ULL;
-  ptr1 = ptr + rounded_up;
-
   for (unsigned int s = 0; s < num_succs; ++s) {
     unsigned long long int ull_offset = ptr1 - data_;
-    if (ull_offset % 8 != 0) {
-      // Not sure this is necessary, but it should be true, so let's check.
-      fprintf(stderr, "Offset is not a multiple of 8?!?\n");
-      exit(-1);
-    }
     Node *succ = node->IthSucc(s);
     if (! succ->Terminal()) {
       unsigned int succ_st = succ->Street();
@@ -1608,7 +1559,47 @@ unsigned char *TCFR::Prepare(unsigned char *ptr, Node *node,
       }
     }
     *((unsigned long long int *)(succ_ptr + s * 8)) = ull_offset;
-    ptr1 = Prepare(ptr1, succ, offsets);
+    if (s == fsi) {
+      unique_ptr<bool []> new_folded(new bool[num_players]);
+      for (unsigned int p = 0; p < num_players; ++p) {
+	new_folded[p] = folded[p] || p == pa;
+      }
+      ptr1 = Prepare(ptr1, succ, new_folded.get(), contributions, last_bet_to,
+		     offsets);
+    } else if (node->HasCallSucc() && s == node->CallSuccIndex()) {
+      // If I call a bet, need to set new_contributions.
+      unique_ptr<unsigned int []>
+	new_contributions(new unsigned int[num_players]);
+      for (unsigned int p = 0; p < num_players; ++p) {
+	if (p == pa) {
+	  new_contributions[p] = last_bet_to;
+	} else {
+	  new_contributions[p] = contributions[p];
+	}
+      }
+      ptr1 = Prepare(ptr1, succ, folded, new_contributions.get(), last_bet_to,
+		     offsets);
+    } else {
+      unsigned int new_bet_to;
+      if (num_players == 2) {
+	Node *call = succ->IthSucc(succ->CallSuccIndex());
+	unsigned int new_pot_size = call->PotSize();
+	new_bet_to = new_pot_size / 2;
+      } else {
+	new_bet_to = succ->LastBetTo();
+      }
+      unique_ptr<unsigned int []>
+	new_contributions(new unsigned int[num_players]);
+      for (unsigned int p = 0; p < num_players; ++p) {
+	if (p == pa) {
+	  new_contributions[p] = new_bet_to;
+	} else {
+	  new_contributions[p] = contributions[p];
+	}
+      }
+      ptr1 = Prepare(ptr1, succ, folded, new_contributions.get(), new_bet_to,
+		     offsets);
+    }
   }
   return ptr1;
 }
@@ -1616,8 +1607,7 @@ unsigned char *TCFR::Prepare(unsigned char *ptr, Node *node,
 void TCFR::MeasureTree(Node *node, bool ***seen,
 		       unsigned long long int *allocation_size) {
   if (node->Terminal()) {
-    // 8 bytes for every terminal node
-    *allocation_size += 8ULL;
+    *allocation_size += 8 + Game::NumPlayers() * 4;
     return;
   }
 
@@ -1629,9 +1619,9 @@ void TCFR::MeasureTree(Node *node, bool ***seen,
   }
   seen[st][pa][nt] = true;
   
-  // Four bytes for everything else (e.g., num-succs) to keep things
-  // aligned.
-  unsigned int this_sz = 4;
+  // This is the number of bytes needed for everything else (e.g.,
+  // num-succs).
+  unsigned int this_sz = 8 + Game::NumPlayers() * 4;
 
   unsigned int num_succs = node->NumSuccs();
   // Eight bytes per succ
@@ -1652,9 +1642,7 @@ void TCFR::MeasureTree(Node *node, bool ***seen,
       }
     }
   }
-  
-  // Round up to multiple of 8
-  this_sz = ((this_sz - 1) / 8 + 1) * 8;
+
   *allocation_size += this_sz;
 
   for (unsigned int s = 0; s < num_succs; ++s) {
@@ -1662,15 +1650,19 @@ void TCFR::MeasureTree(Node *node, bool ***seen,
   }
 }
 
+static unsigned int PrecedingPlayer(unsigned int p) {
+  if (p == 0) return Game::NumPlayers() - 1;
+  else        return p - 1;
+}
+
 // Allocate one contiguous block of memory that has successors, street,
 // num-succs, regrets, sum-probs, showdown/fold flag, pot-size/2.
 void TCFR::Prepare(void) {
   unsigned int max_street = Game::MaxStreet();
-  unsigned int num_players = Game::NumPlayers();
   bool ***seen = new bool **[max_street + 1];
   for (unsigned int st = 0; st <= max_street; ++st) {
-    seen[st] = new bool *[num_players];
-    for (unsigned int pa = 0; pa < num_players; ++pa) {
+    seen[st] = new bool *[num_players_];
+    for (unsigned int pa = 0; pa < num_players_; ++pa) {
       unsigned int num_nt = betting_tree_->NumNonterminals(pa, st);
       seen[st][pa] = new bool[num_nt];
       for (unsigned int i = 0; i < num_nt; ++i) {
@@ -1683,7 +1675,7 @@ void TCFR::Prepare(void) {
   MeasureTree(betting_tree_->Root(), seen, &allocation_size);
 
   for (unsigned int st = 0; st <= max_street; ++st) {
-    for (unsigned int pa = 0; pa < num_players; ++pa) {
+    for (unsigned int pa = 0; pa < num_players_; ++pa) {
       delete [] seen[st][pa];
     }
     delete [] seen[st];
@@ -1705,8 +1697,8 @@ void TCFR::Prepare(void) {
   unsigned long long int ***offsets =
     new unsigned long long int **[max_street + 1];
   for (unsigned int st = 0; st <= max_street; ++st) {
-    offsets[st] = new unsigned long long int *[num_players];
-    for (unsigned int pa = 0; pa < num_players; ++pa) {
+    offsets[st] = new unsigned long long int *[num_players_];
+    for (unsigned int pa = 0; pa < num_players_; ++pa) {
       unsigned int num_nt = betting_tree_->NumNonterminals(pa, st);
       offsets[st][pa] = new unsigned long long int[num_nt];
       for (unsigned int i = 0; i < num_nt; ++i) {
@@ -1714,8 +1706,24 @@ void TCFR::Prepare(void) {
       }
     }
   }
-
-  unsigned char *end = Prepare(data_, betting_tree_->Root(), offsets);
+  unique_ptr<bool []> folded(new bool[num_players_]);
+  for (unsigned int p = 0; p < num_players_; ++p) folded[p] = false;
+  unique_ptr<unsigned int []> contributions(new unsigned int[num_players_]);
+  // Assume the big blind is last to act preflop
+  // Assume the small blind is prior to the big blind
+  unsigned int big_blind_p = PrecedingPlayer(Game::FirstToAct(0));
+  unsigned int small_blind_p = PrecedingPlayer(big_blind_p);
+  for (unsigned int p = 0; p < num_players_; ++p) {
+    if (p == small_blind_p) {
+      contributions[p] = Game::SmallBlind();
+    } else if (p == big_blind_p) {
+      contributions[p] = Game::BigBlind();
+    } else {
+      contributions[p] = 0;
+    }
+  }
+  unsigned char *end = Prepare(data_, betting_tree_->Root(), folded.get(),
+			       contributions.get(), Game::BigBlind(), offsets);
   unsigned long long int sz = end - data_;
   if (sz != allocation_size) {
     fprintf(stderr, "Didn't fill expected number of bytes: sz %llu as %llu\n",
@@ -1724,7 +1732,7 @@ void TCFR::Prepare(void) {
   }
 
   for (unsigned int st = 0; st <= max_street; ++st) {
-    for (unsigned int pa = 0; pa < num_players; ++pa) {
+    for (unsigned int pa = 0; pa < num_players_; ++pa) {
       delete [] offsets[st][pa];
     }
     delete [] offsets[st];
@@ -1741,6 +1749,7 @@ TCFR::TCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
 	  cfr_config_.CloseThreshold());
   time_t start_t = time(NULL);
   asymmetric_ = betting_abstraction_.Asymmetric();
+  num_players_ = Game::NumPlayers();
   target_player_ = target_player;
   num_cfr_threads_ = num_threads;
   fprintf(stderr, "Num threads: %i\n", num_cfr_threads_);
@@ -1877,21 +1886,6 @@ TCFR::TCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
   } else {
     cards_to_indices_ = NULL;
   }
-
-#if 0
-  bool *compressed_streets = new bool[max_street_ + 1];
-  for (unsigned int st = 0; st <= max_street_; ++st) {
-    compressed_streets[st] = false;
-  }
-
-  regrets_.reset(new CFRValues(true, true, false, nullptr, betting_tree_, 0,
-			       0, buckets_, compressed_streets));
-  // Should check for asymmetric systems
-  // Should honor sumprobs_streets_
-  sumprobs_.reset(new CFRValues(true, true, true, nullptr, betting_tree_, 0,
-				0, buckets_, compressed_streets));
-  delete [] compressed_streets;
-#endif
 
   time_t end_t = time(NULL);
   double diff_sec = difftime(end_t, start_t);

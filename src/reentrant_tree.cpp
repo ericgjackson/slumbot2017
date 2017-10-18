@@ -16,13 +16,11 @@
 
 using namespace std;
 
-// uint64_t fasthash64(const void *buf, size_t len, uint64_t seed);
-
-static void AddStringToKey(const string &s, string *key) {
+void AddStringToKey(const string &s, string *key) {
   *key += s;
 }
 
-static void AddUnsignedIntToKey(unsigned int ui, string *key) {
+void AddUnsignedIntToKey(unsigned int ui, string *key) {
   char buf[10];
   sprintf(buf, "%u", ui);
   *key += buf;
@@ -59,6 +57,7 @@ BettingTreeBuilder::RCreateCallSucc(unsigned int street,
 				    unsigned int num_street_bets,
 				    unsigned int player_acting,
 				    unsigned int target_player,
+				    unsigned int num_remaining,
 				    string *key, unsigned int *terminal_id) {
   unsigned int after_call_pot_size = last_pot_size + 2 * last_bet_size;
   string new_key = *key;
@@ -74,16 +73,17 @@ BettingTreeBuilder::RCreateCallSucc(unsigned int street,
   unsigned int max_street = Game::MaxStreet();
   if (street < max_street && advance_street) {
     call_succ = CreateReentrantStreet(street + 1, after_call_pot_size,
-				      target_player, &new_key, terminal_id);
+				      target_player, num_remaining, &new_key,
+				      terminal_id);
   } else if (! advance_street) {
     // This is a check that does not advance the street
     call_succ = RCreateNoLimitSubtree(street, after_call_pot_size, 0, 0,
 				      player_acting^1, target_player,
-				      &new_key, terminal_id);
+				      num_remaining, &new_key, terminal_id);
   } else {
     // This is a call on the final street
     call_succ.reset(new Node((*terminal_id)++, street, 255, nullptr, nullptr,
-			     nullptr, 255, after_call_pot_size));
+			     nullptr, num_remaining, after_call_pot_size));
 
   }
   return call_succ;
@@ -102,7 +102,7 @@ void BettingTreeBuilder::RHandleBet(unsigned int street,
 				    unsigned int num_street_bets,
 				    unsigned int player_acting,
 				    unsigned int target_player,
-				    string *key,
+				    unsigned int num_remaining, string *key,
 				    unsigned int *terminal_id,
 				    vector< shared_ptr<Node> > *bet_succs) {
   // Obviously pot size can't go down after additional bet
@@ -139,7 +139,7 @@ void BettingTreeBuilder::RHandleBet(unsigned int street,
   shared_ptr<Node> bet =
     RCreateNoLimitSubtree(street, old_after_call_pot_size, new_bet_size,
 			  num_street_bets + 1, player_acting^1, target_player,
-			  &new_key, terminal_id);
+			  num_remaining, &new_key, terminal_id);
   bet_succs->push_back(bet);
 }
 
@@ -155,6 +155,7 @@ void BettingTreeBuilder::RCreateNoLimitSuccs(unsigned int street,
 					     unsigned int num_street_bets,
 					     unsigned int player_acting,
 					     unsigned int target_player,
+					     unsigned int num_remaining,
 					     string *key,
 					     unsigned int *terminal_id,
 					     shared_ptr<Node> *call_succ,
@@ -175,7 +176,7 @@ void BettingTreeBuilder::RCreateNoLimitSuccs(unsigned int street,
 	 player_acting == Game::FirstToAct(0) && no_open_limp)) {
     *call_succ = RCreateCallSucc(street, last_pot_size, last_bet_size,
 				 num_street_bets, player_acting, target_player,
-				 key, terminal_id);
+				 num_remaining, key, terminal_id);
   }
   if (num_street_bets > 0 || (street == 0 && num_street_bets == 0 &&
 			      Game::BigBlind() > Game::SmallBlind() &&
@@ -309,8 +310,8 @@ void BettingTreeBuilder::RCreateNoLimitSuccs(unsigned int street,
   unsigned int num_pot_sizes = new_pot_sizes.size();
   for (unsigned int i = 0; i < num_pot_sizes; ++i) {
     RHandleBet(street, last_bet_size, current_pot_size, new_pot_sizes[i],
-	       num_street_bets, player_acting, target_player, key, terminal_id,
-	       bet_succs);
+	       num_street_bets, player_acting, target_player, num_remaining,
+	       key, terminal_id, bet_succs);
   }
 }
 
@@ -321,14 +322,15 @@ BettingTreeBuilder::RCreateNoLimitSubtree(unsigned int street,
 					  unsigned int num_street_bets,
 					  unsigned int player_acting,
 					  unsigned int target_player,
+					  unsigned int num_remaining,
 					  string *key,
 					  unsigned int *terminal_id) {
   shared_ptr<Node> call_succ(nullptr);
   shared_ptr<Node> fold_succ(nullptr);
   vector< shared_ptr<Node> > bet_succs;
   RCreateNoLimitSuccs(street, pot_size, last_bet_size, num_street_bets,
-		      player_acting, target_player, key, terminal_id,
-		      &call_succ, &fold_succ, &bet_succs);
+		      player_acting, target_player, num_remaining, key,
+		      terminal_id, &call_succ, &fold_succ, &bet_succs);
   if (call_succ == NULL && fold_succ == NULL && bet_succs.size() == 0) {
     fprintf(stderr, "Creating nonterminal with zero succs\n");
     fprintf(stderr, "This will cause problems\n");
@@ -337,7 +339,7 @@ BettingTreeBuilder::RCreateNoLimitSubtree(unsigned int street,
   // Assign nonterminal ID of kMaxUInt for now.
   shared_ptr<Node> node;
   node.reset(new Node(kMaxUInt, street, player_acting, call_succ, fold_succ,
-		      &bet_succs, 255, pot_size));
+		      &bet_succs, num_remaining, pot_size));
   return node;
 }
 
@@ -346,25 +348,30 @@ shared_ptr<Node>
 BettingTreeBuilder::CreateReentrantStreet(unsigned int street,
 					  unsigned int pot_size,
 					  unsigned int target_player,
+					  unsigned int num_remaining,
 					  string *key,
 					  unsigned int *terminal_id) {
-  if (street == Game::MaxStreet() &&
+  string final_key;
+  if (betting_abstraction_.ReentrantStreet(street) &&
       pot_size >= betting_abstraction_.MinReentrantPot()) {
-    AddUnsignedIntToKey(pot_size, key);
-#if 0
-    if (pot_size == 54) {
-      fprintf(stderr, "Key: %s\n", key->c_str());
-    }
-#endif
+    final_key = *key;
+    AddStringToKey(":", &final_key);
+    AddUnsignedIntToKey(pot_size, &final_key);
+    AddStringToKey(":", &final_key);
+    AddUnsignedIntToKey(street, &final_key);
+    // fprintf(stderr, "Key: %s\n", final_key.c_str());
     shared_ptr<Node> node;
-    if (FindReentrantNode(*key, &node)) {
+    if (FindReentrantNode(final_key, &node)) {
       return node;
     }
   }
   shared_ptr<Node> node =
     RCreateNoLimitSubtree(street, pot_size, 0, 0, Game::FirstToAct(street),
-			  target_player, key, terminal_id);
-  AddReentrantNode(*key, node);
+			  target_player, num_remaining, key, terminal_id);
+  if (betting_abstraction_.ReentrantStreet(street) &&
+      pot_size >= betting_abstraction_.MinReentrantPot()) {
+    AddReentrantNode(final_key, node);
+  }
   return node;
 }
 
@@ -378,6 +385,6 @@ BettingTreeBuilder::CreateNoLimitTree2(unsigned int target_player,
   
   string key;
   return RCreateNoLimitSubtree(initial_street, initial_pot_size, last_bet_size,
-			       0, player_acting, target_player, &key,
-			       terminal_id);
+			       0, player_acting, target_player,
+			       Game::NumPlayers(), &key, terminal_id);
 }

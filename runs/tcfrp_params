@@ -1,0 +1,5 @@
+CFRConfigName tcfrp
+Algorithm tcfr
+# Always fully evaluate
+ActiveMod 1
+CloseThreshold 2000

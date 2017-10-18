@@ -1,35 +1,14 @@
 // BCFR values are "bucketed counterfactual values".  The code here generates
-// CFR values for bucketed systems whereas cbr_thread.cpp handles
-// base systems built without card abstraction.
-//
-// We handle imperfect recall card abstractions as well as perfect recall card
-// abstractions.  However, in the case of imperfect recall, we do not produce
-// true best-response values (it would be computationally impractical), but
-// rather an approximation of those values.
-//
-// There are three types of tree traversal (known as "passes") that are
-// performed.
-//
-// In the first pass, we compute the counterfactual value of every
-// hand at every terminal node, and aggregates those values into bucket
+// bucket-level CFR values whereas cbr_thread.cpp generates card-level CFR
 // values.
 //
-// The second and third passes are executed on a single street at a time,
-// and from the last street (e.g., the river) to the first street (the
-// preflop).  The second pass identifies the best-response action in the
-// abstract game; i.e., the best action for each *bucket* at each decision
-// point.  The third pass computes counterfactual values for *hands* using the
-// bucket-level best-response strategy computed in the second pass.  The
-// third pass also stores the bucket values for the previous street at
-// the street-initial node for the next street.  For example, turn bucket
-// values at CC/CC/CC.
-// 
 // The BCFR values are written out in normal hand order on every street except
 // the final street.  On the final street, the values are written out for hands
 // as sorted by hand strength.
 //
 // The values for a hand depend only on the opponent's strategy above and below
-// a given node.  P0's values are distinct from P1's values.
+// a given node, and our strategy below the node.  P0's values are distinct
+// from P1's values.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -91,8 +70,8 @@ BCFRThread::BCFRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
 				  compressed_streets_));
 
     char dir[500];
-    sprintf(dir, "%s/%s.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
-	    Game::GameName().c_str(),
+    sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
+	    Game::GameName().c_str(), Game::NumPlayers(),
 	    card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	    Game::NumSuits(), Game::MaxStreet(),
 	    betting_abstraction_.BettingAbstractionName().c_str(),
@@ -144,8 +123,8 @@ void BCFRThread::WriteValues(Node *node, unsigned int gbd,
 			     const string &action_sequence, double *vals) {
   char dir[500], buf[500];
   unsigned int street = node->Street();
-  sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s/bcfrs.%u.p%u/%s",
-	  Files::NewCFRBase(), Game::GameName().c_str(),
+  sprintf(dir, "%s/%s.%u.%s.%i.%i.%i.%s.%s/bcfrs.%u.p%u/%s",
+	  Files::NewCFRBase(), Game::GameName().c_str(), Game::NumPlayers(),
 	  card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	  Game::NumSuits(), Game::MaxStreet(),
 	  betting_abstraction_.BettingAbstractionName().c_str(), 

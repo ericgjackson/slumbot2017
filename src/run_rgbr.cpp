@@ -74,11 +74,16 @@ int main(int argc, char *argv[]) {
   Buckets buckets(*card_abstraction, false);
 
   unique_ptr<BettingTree> betting_tree;
-  double evs[2];
-  evs[0] = 0; evs[1] = 0;
+  unsigned int num_players = Game::NumPlayers();
+  unique_ptr<double []> evs(new double[num_players]);
+  for(unsigned int p = 0; p < num_players; ++p) evs[p] = 0;
 
   if (betting_abstraction->Asymmetric()) {
-    for (unsigned int target_p = 0; target_p <= 1; ++target_p) {
+    if (num_players > 2) {
+      fprintf(stderr, "How to handle more than two players?!?\n");
+      exit(-1);
+    }
+    for (unsigned int target_p = 0; target_p < num_players; ++target_p) {
       betting_tree.reset(BettingTree::BuildAsymmetricTree(*betting_abstraction,
 							  target_p));
       RGBR rgbr(*card_abstraction, *betting_abstraction, *cfr_config, buckets,
@@ -93,20 +98,21 @@ int main(int argc, char *argv[]) {
     RGBR rgbr(*card_abstraction, *betting_abstraction, *cfr_config, buckets,
 	      betting_tree.get(), current, num_threads, streets.get(),
 	      always_call_preflop);
-    for (unsigned int p = 0; p <= 1; ++p) {
+    for (unsigned int p = 0; p < num_players; ++p) {
       evs[p] = rgbr.Go(it, p);
     }
   }
 
-  for (unsigned int p = 0; p <= 1; ++p) {
+  double gap = 0;
+  for (unsigned int p = 0; p < num_players; ++p) {
     // Divide by two to convert chips into big blinds (assumption is that the
     // small blind is one chip).  Multiply by 1000 to convert big blinds into
     // milli-big-blinds.
-    printf("%s best response: %f (%.2f mbb/g)\n", p ? "P1" : "P0", evs[p],
+    printf("P%u best response: %f (%.2f mbb/g)\n", p, evs[p],
 	   (evs[p] / 2.0) * 1000.0);
+    gap += evs[p];
   }
-  double gap = evs[0] + evs[1];
   printf("Gap: %f\n", gap);
-  printf("Exploitability: %.2f mbb/g\n", ((gap / 2.0) / 2.0) * 1000.0);
+  printf("Exploitability: %.2f mbb/g\n", ((gap / 2.0) / num_players) * 1000.0);
   fflush(stdout);
 }

@@ -16,8 +16,43 @@ void CommonBetResponseCalcs(unsigned int st,
 			    double *opp_probs,
 			    double *sum_opp_probs,
 			    double *total_card_probs);
+void ProcessOppProbsBucketed(Node *node, unsigned int **street_buckets,
+			     const CanonicalCards *hands,
+			     bool nonneg, unsigned int it,
+			     unsigned int soft_warmup,
+			     unsigned int hard_warmup,
+			     bool update_sumprobs, double *sumprob_scaling,
+			     double *opp_probs, double **succ_opp_probs,
+			     double *current_probs, int *sumprobs);
+void ProcessOppProbsBucketed(Node *node, unsigned int **street_buckets,
+			     const CanonicalCards *hands, bool nonneg,
+			     unsigned int it, unsigned int soft_warmup,
+			     unsigned int hard_warmup, bool update_sumprobs,
+			     double *opp_probs, double **succ_opp_probs,
+			     double *current_probs, double *sumprobs);
+void ProcessOppProbs(Node *node, const CanonicalCards *hands,
+		     bool nonneg, bool uniform, double explore,
+		     unsigned int it, unsigned int soft_warmup,
+		     unsigned int hard_warmup, bool update_sumprobs,
+		     double *sumprob_scaling, double *opp_probs,
+		     double **succ_opp_probs, int *cs_vals, int *sumprobs);
+void ProcessOppProbs(Node *node, const CanonicalCards *hands,
+		     bool nonneg, bool uniform, double explore, 
+		     unsigned int it, unsigned int soft_warmup,
+		     unsigned int hard_warmup, bool update_sumprobs,
+		     double *opp_probs, double **succ_opp_probs,
+		     double *cs_vals, double *sumprobs);
+void ProcessOppProbs(Node *node, const CanonicalCards *hands,
+		     bool nonneg, bool uniform, double explore, 
+		     unsigned int it, unsigned int soft_warmup,
+		     unsigned int hard_warmup, bool update_sumprobs,
+		     double *opp_probs, double **succ_opp_probs,
+		     int *cs_vals, double *sumprobs);
 void DeleteOldFiles(const CardAbstraction &ca, const BettingAbstraction &ba,
 		    const CFRConfig &cc, unsigned int it);
+void MPTerminal(unsigned int p, const CanonicalCards *hands,
+		unsigned int *contributions, double **opp_probs,
+		double **showdown_vals, double **fold_vals);
 
 // Normally we pass in regrets, but we can also pass in sumprobs.
 template <class T>

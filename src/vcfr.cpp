@@ -355,371 +355,6 @@ double *VCFR::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
   return vals;
 }
 
-// Abstracted, int sumprobs
-void VCFR::ProcessOppProbsBucketed(Node *node, unsigned int **street_buckets,
-				   const CanonicalCards *hands,
-				   bool nonneg, double *opp_probs,
-				   double **succ_opp_probs,
-				   double *current_probs, int *sumprobs) {
-  unsigned int st = node->Street();
-  unsigned int num_succs = node->NumSuccs();
-  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
-  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
-  unsigned int max_card1 = Game::MaxCard() + 1;
-  for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
-    const Card *cards = hands->Cards(i);
-    Card hi = cards[0];
-    unsigned int enc;
-    if (num_hole_cards == 1) {
-      enc = hi;
-    } else {
-      Card lo = cards[1];
-      enc = hi * max_card1 + lo;
-    }
-    double opp_prob = opp_probs[enc];
-    if (opp_prob == 0) {
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	succ_opp_probs[s][enc] = 0;
-      }
-    } else {
-      unsigned int b = street_buckets[st][i];
-      double *my_current_probs = current_probs + b * num_succs;
-      int *my_sumprobs = nullptr;
-      if (sumprobs) my_sumprobs = sumprobs + b * num_succs;
-      bool downscale = false;
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	double succ_opp_prob = opp_prob * my_current_probs[s];
-	succ_opp_probs[s][enc] = succ_opp_prob;
-	if (value_calculation_ || my_sumprobs == nullptr ||
-	    (hard_warmup_ > 0 && it_ <= hard_warmup_)) {
-	  // No sumprob update if a) doing value calculation (e.g., RGBR), b)
-	  // we have no sumprobs (e.g., in asymmetric CFR), or c) we are during
-	  // the hard warmup period
-	} else {
-	  if ((hard_warmup_ == 0 && soft_warmup_ == 0) ||
-	      (soft_warmup_ > 0 && it_ <= soft_warmup_)) {
-	    // Update sumprobs with weight of 1.  Do this when either:
-	    // a) There is no warmup (hard or soft), or
-	    // b) We are during the soft warmup period.
-	    my_sumprobs[s] += lrint(succ_opp_prob * sumprob_scaling_[st]);
-	  } else if (hard_warmup_ > 0) {
-	    // Use a weight of (it_ - hard_warmup_)
-	    my_sumprobs[s] += lrint(succ_opp_prob * (it_ - hard_warmup_) *
-				    sumprob_scaling_[st]);
-	  } else {
-	    // Use a weight of (it_ - soft_warmup_)
-	    my_sumprobs[s] += lrint(succ_opp_prob * (it_ - soft_warmup_) *
-				    sumprob_scaling_[st]);
-	  }
-	  if (my_sumprobs[s] > 2000000000) {
-	    downscale = true;
-	  }
-	}
-      }
-      if (downscale) {
-	for (unsigned int s = 0; s < num_succs; ++s) {
-	  my_sumprobs[s] /= 2;
-	}
-      }
-    }
-  }
-}
-
-// Abstracted, double sumprobs
-void VCFR::ProcessOppProbsBucketed(Node *node,
-				   unsigned int **street_buckets,
-				   const CanonicalCards *hands,
-				   bool nonneg, double *opp_probs,
-				   double **succ_opp_probs,
-				   double *current_probs, double *sumprobs) {
-  unsigned int st = node->Street();
-  unsigned int num_succs = node->NumSuccs();
-  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
-  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
-  unsigned int max_card1 = Game::MaxCard() + 1;
-  for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
-    const Card *cards = hands->Cards(i);
-    Card hi = cards[0];
-    unsigned int enc;
-    if (num_hole_cards == 1) {
-      enc = hi;
-    } else {
-      Card lo = cards[1];
-      enc = hi * max_card1 + lo;
-    }
-    double opp_prob = opp_probs[enc];
-    if (opp_prob == 0) {
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	succ_opp_probs[s][enc] = 0;
-      }
-    } else {
-      unsigned int b = street_buckets[st][i];
-      double *my_current_probs = current_probs + b * num_succs;
-      double *my_sumprobs = nullptr;
-      if (sumprobs) my_sumprobs = sumprobs + b * num_succs;
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	double succ_opp_prob = opp_prob * my_current_probs[s];
-	succ_opp_probs[s][enc] = succ_opp_prob;
-	if (value_calculation_ || my_sumprobs == nullptr ||
-	    (hard_warmup_ > 0 && it_ <= hard_warmup_)) {
-	  // No sumprob update if a) doing value calculation (e.g., RGBR), b)
-	  // we have no sumprobs (e.g., in asymmetric CFR), or c) we are during
-	  // the hard warmup period
-	} else if ((hard_warmup_ == 0 && soft_warmup_ == 0) ||
-		   (soft_warmup_ > 0 && it_ <= soft_warmup_)) {
-	  // Update sumprobs with weight of 1.  Do this when either:
-	  // a) There is no warmup (hard or soft), or
-	  // b) We are during the soft warmup period.
-	  my_sumprobs[s] += succ_opp_prob;
-	} else if (hard_warmup_ > 0) {
-	  // Use a weight of (it_ - hard_warmup_)
-	  my_sumprobs[s] += succ_opp_prob * (it_ - hard_warmup_);
-	} else {
-	  // Use a weight of (it_ - soft_warmup_)
-	  my_sumprobs[s] += succ_opp_prob * (it_ - soft_warmup_);
-	}
-      }
-    }
-  }
-}
-
-static unsigned int g_lbd;
-
-// Unabstracted, int cs_vals, int sumprobs
-void VCFR::ProcessOppProbs(Node *node, const CanonicalCards *hands,
-			   bool nonneg, double explore, 
-			   double *opp_probs, double **succ_opp_probs,
-			   int *cs_vals, int *sumprobs) {
-  unsigned int st = node->Street();
-  unsigned int num_succs = node->NumSuccs();
-  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
-  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
-  unsigned int default_succ_index = node->DefaultSuccIndex();
-  unsigned int max_card1 = Game::MaxCard() + 1;
-  double *current_probs = new double[num_succs];
-  unsigned int num_nonterminal_succs = 0;
-  bool *nonterminal_succs = new bool[num_succs];
-  for (unsigned int s = 0; s < num_succs; ++s) {
-    if (node->IthSucc(s)->Terminal()) {
-      nonterminal_succs[s] = false;
-    } else {
-      nonterminal_succs[s] = true;
-      ++num_nonterminal_succs;
-    }
-  }
-  for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
-    const Card *cards = hands->Cards(i);
-    Card lo, hi = cards[0];
-    unsigned int enc;
-    if (num_hole_cards == 1) {
-      enc = hi;
-    } else {
-      lo = cards[1];
-      enc = hi * max_card1 + lo;
-    }
-    double opp_prob = opp_probs[enc];
-    if (opp_prob == 0) {
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	succ_opp_probs[s][enc] = 0;
-      }
-    } else {
-      int *my_cs_vals = cs_vals + i * num_succs;
-      int *my_sumprobs = nullptr;
-      if (! value_calculation_ && sumprobs) {
-	my_sumprobs = sumprobs + i * num_succs;
-      }
-      RegretsToProbs(my_cs_vals, num_succs, nonneg, uniform_,
-		     default_succ_index, explore, num_nonterminal_succs,
-		     nonterminal_succs, current_probs);
-      bool downscale = false;
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	double succ_opp_prob = opp_prob * current_probs[s];
-	succ_opp_probs[s][enc] = succ_opp_prob;
-	if (value_calculation_ || my_sumprobs == nullptr ||
-	    (hard_warmup_ > 0 && it_ <= hard_warmup_)) {
-	  // No sumprob update if a) doing value calculation (e.g., RGBR), b)
-	  // we have no sumprobs (e.g., in asymmetric CFR), or c) we are during
-	  // the hard warmup period
-	} else {
-	  if ((hard_warmup_ == 0 && soft_warmup_ == 0) ||
-	      (soft_warmup_ > 0 && it_ <= soft_warmup_)) {
-	    // Update sumprobs with weight of 1.  Do this when either:
-	    // a) There is no warmup (hard or soft), or
-	    // b) We are during the soft warmup period.
-	    my_sumprobs[s] += lrint(succ_opp_prob * sumprob_scaling_[st]);
-	  } else if (hard_warmup_ > 0) {
-	    // Use a weight of (it_ - hard_warmup_)
-	    my_sumprobs[s] += lrint(succ_opp_prob * (it_ - hard_warmup_) *
-				    sumprob_scaling_[st]);
-	  } else {
-	    // Use a weight of (it_ - soft_warmup_)
-	    my_sumprobs[s] += lrint(succ_opp_prob * (it_ - soft_warmup_) *
-				    sumprob_scaling_[st]);
-	  }
-	  if (my_sumprobs[s] > 2000000000) {
-	    downscale = true;
-	  }
-	}
-      }
-      if (downscale) {
-	for (unsigned int s = 0; s < num_succs; ++s) {
-	  my_sumprobs[s] /= 2;
-	}
-      }
-    }
-  }
-  delete [] current_probs;
-  delete [] nonterminal_succs;
-}
-
-// Unabstracted, double cs_vals, double sumprobs
-void VCFR::ProcessOppProbs(Node *node, const CanonicalCards *hands,
-			   bool nonneg, double explore, 
-			   double *opp_probs, double **succ_opp_probs,
-			   double *cs_vals, double *sumprobs) {
-  unsigned int st = node->Street();
-  unsigned int num_succs = node->NumSuccs();
-  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
-  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
-  unsigned int default_succ_index = node->DefaultSuccIndex();
-  unsigned int max_card1 = Game::MaxCard() + 1;
-  double *current_probs = new double[num_succs];
-  unsigned int num_nonterminal_succs = 0;
-  bool *nonterminal_succs = new bool[num_succs];
-  for (unsigned int s = 0; s < num_succs; ++s) {
-    if (node->IthSucc(s)->Terminal()) {
-      nonterminal_succs[s] = false;
-    } else {
-      nonterminal_succs[s] = true;
-      ++num_nonterminal_succs;
-    }
-  }
-  for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
-    const Card *cards = hands->Cards(i);
-    Card lo, hi = cards[0];
-    unsigned int enc;
-    if (num_hole_cards == 1) {
-      enc = hi;
-    } else {
-      lo = cards[1];
-      enc = hi * max_card1 + lo;
-    }
-    double opp_prob = opp_probs[enc];
-    if (opp_prob == 0) {
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	succ_opp_probs[s][enc] = 0;
-      }
-    } else {
-      double *my_cs_vals = cs_vals + i * num_succs;
-      double *my_sumprobs = nullptr;
-      if (! value_calculation_ && sumprobs) {
-	my_sumprobs = sumprobs + i * num_succs;
-      }
-      RegretsToProbs(my_cs_vals, num_succs, nonneg, uniform_,
-		     default_succ_index, explore, num_nonterminal_succs,
-		     nonterminal_succs, current_probs);
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	double succ_opp_prob = opp_prob * current_probs[s];
-	succ_opp_probs[s][enc] = succ_opp_prob;
-	if (value_calculation_ || my_sumprobs == nullptr ||
-	    (hard_warmup_ > 0 && it_ <= hard_warmup_)) {
-	  // No sumprob update if a) doing value calculation (e.g., RGBR), b)
-	  // we have no sumprobs (e.g., in asymmetric CFR), or c) we are during
-	  // the hard warmup period
-	} else if ((hard_warmup_ == 0 && soft_warmup_ == 0) ||
-		   (soft_warmup_ > 0 && it_ <= soft_warmup_)) {
-	  // Update sumprobs with weight of 1.  Do this when either:
-	  // a) There is no warmup (hard or soft), or
-	  // b) We are during the soft warmup period.
-	  my_sumprobs[s] += succ_opp_prob;
-	} else if (hard_warmup_ > 0) {
-	  // Use a weight of (it_ - hard_warmup_)
-	  my_sumprobs[s] += succ_opp_prob * (it_ - hard_warmup_);
-	} else {
-	  // Use a weight of (it_ - soft_warmup_)
-	  my_sumprobs[s] += succ_opp_prob * (it_ - soft_warmup_);
-	}
-      }
-    }
-  }
-  delete [] current_probs;
-  delete [] nonterminal_succs;
-}
-
-// Unabstracted, int cs_vals, double sumprobs
-void VCFR::ProcessOppProbs(Node *node, const CanonicalCards *hands,
-			   bool nonneg, double explore, 
-			   double *opp_probs, double **succ_opp_probs,
-			   int *cs_vals, double *sumprobs) {
-  unsigned int st = node->Street();
-  unsigned int num_succs = node->NumSuccs();
-  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
-  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
-  unsigned int default_succ_index = node->DefaultSuccIndex();
-  unsigned int max_card1 = Game::MaxCard() + 1;
-  double *current_probs = new double[num_succs];
-  unsigned int num_nonterminal_succs = 0;
-  bool *nonterminal_succs = new bool[num_succs];
-  for (unsigned int s = 0; s < num_succs; ++s) {
-    if (node->IthSucc(s)->Terminal()) {
-      nonterminal_succs[s] = false;
-    } else {
-      nonterminal_succs[s] = true;
-      ++num_nonterminal_succs;
-    }
-  }
-  for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
-    const Card *cards = hands->Cards(i);
-    Card hi = cards[0];
-    unsigned int enc;
-    if (num_hole_cards == 1) {
-      enc = hi;
-    } else {
-      Card lo = cards[1];
-      enc = hi * max_card1 + lo;
-    }
-    double opp_prob = opp_probs[enc];
-    if (opp_prob == 0) {
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	succ_opp_probs[s][enc] = 0;
-      }
-    } else {
-      int *my_cs_vals = cs_vals + i * num_succs;
-      double *my_sumprobs = nullptr;
-      if (! value_calculation_ && sumprobs) {
-	my_sumprobs = sumprobs + i * num_succs;
-      }
-      RegretsToProbs(my_cs_vals, num_succs, nonneg, uniform_,
-		     default_succ_index, explore, num_nonterminal_succs,
-		     nonterminal_succs, current_probs);
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	double succ_opp_prob = opp_prob * current_probs[s];
-	succ_opp_probs[s][enc] = succ_opp_prob;
-	if (value_calculation_ || my_sumprobs == nullptr ||
-	    (hard_warmup_ > 0 && it_ <= hard_warmup_)) {
-	  // No sumprob update if a) doing value calculation (e.g., RGBR), b)
-	  // we have no sumprobs (e.g., in asymmetric CFR), or c) we are during
-	  // the hard warmup period
-	} else if ((hard_warmup_ == 0 && soft_warmup_ == 0) ||
-		   (soft_warmup_ > 0 && it_ <= soft_warmup_)) {
-	  // Update sumprobs with weight of 1.  Do this when either:
-	  // a) There is no warmup (hard or soft), or
-	  // b) We are during the soft warmup period.
-	  my_sumprobs[s] += succ_opp_prob;
-	} else if (hard_warmup_ > 0) {
-	  // Use a weight of (it_ - hard_warmup_)
-	  my_sumprobs[s] += succ_opp_prob * (it_ - hard_warmup_);
-	} else {
-	  // Use a weight of (it_ - soft_warmup_)
-	  my_sumprobs[s] += succ_opp_prob * (it_ - soft_warmup_);
-	}
-      }
-    }
-  }
-  delete [] current_probs;
-  delete [] nonterminal_succs;
-}
-
 double *VCFR::OppChoice(Node *node, unsigned int lbd, double *opp_probs,
 			double sum_opp_probs, double *total_card_probs,
 			unsigned int **street_buckets,
@@ -818,46 +453,68 @@ double *VCFR::OppChoice(Node *node, unsigned int lbd, double *opp_probs,
       }
     }
 
-    g_lbd = lbd;
-  
     bool nonneg;
     if (value_calculation_ && ! br_current_) {
       nonneg = true;
     } else {
       nonneg = nn_regrets_ && regret_floors_[st] >= 0;
     }
+    // No sumprob update if a) doing value calculation (e.g., RGBR), b)
+    // we have no sumprobs (e.g., in asymmetric CFR), or c) we are during
+    // the hard warmup period
     if (bucketed) {
       if (d_sumprobs) {
 	// Double sumprobs
-	ProcessOppProbsBucketed(node, street_buckets, hands, nonneg, opp_probs,
-				succ_opp_probs, d_all_current_probs,
-				d_sumprobs);
+	bool update_sumprobs =
+	  ! (value_calculation_ || d_sumprobs == nullptr ||
+	     (hard_warmup_ > 0 && it_ <= hard_warmup_));
+	ProcessOppProbsBucketed(node, street_buckets, hands, nonneg, it_,
+				soft_warmup_, hard_warmup_, update_sumprobs,
+				opp_probs, succ_opp_probs,
+				d_all_current_probs, d_sumprobs);
       } else {
 	// Int sumprobs
-	ProcessOppProbsBucketed(node, street_buckets, hands, nonneg, opp_probs,
-				succ_opp_probs, d_all_current_probs,
-				i_sumprobs);
+	bool update_sumprobs =
+	  ! (value_calculation_ || i_sumprobs == nullptr ||
+	     (hard_warmup_ > 0 && it_ <= hard_warmup_));
+	ProcessOppProbsBucketed(node, street_buckets, hands, nonneg, it_,
+				soft_warmup_, hard_warmup_, update_sumprobs,
+				sumprob_scaling_, opp_probs, succ_opp_probs,
+				d_all_current_probs, i_sumprobs);
       }
     } else {
       if (i_cs_vals) {
 	if (d_sumprobs) {
 	  // Int regrets, double sumprobs
-	  ProcessOppProbs(node, hands, nonneg, explore, opp_probs,
-			  succ_opp_probs, i_cs_vals, d_sumprobs);
+	  bool update_sumprobs =
+	    ! (value_calculation_ || d_sumprobs == nullptr ||
+	       (hard_warmup_ > 0 && it_ <= hard_warmup_));
+	  ProcessOppProbs(node, hands, nonneg, uniform_, explore, it_,
+			  soft_warmup_, hard_warmup_, update_sumprobs,
+			  opp_probs, succ_opp_probs, i_cs_vals, d_sumprobs);
 	} else {
 	  // Int regrets and sumprobs
-	  ProcessOppProbs(node, hands, nonneg, explore, opp_probs,
-			  succ_opp_probs, i_cs_vals, i_sumprobs);
+	  bool update_sumprobs =
+	    ! (value_calculation_ || i_sumprobs == nullptr ||
+	       (hard_warmup_ > 0 && it_ <= hard_warmup_));
+	  ProcessOppProbs(node, hands, nonneg, uniform_, explore, it_,
+			  soft_warmup_, hard_warmup_, update_sumprobs,
+			  sumprob_scaling_, opp_probs, succ_opp_probs,
+			  i_cs_vals, i_sumprobs);
 	}
       } else {
 	// Double regrets and sumprobs
-	ProcessOppProbs(node, hands, nonneg, explore, opp_probs,
-			succ_opp_probs, d_cs_vals, d_sumprobs);
+	  bool update_sumprobs =
+	    ! (value_calculation_ || d_sumprobs == nullptr ||
+	       (hard_warmup_ > 0 && it_ <= hard_warmup_));
+	  ProcessOppProbs(node, hands, nonneg, uniform_, explore, it_,
+			  soft_warmup_, hard_warmup_, update_sumprobs,
+			  opp_probs, succ_opp_probs, d_cs_vals, d_sumprobs);
       }
     }
   }
 
-  double *vals = NULL;
+  double *vals = nullptr;
   double *succ_total_card_probs = new double[num_hole_card_pairs];
   double succ_sum_opp_probs;
   for (unsigned int s = 0; s < num_succs; ++s) {
@@ -870,7 +527,7 @@ double *VCFR::OppChoice(Node *node, unsigned int lbd, double *opp_probs,
     double *succ_vals = Process(node->IthSucc(s), lbd, succ_opp_probs[s],
 				succ_sum_opp_probs, succ_total_card_probs,
 				street_buckets, action_sequence + action, st);
-    if (vals == NULL) {
+    if (vals == nullptr) {
       vals = succ_vals;
     } else {
       for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
@@ -879,7 +536,7 @@ double *VCFR::OppChoice(Node *node, unsigned int lbd, double *opp_probs,
       delete [] succ_vals;
     }
   }
-  if (vals == NULL) {
+  if (vals == nullptr) {
     // This can happen if there were non-zero opp probs on the prior street,
     // but the board cards just dealt blocked all the opponent hands with
     // non-zero probability.
@@ -1288,14 +945,12 @@ double *VCFR::Process(Node *node, unsigned int lbd, double *opp_probs,
 		      const string &action_sequence, unsigned int last_st) {
   unsigned int st = node->Street();
   if (node->Terminal()) {
-    if (node->Showdown()) {
-      double *vals = Showdown(node, hand_tree_->Hands(st, lbd), opp_probs,
-			      sum_opp_probs, total_card_probs);
-      return vals;
+    if (node->NumRemaining() == 1) {
+      return Fold(node, p_, hand_tree_->Hands(st, lbd), opp_probs,
+		  sum_opp_probs, total_card_probs);
     } else {
-      double *vals = Fold(node, p_, hand_tree_->Hands(st, lbd), opp_probs,
-			  sum_opp_probs, total_card_probs);
-      return vals;
+      return Showdown(node, hand_tree_->Hands(st, lbd), opp_probs,
+		      sum_opp_probs, total_card_probs);
     }
   }
   if (st > last_st) {

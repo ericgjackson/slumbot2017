@@ -48,6 +48,7 @@ unique_ptr<Params> CreateBettingAbstractionParams(void) {
   params->AddParam("CloseToAllInFrac", P_DOUBLE);
   params->AddParam("OurBetSizeMultipliers", P_STRING);
   params->AddParam("OppBetSizeMultipliers", P_STRING);
+  params->AddParam("ReentrantStreets", P_STRING);
   params->AddParam("BettingKeyStreets", P_STRING);
   params->AddParam("MinReentrantPot", P_INT);
 
