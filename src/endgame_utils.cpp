@@ -325,7 +325,7 @@ static void ReadEndgame(Node *node, const string &action_sequence,
     unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(node->Street());
     unsigned int lbd = BoardTree::LocalIndex(root_bd_st, root_bd, st, gbd);
     unsigned int offset = lbd * num_hole_card_pairs * num_succs;
-    sumprobs->ReadNode(node, &reader, nullptr, num_hole_card_pairs, false,
+    sumprobs->ReadNode(node, &reader, nullptr, num_hole_card_pairs, CFR_DOUBLE,
 		       offset);
   }
 

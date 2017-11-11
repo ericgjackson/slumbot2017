@@ -30,7 +30,9 @@ public:
 	     unsigned int target_player, float *rngs, unsigned int *uncompress,
 	     unsigned int *short_uncompress, unsigned int *pruning_thresholds,
 	     bool *sumprob_streets, unsigned char *hvb_table,
-	     unsigned char ***cards_to_indices, unsigned int batch_size);
+	     unsigned char ***cards_to_indices, unsigned int num_raw_boards,
+	     const unsigned int *board_table_, unsigned int batch_size,
+	     unsigned long long int *total_its);
   virtual ~TCFRThread(void);
   void RunThread(void);
   void Join(void);
@@ -41,12 +43,13 @@ public:
     return full_process_count_;
   }
  protected:
-  static const unsigned int kStackDepth = 50;
+  static const unsigned int kStackDepth = 500;
   static const unsigned int kMaxSuccs = 50;
 
-  virtual T_VALUE Process(unsigned char *ptr);
-  bool HVBDealHand(void);
-  bool NoHVBDealHand(void);
+  virtual T_VALUE Process(unsigned char *ptr, unsigned int last_player_acting,
+			  int last_st);
+  void HVBDealHand(void);
+  void NoHVBDealHand(void);
   int Round(double d);
 
   const BettingAbstraction &betting_abstraction_;
@@ -60,6 +63,10 @@ public:
   unsigned int target_player_;
   unsigned int p_;
   unsigned int *winners_;
+  // Keep this as a signed int so we can use it in winnings calculation
+  // without casting.
+  int *contributions_;
+  bool *folded_;
   unsigned int *canon_bds_;
   unsigned int *hi_cards_;
   unsigned int *lo_cards_;
@@ -75,8 +82,8 @@ public:
   unsigned long long int it_;
   float *rngs_;
   unsigned int rng_index_;
-  bool *quantized_streets_;
-  bool *short_quantized_streets_;
+  unique_ptr<bool []> char_quantized_streets_;
+  unique_ptr<bool []> short_quantized_streets_;
   bool *scaled_streets_;
   bool full_only_avg_update_;
   unsigned int *uncompress_;
@@ -86,6 +93,8 @@ public:
   unsigned char *hvb_table_;
   unsigned long long int bytes_per_hand_;
   unsigned char ***cards_to_indices_;
+  unsigned int num_raw_boards_;
+  const unsigned int *board_table_;
   unsigned int max_street_;
   bool all_full_;
   bool *full_;
@@ -99,10 +108,13 @@ public:
   unsigned int **active_streets_;
   unsigned int **active_rems_;
   unsigned int batch_size_;
+  unsigned long long int *total_its_;
   struct drand48_data rand_buf_;
+#if 0
   // Keep this as a signed int so we can use it in winnings calculation
   // without casting.
   int board_count_;
+#endif
 };
 
 class TCFR : public CFR {
@@ -128,8 +140,8 @@ private:
   void Write(unsigned int batch_base);
   void Run(void);
   void RunBatch(unsigned int batch_size);
-  unsigned char *Prepare(unsigned char *ptr, Node *node, bool *folded,
-			 unsigned int *contributions, unsigned int last_bet_to,
+  unsigned char *Prepare(unsigned char *ptr, Node *node,
+			 unsigned short last_bet_to,
 			 unsigned long long int ***offsets);
   void MeasureTree(Node *node, bool ***seen,
 		   unsigned long long int *allocation_size);
@@ -147,20 +159,21 @@ private:
   unsigned int batch_base_;
   unsigned int num_cfr_threads_;
   TCFRThread **cfr_threads_;
-  unsigned int *canonical_boards_;
-  unsigned int num_raw_boards_;
   float *rngs_;
   unsigned int *uncompress_;
   unsigned int *short_uncompress_;
   unsigned int max_street_;
   unsigned int *pruning_thresholds_;
   bool *sumprob_streets_;
-  bool *quantized_streets_;
-  bool *short_quantized_streets_;
+  unique_ptr<bool []> char_quantized_streets_;
+  unique_ptr<bool []> short_quantized_streets_;
   unsigned char *hvb_table_;
   unsigned char ***cards_to_indices_;
+  unsigned int num_raw_boards_;
+  unique_ptr<unsigned int []> board_table_;
   unsigned long long int total_process_count_;
   unsigned long long int total_full_process_count_;
+  unsigned long long int total_its_;
 };
 
 #endif

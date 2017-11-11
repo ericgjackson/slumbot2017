@@ -19,7 +19,7 @@ using namespace std;
 Node::Node(unsigned int id, unsigned int street, unsigned int player_acting,
 	   const shared_ptr<Node> &call_succ, const shared_ptr<Node> &fold_succ,
 	   vector< shared_ptr<Node> > *bet_succs, unsigned int num_remaining,
-	   unsigned int pot_size) {
+	   unsigned int bet_to) {
   unsigned int num_succs = 0;
   if (call_succ) {
     ++num_succs;
@@ -45,7 +45,7 @@ Node::Node(unsigned int id, unsigned int street, unsigned int player_acting,
     }
   }
   id_ = id;
-  pot_size_ = pot_size;
+  last_bet_to_ = bet_to;
   num_succs_ = num_succs;
   flags_ = 0;
   if (call_succ)   flags_ |= kHasCallSuccFlag;
@@ -72,18 +72,18 @@ Node::Node(Node *src) {
   }
   for (unsigned int s = 0; s < num_succs; ++s) succs_[s] = NULL;
   id_ = src->id_;
-  pot_size_ = src->pot_size_;
+  last_bet_to_ = src->last_bet_to_;
   num_succs_ = src->num_succs_;
   flags_ = src->flags_;
   player_acting_ = src->player_acting_;
   num_remaining_ = src->num_remaining_;
 }
 
-Node::Node(unsigned int id, unsigned int pot_size, unsigned int num_succs,
+Node::Node(unsigned int id, unsigned int last_bet_to, unsigned int num_succs,
 	   unsigned short flags, unsigned char player_acting,
 	   unsigned char num_remaining) {
   id_ = id;
-  pot_size_ = pot_size;
+  last_bet_to_ = last_bet_to;
   num_succs_ = num_succs;
   if (num_succs == 0) {
     succs_ = nullptr;
@@ -116,6 +116,8 @@ string Node::ActionName(unsigned int s) {
 	fprintf(stderr, "Expected node to have call succ\n");
 	exit(-1);
       }
+      bet_size = b->LastBetTo() - LastBetTo();
+#if 0
       unsigned int csi = b->CallSuccIndex();
       Node *bc = b->IthSucc(csi);
       unsigned int pot_size;
@@ -127,6 +129,7 @@ string Node::ActionName(unsigned int s) {
 	pot_size = PotSize();
       }
       bet_size = (bc->PotSize() - pot_size) / 2;
+#endif
     }
     char buf[100];
     sprintf(buf, "b%u", bet_size);
@@ -143,13 +146,8 @@ void Node::PrintTree(unsigned int depth, string name,
   Indent(2 * depth);
   unsigned int street = Street();
   if (street > last_street) name += " ";
-  if (Game::NumPlayers() > 2) {
-    printf("\"%s\" (id %u lbt %u ns %u s %u", name.c_str(), id_, LastBetTo(),
-	   NumSuccs(), street);
-  } else {
-    printf("\"%s\" (id %u ps %u ns %u s %u", name.c_str(), id_, PotSize(),
-	   NumSuccs(), street);
-  }
+  printf("\"%s\" (id %u lbt %u ns %u s %u", name.c_str(), id_, LastBetTo(),
+	 NumSuccs(), street);
   if (NumSuccs() > 0) {
     printf(" p%uc", player_acting_);
   }
@@ -215,6 +213,7 @@ void BettingTree::FillTerminalArray(void) {
   if (root_.get()) FillTerminalArray(root_.get());
 }
 
+#if 0
 bool BettingTree::GetPathToNamedNode(const char *str, Node *node,
 				     vector<Node *> *path) {
   char c = *str;
@@ -375,6 +374,7 @@ Node *BettingTree::GetNodeFromName(const char *str) {
   }
   return node;
 }
+#endif
 
 // Used by the subtree constructor
 // This doesn't preserve the reentrancy of the source tree
@@ -397,7 +397,7 @@ shared_ptr<Node>
 BettingTree::Read(Reader *reader,
 		  unordered_map< unsigned int, shared_ptr<Node> > ***maps) {
   unsigned int id = reader->ReadUnsignedIntOrDie();
-  unsigned short pot_size = reader->ReadUnsignedShortOrDie();
+  unsigned short last_bet_to = reader->ReadUnsignedShortOrDie();
   unsigned short num_succs = reader->ReadUnsignedShortOrDie();
   unsigned short flags = reader->ReadUnsignedShortOrDie();
   unsigned char pa = reader->ReadUnsignedCharOrDie();
@@ -414,7 +414,7 @@ BettingTree::Read(Reader *reader,
     }
   }
   shared_ptr<Node>
-    node(new Node(id, pot_size, num_succs, flags, pa, num_remaining));
+    node(new Node(id, last_bet_to, num_succs, flags, pa, num_remaining));
   if (num_succs == 0) {
     ++num_terminals_;
     return node;
@@ -551,5 +551,5 @@ bool TwoSuccsCorrespond(Node *node1, unsigned int s1, Node *node2,
   Node *bc1 = b1->IthSucc(b1->CallSuccIndex());
   Node *b2 = node2->IthSucc(s2);
   Node *bc2 = b2->IthSucc(b2->CallSuccIndex());
-  return (bc1->PotSize() == bc2->PotSize());
+  return (bc1->LastBetTo() == bc2->LastBetTo());
 }

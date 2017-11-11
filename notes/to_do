@@ -406,10 +406,8 @@ of opponent probs.
 * Evaluate expansion with mb2b5ss100?
 * Should I quantize regrets but maintain 4 byte sumprobs?  Only reduces
   memory usage by 3/8.
-* Update all file and path names as needed with number of players.
-* Try 6-player no-limit with imperfect recall.  For symmetric games, remember
-  pot size and number of players.  For asymmetric games, remember target
-  player's position.
+* Support asymmetric multiplayer.  Lose information about opponent position
+  in reentrant tree construction.
 * How can I estimate exploitability of multiplayer system?
   * Don't think O(n) implementations of Showdown() and Fold() possible.
   * For 6-player holdem, would need O(n^6) implementation.  Prohibitive?
@@ -420,31 +418,77 @@ of opponent probs.
     store a real-game strategy in memory (for one player).  That's probably
     prohibitively big.
   * Should I instead compare systems with head-to-head?
-* Evaluate reentrant trees with head-to-head.
-* More testing of multiplayer.  How does preflop strategy look?
-* May need reentrancy that is not street-initial.  Key on street, pot size,
-  last bet to, number of remaining players, number of callers
-  of bet, position of player to act with respect to remaining players.
-  * This implies we may combine nodes with different players to act.  Doesn't
-    that mess things up?
-  * Start with using player-to-act as a key.
-* Not sure if TCFR is working for 6 player flop game.  System improves
-  initially but asymptotes much more quickly than I expected it to.  Do I
-  need a best-response calculation to verify?  It may be very slow, but I
-  can evaluate on small games.
+  * What about UCT Monte Carlo Tree Search?  UCB1 is an algorithm that uses
+    UCT.  Davis actually recommends frequentist best-response (FBR).
+    1) Model opponent with abstraction; 2) Compute within-abstraction
+    best-response to that model.  Modeling the opponent with an abstraction
+    seems unnecessary; you already have an abstracted strategy.  How do
+    you do (2) faster than a real-game best-response?  Estimate CVs through
+    sampling?
+* Verify multiplayer TCFR with a best-response calculation.  mp_vcfr written,
+  but not tested.  Start with three-player one-street mb1b1 game.
 * Can I solve endgames for multiplayer?  Only do it for two players.
-* Test tcfr for heads-up.  Exploitability should go to zero.
-* Why does P4 have lower CV than P3 in six player four street game?
-  * Don't see in games with fewer streets.
-  * Don't see in games with fewer players.
-  * Still see if we run a second time.
-  * Still see with larger card abstraction.
-* Rebuild betting trees for PokerStars systems; confirm systems still work.
-  Exploitability should be the same.  Do I need to rename any files?
-  Need num_remaining to be set appropriately.
-  Need player acting to encode player remaining in fold nodes.
-  Directory names have changed also (number of players), but that shouldn't
-    matter.
 * What would happen if we solved a multiplayer game with N-2 player strategies
   fixed?  This is effectively a two-player game and should converge to
   equilibrium.
+* Reentrant multiplayer means that the player acting value cannot be known
+  when we build the betting tree.  We will merge betting sequences in which
+  different players have folded and different players are remaining.
+  So we need to compute the player acting field dynamically as we go.
+  Making things more confusing is that when we look up a probability, say,
+  we need to do that under the "original" player acting value and not the
+  "actual" player acting value.  run_tcfr and play support this now, but
+  other programs will have to be modified.
+  * This is a bit of a mess.  Is there a better way?  Could compute a mapping
+    from original_pa to actual_pa when we get to a reentrant tree.  Will that
+    be any better?
+* Does CFR+ work on reentrant trees?  If so, use it to compare reentrant
+  trees (possibly with better card abstractions) to non-reentrant trees.
+* Test endgame solving after VCFRState changes.
+  * Getting slightly bad results with zero-sum CVs in combined endgame
+    solving on ms1f3.  But results on four-street games look good.
+  * I think I lost my old ms3h5/nhs3/tcfr base system.  Rebuild.
+* Verify that multiplayer strategies look reasonable.  It's a little
+  suspicious that the gaps in head-to-head between any two systems is so
+  small.
+* Maintain last_aggressor.  Use as key for reentrancy.
+* Why is it so much faster to build a reentrant betting tree than to read
+  one from disk?  Don't they both do the same sorts of hashtable lookups?
+* PokerStars issues
+  * Should I write test program that compares EVs to probabilities?
+  * Try computing strategies that are better along untaken lines.  Exploration
+    (of 0.001) only helps a little.  Maybe external CFR would be better.
+    Endgame solving?
+  * Add translation.
+* What went wrong in ACPC last year?  We fold flop, turn and river a lot
+  more than Intermission.  Didn't we only do fold-to-alternative on the
+  river?  Does purification hurt?  Did we use a min fold prob?
+  * We get crushed by PokerBot5 who employs a hyper-aggressive flop check
+    raise strategy.  It appears to be adaptive.  Why do we get crushed?
+    Is it FTAR?  Do we map the flop checkraise up to a larger bet size?
+    Our fold probability is around 45% which seems high, but Intermission
+    is similar.  Should I look at analogous prob in mb3b3 system?
+  * Is StatelessNLAgent::Recurse() doing the right thing with pot sizes?
+  * We used CanonicalCards::ToCanon2() to canonicalize cards.  I thought I
+    decided that could not be used for that purpose.
+* Evaluate current strategy for head-to-head.
+  * Evaluate exploitability of current strategy.
+  * Does current strategy fold much more or less than cumulative strategy?
+  * Should compare current strategy of one abstraction to cumulative
+    strategy of a different abstraction.
+* Build a big abstraction.  kmeans as much as possible, and then
+  prify or crossproduct.
+* Can I try harder to use templates everywhere?
+* Quantization
+  * Test quantizing turn regrets.
+  * Try scaling by 0.01
+  * Test chars and shorts in CFRValues class.  Need to handle chars and
+    sorts in vcfr.cpp.
+* Can I do endgame solving well if all I have is the current strategy?
+  The current strategy may not be very balanced.
+  * Also, even if I have mixed ranges (from sumprobs) up to the river,
+    what if my opp CVs are calculated based on the current strategy?
+* Experiments to run
+  * If we make abstract game 10x bigger, how much longer until the big
+    system surpasses the small system?
+  * Best 1m river bucket abstraction.

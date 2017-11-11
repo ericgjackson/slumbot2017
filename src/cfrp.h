@@ -31,6 +31,8 @@ public:
   void HalfIteration(unsigned int p);
   void Checkpoint(unsigned int it);
   void ReadFromCheckpoint(unsigned int it);
+
+  const HandTree *hand_tree_;
 };
 
 #endif

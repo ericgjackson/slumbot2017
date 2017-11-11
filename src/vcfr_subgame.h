@@ -30,11 +30,14 @@ private:
   void DeleteOldFiles(unsigned int it);
 
   Node *root_;
+  unsigned int root_bd_;
+  unsigned int root_bd_st_;
   BettingTree *subtree_;
   VCFR *cfr_;
   bool *subtree_streets_;
   const string &action_sequence_;
   double *opp_probs_;
+  const HandTree *hand_tree_;
   unsigned int thread_index_;
   double *final_vals_;
 };

@@ -9,6 +9,9 @@
 // The values for a hand depend only on the opponent's strategy above and below
 // a given node, and our strategy below the node.  P0's values are distinct
 // from P1's values.
+//
+// We still write out values for individual hands.  So does this code do
+// anything different than cfr_thread.cpp?  Not sure it does.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -60,9 +63,6 @@ BCFRThread::BCFRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
 
   regrets_.reset(nullptr);
   if (trunk) {
-    root_bd_st_ = 0;
-    root_bd_ = 0;
-    hand_tree_ = trunk_hand_tree_;
     // Should handle asymmetric systems
     // Should honor sumprobs_streets_
     sumprobs_.reset(new CFRValues(nullptr, true, nullptr, betting_tree_, 0, 0,
@@ -106,17 +106,11 @@ BCFRThread::BCFRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
     }
   } else {
     // We are not the trunk thread
-    root_bd_st_ = kSplitStreet;
-    root_bd_ = kMaxUInt;
-    hand_tree_ = nullptr;
     sumprobs_.reset(nullptr);
   }
 }
 
 BCFRThread::~BCFRThread(void) {
-  // Don't delete hand_tree_.  In the trunk it is identical to trunk_hand_tree_
-  // which is owned by the caller (PRBRBuilder).  In the endgames it is
-  // deleted in AfterSplit().
 }
 
 void BCFRThread::WriteValues(Node *node, unsigned int gbd,
@@ -139,63 +133,49 @@ void BCFRThread::WriteValues(Node *node, unsigned int gbd,
   }
 }
 
-double *BCFRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
-			      double sum_opp_probs, double *total_card_probs,
-			      unsigned int **street_buckets,
-			      const string &action_sequence) {
+double *BCFRThread::OurChoice(Node *node, unsigned int lbd,
+			      const VCFRState &state) {
   unsigned int st = node->Street();
   
-  double *vals = VCFR::OurChoice(node, lbd, opp_probs, sum_opp_probs,
-				 total_card_probs, street_buckets,
-				 action_sequence);
+  double *vals = VCFR::OurChoice(node, lbd, state);
   unsigned int gbd = 0;
-  if (st > 0) gbd = BoardTree::GlobalIndex(root_bd_st_, root_bd_, st, lbd);
-  WriteValues(node, gbd, action_sequence, vals);
+  if (st > 0) {
+    gbd = BoardTree::GlobalIndex(state.RootBdSt(), state.RootBd(), st, lbd);
+  }
+  WriteValues(node, gbd, state.ActionSequence(), vals);
   
   return vals;
 }
 
 // Can't skip succ even if succ_sum_opp_probs is zero.  I need to write
 // out values at every node.
-double *BCFRThread::OppChoice(Node *node, unsigned int lbd, double *opp_probs,
-			      double sum_opp_probs, double *total_card_probs,
-			      unsigned int **street_buckets,
-			      const string &action_sequence) {
-  double *vals = VCFR::OppChoice(node, lbd, opp_probs, sum_opp_probs,
-				 total_card_probs, street_buckets,
-				 action_sequence);
+double *BCFRThread::OppChoice(Node *node, unsigned int lbd, 
+			      const VCFRState &state) {
+  double *vals = VCFR::OppChoice(node, lbd, state);
 
   unsigned int st = node->Street();
   unsigned int gbd = 0;
-  if (st > 0) gbd = BoardTree::GlobalIndex(root_bd_st_, root_bd_, st, lbd);
-  WriteValues(node, gbd, action_sequence, vals);
+  if (st > 0) {
+    gbd = BoardTree::GlobalIndex(state.RootBdSt(), state.RootBd(), st, lbd);
+  }
+  WriteValues(node, gbd, state.ActionSequence(), vals);
 
   return vals;
 }
 
-// Used for the first and third passes
 void BCFRThread::Go(void) {
   time_t start_t = time(NULL);
 
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(0);
   unsigned int num_hole_cards = Game::NumCardsForStreet(0);
-  unsigned int max_card = Game::MaxCard();
-  unsigned int num;
-  if (num_hole_cards == 1) num = max_card + 1;
-  else                     num = (max_card + 1) * (max_card + 1);
-  double *opp_probs = new double[num];
-  for (unsigned int i = 0; i < num; ++i) opp_probs[i] = 1.0;
-  const CanonicalCards *hands = hand_tree_->Hands(0, 0);
 
-  double sum_opp_probs;
-  double *total_card_probs = new double[num_hole_card_pairs];
-  CommonBetResponseCalcs(0, hands, opp_probs, &sum_opp_probs,
-			 total_card_probs);
-  unsigned int **street_buckets = InitializeStreetBuckets();
-  double *vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-			 total_card_probs, street_buckets, "x", 0);
+  double *opp_probs = AllocateOppProbs(true);
+  unsigned int **street_buckets = AllocateStreetBuckets();
+  VCFRState state(opp_probs, street_buckets, trunk_hand_tree_);
+  SetStreetBuckets(0, 0, state);
+  double *vals = Process(betting_tree_->Root(), 0, state, 0);
   DeleteStreetBuckets(street_buckets);
-  delete [] total_card_probs;
+  delete [] opp_probs;
 
   // EVs for our hands are summed over all opponent hole card pairs.  To
   // compute properly normalized EV, need to divide by that number.
@@ -215,7 +195,6 @@ void BCFRThread::Go(void) {
   printf("EV: %f\n", ev);
   fflush(stdout);
 
-  delete [] opp_probs;
   delete [] vals;
 
   time_t end_t = time(NULL);

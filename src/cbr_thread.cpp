@@ -68,7 +68,7 @@ CBRThread::CBRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
   regrets_.reset(nullptr);
 
 
-  final_hand_vals_ = nullptr;
+  // final_hand_vals_ = nullptr;
   unsigned int max_street = Game::MaxStreet();
   for (unsigned int st = 0; st <= max_street; ++st) {
     best_response_streets_[st] = ! cfrs_;
@@ -87,9 +87,6 @@ CBRThread::CBRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
     players[p] = cfrs_ || p != p_;
   }
   if (trunk) {
-    root_bd_st_ = 0;
-    root_bd_ = 0;
-    hand_tree_ = trunk_hand_tree_;
     // Should handle asymmetric systems
     // Should honor sumprobs_streets_
     sumprobs_.reset(new CFRValues(players.get(), true, nullptr, betting_tree_,
@@ -97,8 +94,8 @@ CBRThread::CBRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
 				  compressed_streets_));
 
     char dir[500];
-    sprintf(dir, "%s/%s.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
-	    Game::GameName().c_str(),
+    sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
+	    Game::GameName().c_str(), Game::NumPlayers(),
 	    card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	    Game::NumSuits(), Game::MaxStreet(),
 	    betting_abstraction_.BettingAbstractionName().c_str(),
@@ -136,26 +133,20 @@ CBRThread::CBRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
     }
   } else {
     // We are not the trunk thread
-    root_bd_st_ = kSplitStreet;
-    root_bd_ = kMaxUInt;
-    hand_tree_ = nullptr;
     sumprobs_.reset(nullptr);
   }
 }
 
 CBRThread::~CBRThread(void) {
-  // Don't delete hand_tree_.  In the trunk it is identical to trunk_hand_tree_
-  // which is owned by the caller (CBRBuilder).  In the endgames it is
-  // deleted in AfterSplit().
-  delete [] final_hand_vals_;
+  // delete [] final_hand_vals_;
 }
 
 void CBRThread::WriteValues(Node *node, unsigned int gbd,
 			    const string &action_sequence, double *vals) {
   char dir[500], dir2[500], buf[500];
   unsigned int street = node->Street();
-  sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s",
-	  Files::NewCFRBase(), Game::GameName().c_str(),
+  sprintf(dir, "%s/%s.%u.%s.%i.%i.%i.%s.%s",
+	  Files::NewCFRBase(), Game::GameName().c_str(), Game::NumPlayers(),
 	  card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	  Game::NumSuits(), Game::MaxStreet(),
 	  betting_abstraction_.BettingAbstractionName().c_str(), 
@@ -180,58 +171,35 @@ void CBRThread::WriteValues(Node *node, unsigned int gbd,
   }
 }
 
-double *CBRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
-			     double sum_opp_probs, double *total_card_probs,
-			     unsigned int **street_buckets,
-			     const string &action_sequence) {
-  double *vals = VCFR::OurChoice(node, lbd, opp_probs, sum_opp_probs,
-				 total_card_probs, street_buckets,
-				 action_sequence);
+double *CBRThread::OurChoice(Node *node, unsigned int lbd, 
+			     const VCFRState &state) {
+  double *vals = VCFR::OurChoice(node, lbd, state);
 
   unsigned int st = node->Street();
   unsigned int gbd = 0;
   if (st > 0) {
-    gbd = BoardTree::GlobalIndex(root_bd_st_, root_bd_, st, lbd);
+    gbd = BoardTree::GlobalIndex(state.RootBdSt(), state.RootBd(), st, lbd);
   }
+  WriteValues(node, gbd, state.ActionSequence(), vals);
+  
+  return vals;
+}
+
+double *CBRThread::OppChoice(Node *node, unsigned int lbd, 
+			     const VCFRState &state) {
+  double *vals = VCFR::OppChoice(node, lbd, state);
+
+  unsigned int st = node->Street();
+  unsigned int gbd = 0;
+  if (st > 0) {
+    gbd = BoardTree::GlobalIndex(state.RootBdSt(), state.RootBd(), st, lbd);
+  }
+  WriteValues(node, gbd, state.ActionSequence(), vals);
+  
+  return vals;
+}
+
 #if 0
-  if (node->NonterminalID() == 0 && st == 1 && node->PlayerActing() == 0 &&
-      gbd == 0) {
-    double sop = 0;
-    unsigned int max_card1 = Game::MaxCard() + 1;
-    const CanonicalCards *hands = hand_tree_->Hands(st, lbd);
-    unsigned int num_hands = hands->NumRaw();
-    for (unsigned int i = 0; i < num_hands; ++i) {
-      const Card *cards = hands->Cards(i);
-      Card hi = cards[0];
-      Card lo = cards[1];
-      unsigned int enc = hi * max_card1 + lo;
-      sop += opp_probs[enc];
-    }
-  }
-#endif
-  WriteValues(node, gbd, action_sequence, vals);
-  
-  return vals;
-}
-
-double *CBRThread::OppChoice(Node *node, unsigned int lbd, double *opp_probs,
-			     double sum_opp_probs, double *total_card_probs,
-			     unsigned int **street_buckets,
-			     const string &action_sequence) {
-  double *vals = VCFR::OppChoice(node, lbd, opp_probs, sum_opp_probs,
-				 total_card_probs, street_buckets,
-				 action_sequence);
-
-  unsigned int st = node->Street();
-  unsigned int gbd = 0;
-  if (st > 0) {
-    gbd = BoardTree::GlobalIndex(root_bd_st_, root_bd_, st, lbd);
-  }
-  WriteValues(node, gbd, action_sequence, vals);
-  
-  return vals;
-}
-
 // Fork off threads on street kSplitStreet
 double *CBRThread::Split(Node *node, unsigned int bd, double *opp_probs) {
   unsigned int nst = node->Street();
@@ -259,35 +227,13 @@ double *CBRThread::Split(Node *node, unsigned int bd, double *opp_probs) {
   return vals;
 }
 
-double *CBRThread::Process(Node *node, unsigned int lbd, double *opp_probs,
-			   double sum_opp_probs, double *total_card_probs,
-			   unsigned int **street_buckets,
-			   const string &action_sequence,
-			   unsigned int last_st) {
+double *CBRThread::Process(Node *node, unsigned int lbd, 
+			   const VCFRState &state, unsigned int last_st) {
   unsigned int st = node->Street();
   if (st > last_st && st == kSplitStreet) {
-    return Split(node, lbd, opp_probs);
+    return Split(node, lbd, state.OppProbs());
   } else {
-#if 0
-    if (node->NonterminalID() == 0 && st == 1 && node->PlayerActing() == 0 &&
-	lbd == 0 && last_st == 1) {
-      double sop = 0;
-      unsigned int max_card1 = Game::MaxCard() + 1;
-      const CanonicalCards *hands = hand_tree_->Hands(st, lbd);
-      unsigned int num_hands = hands->NumRaw();
-      for (unsigned int i = 0; i < num_hands; ++i) {
-	const Card *cards = hands->Cards(i);
-	Card hi = cards[0];
-	Card lo = cards[1];
-	unsigned int enc = hi * max_card1 + lo;
-	sop += opp_probs[enc];
-      }
-      fprintf(stderr, "P%u sop %f\n", p_, sop);
-    }
-#endif
-    return VCFR::Process(node, lbd, opp_probs, sum_opp_probs,
-			 total_card_probs, street_buckets, action_sequence,
-			 last_st);
+    return VCFR::Process(node, lbd, state, last_st);
   }
 }
 
@@ -304,7 +250,9 @@ void CBRThread::Run(void) {
 void CBRThread::Join(void) {
   pthread_join(pthread_id_, NULL); 
 }
+#endif
 
+#if 0
 // We replicate a lot of the logic from CFR::StreetInitial().  But we can't
 // use CFR::StreetInitial() because we are only interested in a subset of
 // the boards.
@@ -312,7 +260,6 @@ void CBRThread::AfterSplit(void) {
   fprintf(stderr, "AfterSplit %p\n", split_node_);
   unsigned int nst = split_node_->Street();
   unsigned int pst = nst - 1;
-  root_bd_st_ = nst;
 
   unsigned int pred_num_hole_card_pairs = Game::NumHoleCardPairs(pst);
   fprintf(stderr, "AfterSplit 1.1\n");
@@ -324,9 +271,9 @@ void CBRThread::AfterSplit(void) {
   }
   fprintf(stderr, "AfterSplit 1.3\n");
 
-  unsigned int max_card = Game::MaxCard();
-  unsigned int num_encodings = (max_card + 1) * (max_card + 1);
-  unsigned int *prev_canons = new unsigned int[num_encodings];
+  unsigned int max_card1 = Game::MaxCard() + 1;
+  unsigned int num_enc = max_card1 * max_card1;
+  unsigned int *prev_canons = new unsigned int[num_enc];
   fprintf(stderr, "AfterSplit 1.4\n");
   const CanonicalCards *pred_hands = trunk_hand_tree_->Hands(pst, split_bd_);
   fprintf(stderr, "AfterSplit2\n");
@@ -337,7 +284,7 @@ void CBRThread::AfterSplit(void) {
       const Card *prev_cards = pred_hands->Cards(ph);
       Card hi = prev_cards[0];
       Card lo = prev_cards[1];
-      unsigned int prev_encoding = hi * (max_card + 1) + lo;
+      unsigned int prev_encoding = hi * max_card1 + lo;
       prev_canons[prev_encoding] = ph;
     }
   }
@@ -346,7 +293,7 @@ void CBRThread::AfterSplit(void) {
       const Card *prev_cards = pred_hands->Cards(ph);
       Card hi = prev_cards[0];
       Card lo = prev_cards[1];
-      unsigned int prev_encoding = hi * (max_card + 1) + lo;
+      unsigned int prev_encoding = hi * max_card1 + lo;
       unsigned int pc = prev_canons[pred_hands->Canon(ph)];
       prev_canons[prev_encoding] = pc;
     }
@@ -381,16 +328,12 @@ void CBRThread::AfterSplit(void) {
   unsigned int ngbd_end = BoardTree::SuccBoardEnd(pst, split_bd_, nst);
   for (unsigned int ngbd = ngbd_begin; ngbd < ngbd_end; ++ngbd) {
     fprintf(stderr, "AfterSplit6 %u\n", ngbd);
-    unsigned int nlbd;
-    if (root_bd_st_ == 0) {
-      nlbd = ngbd;
-    } else {
-      nlbd = BoardTree::LocalIndex(root_bd_st_, root_bd_, nst, ngbd);
+    unsigned int nlbd = BoardTree::LocalIndex(state.RootBdSt(), state.RootBd(),
+					      nst, ngbd);
     }
     fprintf(stderr, "AfterSplit7 %u\n", nlbd);
     if (ngbd % num_threads_ != thread_index_) continue;
-    root_bd_ = ngbd;
-    hand_tree_ = new HandTree(nst, ngbd, max_street);
+    HandTree hand_tree(nst, ngbd, max_street);
     // Should handle asymmetric systems
     // Should honor sumprobs_streets_
     fprintf(stderr, "AfterSplit8\n");
@@ -402,7 +345,7 @@ void CBRThread::AfterSplit(void) {
       players[p] = cfrs_ || p != p_;
     }
     sumprobs_.reset(new CFRValues(players.get(), true, subtree_streets,
-				  subtree, ngbd, root_bd_st_,
+				  subtree, ngbd, state.RootBdSt(),
 				  card_abstraction_, buckets_,
 				  compressed_streets_));
     // We are assuming sumprobs are split in the same way as we want to
@@ -425,23 +368,25 @@ void CBRThread::AfterSplit(void) {
     fprintf(stderr, "Should pass in current action sequence\n");
     fprintf(stderr, "Should pass in street buckets\n");
     exit(-1);
-    double *next_vals = Process(subtree->Root(), nlbd, opp_reach_probs_, 0,
-				NULL, nullptr, "", nst);
+    string action_sequence = "x";
+    VCFRState state(buckets_, &hand_tree, nst, 0, opp_reach_probs_,
+		    action_sequence);
+    // Should I be passing in nlbd or 0?  hand_tree is local to this subtree,
+    // so shouldn't we pass in 0?
+    double *next_vals = Process(subtree->Root(), nlbd, state, nst);
     sumprobs_.reset(nullptr);
 
-    const CanonicalCards *next_hands = hand_tree_->Hands(nst, 0);
+    const CanonicalCards *next_hands = hand_tree.Hands(nst, 0);
     unsigned int num_next_hands = next_hands->NumRaw();
     for (unsigned int nh = 0; nh < num_next_hands; ++nh) {
       const Card *cards = next_hands->Cards(nh);
       Card hi = cards[0];
       Card lo = cards[1];
-      unsigned int enc = hi * (max_card + 1) + lo;
+      unsigned int enc = hi * max_card1 + lo;
       unsigned int prev_canon = prev_canons[enc];
       final_hand_vals_[prev_canon] += num_variants * next_vals[nh];
     }
     delete [] next_vals;
-    delete hand_tree_;
-    hand_tree_ = NULL;
   }
 
   delete subtree;
@@ -466,30 +411,21 @@ void CBRThread::AfterSplit(void) {
 
   delete [] prev_canons;
 }
+#endif
 
 double CBRThread::Go(void) {
-  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
-  unsigned int max_card = Game::MaxCard();
-  unsigned int num;
-  if (num_hole_cards == 1) num = max_card + 1;
-  else                     num = (max_card + 1) * (max_card + 1);
-  double *opp_probs = new double[num];
-  for (unsigned int i = 0; i < num; ++i) opp_probs[i] = 1.0;
   time_t start_t = time(NULL);
-  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(0);
-  double sum_opp_probs;
-  double *total_card_probs = new double[num_hole_card_pairs];
-  const CanonicalCards *hands = hand_tree_->Hands(0, 0);
-  CommonBetResponseCalcs(0, hands, opp_probs, &sum_opp_probs,
-			 total_card_probs);
-  unsigned int **street_buckets = InitializeStreetBuckets();
-  double *vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-			 total_card_probs, street_buckets, "x", 0);
+  double *opp_probs = AllocateOppProbs(true);
+  unsigned int **street_buckets = AllocateStreetBuckets();
+  VCFRState state(opp_probs, street_buckets, trunk_hand_tree_);
+  SetStreetBuckets(0, 0, state);
+  double *vals = Process(betting_tree_->Root(), 0, state, 0);
   DeleteStreetBuckets(street_buckets);
-  delete [] total_card_probs;
+  delete [] opp_probs;
   // EVs for our hands are summed over all opponent hole card pairs.  To
   // compute properly normalized EV, need to divide by that number.
   unsigned int num_cards_in_deck = Game::NumCardsInDeck();
+  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
   unsigned int num_remaining = num_cards_in_deck - num_hole_cards;
   unsigned int num_opp_hole_card_pairs;
   if (num_hole_cards == 1) {
@@ -497,6 +433,7 @@ double CBRThread::Go(void) {
   } else {
     num_opp_hole_card_pairs = num_remaining * (num_remaining - 1) / 2;
   }
+  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(0);
   double sum = 0;
   for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
     sum += vals[i] / num_opp_hole_card_pairs;
@@ -506,7 +443,6 @@ double CBRThread::Go(void) {
   double diff_sec = difftime(end_t, start_t);
   printf("Process took %.1f seconds\n", diff_sec);
   fflush(stdout);
-  delete [] opp_probs;
   delete [] vals;
   return ev;
 }

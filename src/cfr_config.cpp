@@ -46,17 +46,16 @@ CFRConfig::CFRConfig(const Params &params) {
   } else {
     ParseUnsignedInts(str, &sumprob_streets_);
   }
+  unsigned int max_street = Game::MaxStreet();
   const string &pstr = params.GetStringValue("PruningThresholds");
   if (pstr == "") {
     // Default is no pruning on any street.  kMaxUInt signifies no
     // pruning.
-    unsigned int max_street = Game::MaxStreet();
     for (unsigned int st = 0; st <= max_street; ++st) {
       pruning_thresholds_.push_back(kMaxUInt);
     }
   } else {
     ParseUnsignedInts(pstr, &pruning_thresholds_);
-    unsigned int max_street = Game::MaxStreet();
     if (pruning_thresholds_.size() != max_street + 1) {
       fprintf(stderr, "Didn't see expected number of pruning thresholds\n");
       exit(-1);
@@ -68,6 +67,30 @@ CFRConfig::CFRConfig(const Params &params) {
   sample_opp_hands_ = params.GetBooleanValue("SampleOppHands");
   explore_ = params.GetDoubleValue("Explore");
   probe_ = params.GetBooleanValue("Probe");
+  char_quantized_streets_.reset(new bool[max_street + 1]);
+  short_quantized_streets_.reset(new bool[max_street + 1]);
+  scaled_streets_.reset(new bool[max_street + 1]);
+  for (unsigned int st = 0; st <= max_street; ++st) {
+    char_quantized_streets_[st] = false;
+    short_quantized_streets_[st] = false;
+    scaled_streets_[st] = false;
+  }
+  vector<unsigned int> cqsv, sqsv, ssv;
+  ParseUnsignedInts(params.GetStringValue("CharQuantizedStreets"), &cqsv);
+  unsigned int num_cqsv = cqsv.size();
+  for (unsigned int i = 0; i < num_cqsv; ++i) {
+    char_quantized_streets_[cqsv[i]] = true;
+  }
+  ParseUnsignedInts(params.GetStringValue("ShortQuantizedStreets"), &sqsv);
+  unsigned int num_sqsv = sqsv.size();
+  for (unsigned int i = 0; i < num_sqsv; ++i) {
+    short_quantized_streets_[sqsv[i]] = true;
+  }
+  ParseUnsignedInts(params.GetStringValue("ScaledStreets"), &ssv);
+  unsigned int num_ssv = ssv.size();
+  for (unsigned int i = 0; i < num_ssv; ++i) {
+    scaled_streets_[ssv[i]] = true;
+  }
   double_regrets_ = params.GetBooleanValue("DoubleRegrets");
   double_sumprobs_ = params.GetBooleanValue("DoubleSumprobs");
   ParseUnsignedInts(params.GetStringValue("CompressedStreets"),
@@ -118,6 +141,5 @@ CFRConfig::CFRConfig(const Params &params) {
     }
   }
 
-  use_avg_for_current_it_ = params.GetIntValue("UseAvgForCurrentIt");
   uniform_ = params.GetBooleanValue("Uniform");
 }

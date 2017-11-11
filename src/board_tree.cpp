@@ -39,14 +39,16 @@ unsigned int *BoardTree::pred_boards_ = nullptr;
 
 unsigned int BoardTree::LocalIndex(unsigned int root_st, unsigned int root_bd,
 				   unsigned int st, unsigned int gbd) {
-  if (st == root_st) return 0;
-  else               return gbd - succ_board_begins_[root_st][st][root_bd];
+  if (st == root_st)     return 0;
+  else if (root_st == 0) return gbd;
+  else                   return gbd - succ_board_begins_[root_st][st][root_bd];
 }
 
 unsigned int BoardTree::GlobalIndex(unsigned int root_st, unsigned int root_bd,
 				    unsigned int st, unsigned int lbd) {
-  if (st == root_st) return root_bd;
-  else               return lbd + succ_board_begins_[root_st][st][root_bd];
+  if (st == root_st)     return root_bd;
+  else if (root_st == 0) return lbd;
+  else                   return lbd + succ_board_begins_[root_st][st][root_bd];
 }
 
 unsigned int BoardTree::NumLocalBoards(unsigned int root_st,
@@ -213,6 +215,9 @@ void BoardTree::CreateLookup(void) {
     unsigned int num_board_cards = Game::NumBoardCards(st);
     unsigned int num_codes = pow(max_card1, num_board_cards);
     lookup_[st] = new unsigned int[num_codes];
+    for (unsigned int i = 0; i < num_codes; ++i) {
+      lookup_[st][i] = kMaxUInt;
+    }
     unsigned int num_boards = num_boards_[st];
     for (unsigned int bd = 0; bd < num_boards; ++bd) {
       const Card *board = Board(st, bd);
@@ -246,7 +251,15 @@ unsigned int BoardTree::LookupBoard(const Card *board, unsigned int st) {
   for (unsigned int i = 0; i < num_board_cards; ++i) {
     code += board[i] * pow(max_card1, i);
   }
-  return lookup_[st][code];
+  unsigned int ret = lookup_[st][code];
+  if (ret == kMaxUInt) {
+    fprintf(stderr, "BoardTree::LookupBoard() invalid board\n");
+    OutputNCards(board, num_board_cards);
+    printf("\n");
+    fflush(stdout);
+    exit(-1);
+  }
+  return ret;
 }
 
 void BoardTree::DealRawBoards(Card *board, unsigned int st) {

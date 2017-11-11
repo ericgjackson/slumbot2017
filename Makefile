@@ -16,8 +16,9 @@ HEADS =	src/constants.h src/rand.h src/split.h src/files.h \
 	src/vcfr_subgame.h src/kmeans.h src/pkmeans.h src/dynamic_cbr.h \
 	src/endgame_utils.h src/compression_utils.h src/regret_compression.h \
 	src/tcfr.h src/ols.h src/ej_compress.h src/pcs_cfr.h src/canonical.h \
-	src/mp_vcfr.h
-#	src/heads_up_tcfr.h \
+	src/mp_vcfr.h src/mp_rgbr.h src/sampled_bcfr_builder.h \
+	src/runtime_params.h src/runtime_config.h \
+	src/acpc_protocol.h src/agent.h src/nearest_neighbors.h src/nl_agent.h
 
 # -Wl,--no-as-needed fixes my problem of undefined reference to
 # pthread_create (and pthread_join).  Comments I found on the web indicate
@@ -51,11 +52,24 @@ OBJS =	obj/rand.o obj/split.o obj/files.o obj/cards.o obj/io.o \
 	obj/pkmeans.o obj/dynamic_cbr.o obj/endgame_utils.o \
 	obj/compression_utils.o obj/regret_compression.o obj/tcfr.o \
 	obj/ols.o obj/ej_compress.o obj/pcs_cfr.o obj/canonical.o \
-	obj/mp_vcfr.o
-#	obj/heads_up_tcfr.o \
+	obj/mp_vcfr.o obj/mp_rgbr.o obj/sampled_bcfr_builder.o \
+	obj/runtime_params.o obj/runtime_config.o \
+	obj/acpc_protocol.o obj/nearest_neighbors.o obj/nl_agent.o
 
 bin/test:	obj/test.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/test obj/test.o $(OBJS) \
+	$(LIBRARIES)
+
+bin/test2:	obj/test2.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/test2 obj/test2.o $(OBJS) \
+	$(LIBRARIES)
+
+bin/test3:	obj/test3.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/test3 obj/test3.o $(OBJS) \
+	$(LIBRARIES)
+
+bin/test4:	obj/test4.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/test4 obj/test4.o $(OBJS) \
 	$(LIBRARIES)
 
 bin/test_canonicalization:	obj/test_canonicalization.o $(OBJS) $(HEADS)
@@ -88,6 +102,10 @@ bin/run_pcs:	obj/run_pcs.o $(OBJS) $(HEADS)
 
 bin/run_rgbr:	obj/run_rgbr.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/run_rgbr obj/run_rgbr.o $(OBJS) \
+	$(LIBRARIES)
+
+bin/run_mp_rgbr:	obj/run_mp_rgbr.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/run_mp_rgbr obj/run_mp_rgbr.o $(OBJS) \
 	$(LIBRARIES)
 
 bin/solve_all_endgames:	obj/solve_all_endgames.o $(OBJS) $(HEADS)
@@ -125,6 +143,10 @@ bin/build_cfrs:	obj/build_cfrs.o $(OBJS) $(HEADS)
 bin/build_bcbrs:	obj/build_bcbrs.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/build_bcbrs obj/build_bcbrs.o \
 	$(OBJS) $(LIBRARIES)
+
+bin/build_sampled_bcfrs:	obj/build_sampled_bcfrs.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/build_sampled_bcfrs \
+	obj/build_sampled_bcfrs.o $(OBJS) $(LIBRARIES)
 
 bin/play:	obj/play.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/play obj/play.o \
@@ -242,6 +264,10 @@ bin/show_preflop_strategy:	obj/show_preflop_strategy.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/show_preflop_strategy \
 	obj/show_preflop_strategy.o $(OBJS) $(LIBRARIES)
 
+bin/show_strategy:	obj/show_strategy.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/show_strategy obj/show_strategy.o \
+	$(OBJS) $(LIBRARIES)
+
 bin/run_approx_rgbr:	obj/run_approx_rgbr.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/run_approx_rgbr obj/run_approx_rgbr.o \
 	$(OBJS) $(LIBRARIES)
@@ -265,6 +291,10 @@ bin/show_joint_reach_probs:	obj/show_joint_reach_probs.o $(OBJS) $(HEADS)
 bin/test_shared_ptrs:	obj/test_shared_ptrs.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/test_shared_ptrs \
 	obj/test_shared_ptrs.o $(OBJS) $(LIBRARIES)
+
+bin/compare_boards:	obj/compare_boards.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/compare_boards obj/compare_boards.o \
+	$(OBJS) $(LIBRARIES)
 
 bin/x:	obj/x.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/x obj/x.o \

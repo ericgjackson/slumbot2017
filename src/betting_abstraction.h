@@ -99,6 +99,15 @@ class BettingAbstraction {
     return betting_key_[st];
   }
   unsigned int MinReentrantPot(void) const {return min_reentrant_pot_;}
+  unsigned int MinReentrantBets(unsigned int st, unsigned int num_rem) const {
+    if (merge_rules_ == nullptr) return 0;
+    else                         return merge_rules_[st][num_rem];
+  }
+  bool AllowableBetTo(unsigned int bt) const {
+    if (allowable_bet_tos_.get() == nullptr) return true;
+    else                                     return allowable_bet_tos_[bt];
+  }
+  bool LastAggressorKey(void) const {return last_aggressor_key_;}
  private:
   bool **ParseMinBets(const string &value);
   
@@ -142,6 +151,9 @@ class BettingAbstraction {
   unique_ptr<bool []> reentrant_streets_;
   unique_ptr<bool []> betting_key_;
   unsigned int min_reentrant_pot_;
+  unsigned int **merge_rules_;
+  unique_ptr<bool []> allowable_bet_tos_;
+  bool last_aggressor_key_;
 };
 
 #endif

@@ -1,6 +1,7 @@
 #ifndef _CFR_CONFIG_H_
 #define _CFR_CONFIG_H_
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -39,14 +40,14 @@ public:
   bool SampleOppHands(void) const {return sample_opp_hands_;}
   double Explore(void) const {return explore_;}
   bool Probe(void) const {return probe_;}
-  const vector<unsigned int> &QuantizedStreets(void) const {
-    return quantized_streets_;
+  bool CharQuantizedStreet(unsigned int st) const {
+    return char_quantized_streets_[st];
   }
-  const vector<unsigned int> &ShortQuantizedStreets(void) const {
-    return short_quantized_streets_;
+  bool ShortQuantizedStreet(unsigned int st) const {
+    return short_quantized_streets_[st];
   }
-  const vector<unsigned int> &ScaledStreets(void) const {
-    return scaled_streets_;
+  bool ScaledStreet(unsigned int st) const {
+    return scaled_streets_[st];
   }
   unsigned int ActiveMod(void) const {return active_mod_;}
   unsigned int NumActiveConditions(void) const {return num_active_conditions_;}
@@ -69,7 +70,6 @@ public:
   const vector<unsigned int> &CompressedStreets(void) const {
     return compressed_streets_;
   }
-  unsigned int UseAvgForCurrentIt(void) const {return use_avg_for_current_it_;}
   bool Uniform(void) const {return uniform_;}
  private:
   string cfr_config_name_;
@@ -94,9 +94,9 @@ public:
   bool sample_opp_hands_;
   double explore_;
   bool probe_;
-  vector<unsigned int> quantized_streets_;
-  vector<unsigned int> short_quantized_streets_;
-  vector<unsigned int> scaled_streets_;
+  unique_ptr<bool []> char_quantized_streets_;
+  unique_ptr<bool []> short_quantized_streets_;
+  unique_ptr<bool []> scaled_streets_;
   unsigned int active_mod_;
   unsigned int num_active_conditions_;
   vector<unsigned int> *active_streets_;
@@ -106,7 +106,6 @@ public:
   bool double_regrets_;
   bool double_sumprobs_;
   vector<unsigned int> compressed_streets_;
-  unsigned int use_avg_for_current_it_;
   bool uniform_;
 };
 

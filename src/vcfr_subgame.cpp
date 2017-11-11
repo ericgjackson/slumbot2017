@@ -224,23 +224,19 @@ void VCFRSubgame::Go(void) {
     }
   }
 
-  unsigned int max_card = Game::MaxCard();
-  double *total_card_probs = new double[max_card + 1];
-  double sum_opp_probs;
-  const CanonicalCards *hands = hand_tree_->Hands(root_bd_st_, 0);
-  CommonBetResponseCalcs(root_bd_st_, hands, opp_probs_, &sum_opp_probs,
-			 total_card_probs);
   // Should set buckets for initial street of subgame
-  unsigned int **street_buckets = InitializeStreetBuckets();
   if (! buckets_.None(subtree_st)) {
     fprintf(stderr, "Need to set buckets for initial street of subgame\n");
     exit(-1);
   }
-  final_vals_ = Process(subtree_->Root(), 0, opp_probs_, sum_opp_probs,
-			total_card_probs, street_buckets, "", subtree_st - 1);
+  // Should set action sequence
+  unsigned int **street_buckets = AllocateStreetBuckets();
+  VCFRState state(opp_probs_, hand_tree_, root_bd_st_, 0, action_sequence_,
+		  root_bd_, root_bd_st_, street_buckets);
+  SetStreetBuckets(root_bd_st_, root_bd_, state);
+  final_vals_ = Process(subtree_->Root(), 0, state, subtree_st - 1);
   DeleteStreetBuckets(street_buckets);
 
-  delete [] total_card_probs;
 
   if (! value_calculation_) {
     Mkdir(dir);

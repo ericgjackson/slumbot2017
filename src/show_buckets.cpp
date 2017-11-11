@@ -8,6 +8,7 @@
 #include "cards.h"
 #include "card_abstraction.h"
 #include "card_abstraction_params.h"
+#include "constants.h"
 #include "files.h"
 #include "game.h"
 #include "game_params.h"
@@ -16,7 +17,8 @@
 
 using namespace std;
 
-static void Show(const Buckets &buckets, unsigned int street) {
+static void Show(const Buckets &buckets, unsigned int street,
+		 unsigned int bucket) {
   BoardTree::Create();
   unsigned int num_hole_cards = Game::NumCardsForStreet(0);
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(street);
@@ -35,12 +37,14 @@ static void Show(const Buckets &buckets, unsigned int street) {
 	  if (InCards(lo, board, num_board_cards)) continue;
 	  unsigned int h = bd * num_hole_card_pairs + hcp;
 	  unsigned int b = buckets.Bucket(street, h);
-	  printf("%u: ", b);
-	  OutputNCards(board, num_board_cards);
-	  printf(" / ");
-	  OutputTwoCards(hi, lo);
-	  printf(" (bd %u h %u)\n", bd, h);
-	  fflush(stdout);
+	  if (bucket == kMaxUInt || b == bucket) {
+	    printf("%u: ", b);
+	    OutputNCards(board, num_board_cards);
+	    printf(" / ");
+	    OutputTwoCards(hi, lo);
+	    printf(" (bd %u h %u)\n", bd, h);
+	    fflush(stdout);
+	  }
 	  ++hcp;
 	}
       }
@@ -49,13 +53,13 @@ static void Show(const Buckets &buckets, unsigned int street) {
 }
 
 static void Usage(const char *prog_name) {
-  fprintf(stderr, "USAGE: %s <game params> <card params> <street>\n",
-	  prog_name);
+  fprintf(stderr, "USAGE: %s <game params> <card params> <street> "
+	  "(<bucket>)\n", prog_name);
   exit(-1);
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 4) Usage(argv[0]);
+  if (argc != 4 && argc != 5) Usage(argv[0]);
   Files::Init();
   unique_ptr<Params> game_params = CreateGameParams();
   game_params->ReadFromFile(argv[1]);
@@ -63,8 +67,11 @@ int main(int argc, char *argv[]) {
   unique_ptr<Params> card_abstraction_params = CreateCardAbstractionParams();
   card_abstraction_params->ReadFromFile(argv[2]);
   unique_ptr<CardAbstraction> ca(new CardAbstraction(*card_abstraction_params));
-  unsigned int street;
+  unsigned int street, bucket = kMaxUInt;
   if (sscanf(argv[3], "%u", &street) != 1) Usage(argv[0]);
+  if (argc == 5) {
+    if (sscanf(argv[4], "%u", &bucket) != 1) Usage(argv[0]);
+  }
   Buckets buckets(*ca, false);
-  Show(buckets, street);
+  Show(buckets, street, bucket);
 }

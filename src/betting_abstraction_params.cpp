@@ -51,6 +51,9 @@ unique_ptr<Params> CreateBettingAbstractionParams(void) {
   params->AddParam("ReentrantStreets", P_STRING);
   params->AddParam("BettingKeyStreets", P_STRING);
   params->AddParam("MinReentrantPot", P_INT);
+  params->AddParam("MergeRules", P_STRING);
+  params->AddParam("AllowableBetTos", P_STRING);
+  params->AddParam("LastAggressorKey", P_BOOLEAN);
 
   return params;
 }

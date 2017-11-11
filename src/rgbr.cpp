@@ -142,30 +142,8 @@ double RGBR::Go(unsigned int it, unsigned int p) {
     bucketed_streets[st] = ! buckets_.None(st);
     if (bucketed_streets[st]) bucketed_ = true;
   }
-  if (bucketed_) {
-    // Current strategy always uses doubles
-    // Want opponent's strategy
-    // This doesn't generalize to multiplayer
-    current_strategy_.reset(new CFRValues(players.get(), false,
-					  bucketed_streets.get(),
-					  betting_tree_, 0, 0,
-					  card_abstraction_, buckets_,
-					  compressed_streets_));
-    current_strategy_->AllocateAndClearDoubles(betting_tree_->Root(),
-					       kMaxUInt);
-  } else {
-    current_strategy_.reset(nullptr);
-  }
 
   delete [] streets;
-
-  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
-  unsigned int max_card = Game::MaxCard();
-  unsigned int num;
-  if (num_hole_cards == 1) num = max_card + 1;
-  else                     num = (max_card + 1) * (max_card + 1);
-  double *opp_probs = new double[num];
-  for (unsigned int i = 0; i < num; ++i) opp_probs[i] = 1.0;
 
   if (subgame_street_ <= max_street) {
     // subgame_running_ should be false for all threads
@@ -179,29 +157,21 @@ double RGBR::Go(unsigned int it, unsigned int p) {
     }
   }
 
-  if (current_strategy_.get() != nullptr) {
-    SetCurrentStrategy(betting_tree_->Root());
-  }
-
-  double *total_card_probs = new double[max_card + 1];
-  double sum_opp_probs;
-  const CanonicalCards *hands = hand_tree_->Hands(0, 0);
-  CommonBetResponseCalcs(0, hands, opp_probs, &sum_opp_probs, total_card_probs);
-  unsigned int **street_buckets = InitializeStreetBuckets();
-
   if (subgame_street_ <= max_street) pre_phase_ = true;
-  double *vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-			 total_card_probs, street_buckets, "x", 0);
+  double *opp_probs = AllocateOppProbs(true);
+  unsigned int **street_buckets = AllocateStreetBuckets();
+  VCFRState state(opp_probs, street_buckets, hand_tree_);
+  SetStreetBuckets(0, 0, state);
+  double *vals = Process(betting_tree_->Root(), 0, state, 0);
   if (subgame_street_ <= max_street) {
     delete [] vals;
     WaitForFinalSubgames();
     pre_phase_ = false;
-    vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-		   total_card_probs, street_buckets, "x", 0);
+    vals = Process(betting_tree_->Root(), 0, state, 0);
   }
   DeleteStreetBuckets(street_buckets);
+  delete [] opp_probs;
   
-  delete [] total_card_probs;
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(0);
 
 #if 0
@@ -229,7 +199,6 @@ double RGBR::Go(unsigned int it, unsigned int p) {
   }
   double overall = sum / (num_hole_card_pairs * num_opp_hole_card_pairs);
   delete [] vals;
-  delete [] opp_probs;
 
   regrets_.reset(nullptr);
   sumprobs_.reset(nullptr);

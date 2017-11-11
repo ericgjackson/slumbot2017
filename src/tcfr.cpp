@@ -32,7 +32,7 @@
 
 using namespace std;
 
-#define SUCCPTR(ptr) (ptr + 8 + num_players_ * 4)
+#define SUCCPTR(ptr) (ptr + 8)
 
 TCFRThread::TCFRThread(const BettingAbstraction &ba, const CFRConfig &cc,
 		       const Buckets &buckets, unsigned int batch_index,
@@ -42,7 +42,10 @@ TCFRThread::TCFRThread(const BettingAbstraction &ba, const CFRConfig &cc,
 		       unsigned int *pruning_thresholds, bool *sumprob_streets,
 		       unsigned char *hvb_table,
 		       unsigned char ***cards_to_indices,
-		       unsigned int batch_size) :
+		       unsigned int num_raw_boards,
+		       const unsigned int *board_table,
+		       unsigned int batch_size,
+		       unsigned long long int *total_its) :
   betting_abstraction_(ba), cfr_config_(cc), buckets_(buckets) {
   batch_index_ = batch_index;
   num_threads_ = num_threads;
@@ -58,38 +61,23 @@ TCFRThread::TCFRThread(const BettingAbstraction &ba, const CFRConfig &cc,
   sumprob_streets_ = sumprob_streets;
   hvb_table_ = hvb_table;
   cards_to_indices_ = cards_to_indices;
+  num_raw_boards_ = num_raw_boards;
+  board_table_ = board_table;
   batch_size_ = batch_size;
+  total_its_ = total_its;
   
   max_street_ = Game::MaxStreet();
-  quantized_streets_ = new bool[max_street_ + 1];
+  char_quantized_streets_.reset(new bool[max_street_ + 1]);
   for (unsigned int st = 0; st <= max_street_; ++st) {
-    quantized_streets_[st] = false;
+    char_quantized_streets_[st] = cfr_config_.CharQuantizedStreet(st);
   }
-  const vector<unsigned int> &qsv = cfr_config_.QuantizedStreets();
-  unsigned int num_qsv = qsv.size();
-  for (unsigned int i = 0; i < num_qsv; ++i) {
-    unsigned int st = qsv[i];
-    quantized_streets_[st] = true;
-  }
-  short_quantized_streets_ = new bool[max_street_ + 1];
+  short_quantized_streets_.reset(new bool[max_street_ + 1]);
   for (unsigned int st = 0; st <= max_street_; ++st) {
-    short_quantized_streets_[st] = false;
-  }
-  const vector<unsigned int> &sqsv = cfr_config_.ShortQuantizedStreets();
-  unsigned int num_sqsv = sqsv.size();
-  for (unsigned int i = 0; i < num_sqsv; ++i) {
-    unsigned int st = sqsv[i];
-    short_quantized_streets_[st] = true;
+    short_quantized_streets_[st] = cfr_config_.ShortQuantizedStreet(st);
   }
   scaled_streets_ = new bool[max_street_ + 1];
   for (unsigned int st = 0; st <= max_street_; ++st) {
-    scaled_streets_[st] = false;
-  }
-  const vector<unsigned int> &ssv = cfr_config_.ScaledStreets();
-  unsigned int num_ssv = ssv.size();
-  for (unsigned int i = 0; i < num_ssv; ++i) {
-    unsigned int st = ssv[i];
-    scaled_streets_[st] = true;
+    scaled_streets_[st] = cfr_config_.ScaledStreet(st);
   }
   explore_ = cfr_config_.Explore();
   full_only_avg_update_ = true; // cfr_config_.FullOnlyAvgUpdate();
@@ -101,6 +89,8 @@ TCFRThread::TCFRThread(const BettingAbstraction &ba, const CFRConfig &cc,
   hvs_ = new unsigned int[num_players_];
   hand_buckets_ = new unsigned int[num_players_ * (max_street_ + 1)];
   winners_ = new unsigned int[num_players_];
+  contributions_ = new int[num_players_];
+  folded_ = new bool[num_players_];
   succ_value_stack_ = new T_VALUE *[kStackDepth];
   succ_iregret_stack_ = new int *[kStackDepth];
   for (unsigned int i = 0; i < kStackDepth; ++i) {
@@ -188,8 +178,6 @@ TCFRThread::~TCFRThread(void) {
   delete [] active_rems_;
   delete [] full_;
   delete [] sumprob_ceilings_;
-  delete [] quantized_streets_;
-  delete [] short_quantized_streets_;
   delete [] scaled_streets_;
   for (unsigned int i = 0; i < kStackDepth; ++i) {
     delete [] succ_value_stack_[i];
@@ -204,17 +192,18 @@ TCFRThread::~TCFRThread(void) {
   delete [] hole_cards_;
   delete [] hvs_;
   delete [] winners_;
+  delete [] contributions_;
+  delete [] folded_;
 }
 
-bool TCFRThread::HVBDealHand(void) {
-  // For holdem5/mb2b1, 1b its takes about 71m.
-  if (it_ == batch_size_ + 1) return false;
-  unsigned int num_boards = BoardTree::NumBoards(max_street_);
+void TCFRThread::HVBDealHand(void) {
   double r;
   drand48_r(&rand_buf_, &r);
-  unsigned int msbd = r * num_boards;
+  // unsigned int num_boards = BoardTree::NumBoards(max_street_);
+  // unsigned int msbd = r * num_boards;
+  unsigned int msbd = board_table_[(int)(r * num_raw_boards_)];
   canon_bds_[max_street_] = msbd;
-  board_count_ = BoardTree::BoardCount(max_street_, msbd);
+  // board_count_ = BoardTree::BoardCount(max_street_, msbd);
   for (unsigned int st = 1; st < max_street_; ++st) {
     canon_bds_[st] = BoardTree::PredBoard(msbd, st);
   }
@@ -275,26 +264,17 @@ bool TCFRThread::HVBDealHand(void) {
       }
     }
   }
-
-  return true;
 }
 
 // Our old implementation which is a bit slower.
-bool TCFRThread::NoHVBDealHand(void) {
-  // For holdem5/mb2b1, 1b its takes about 71m.
-  if (it_ == batch_size_ + 1) return false;
-  unsigned int num_boards = BoardTree::NumBoards(max_street_);
+void TCFRThread::NoHVBDealHand(void) {
   double r;
   drand48_r(&rand_buf_, &r);
-  unsigned int msbd = r * num_boards;
+  // unsigned int num_boards = BoardTree::NumBoards(max_street_);
+  // unsigned int msbd = r * num_boards;
+  unsigned int msbd = board_table_[(int)(r * num_raw_boards_)];
   canon_bds_[max_street_] = msbd;
-  board_count_ = BoardTree::BoardCount(max_street_, msbd);
-  if (board_count_ == 0) {
-    fprintf(stderr, "it_ %llu msbd %u board_count_ %i\n", it_, msbd,
-	    board_count_);
-    fprintf(stderr, "Num boards: %u\n", BoardTree::NumBoards(max_street_));
-    exit(-1);
-  }
+  // board_count_ = BoardTree::BoardCount(max_street_, msbd);
   for (unsigned int st = 1; st < max_street_; ++st) {
     canon_bds_[st] = BoardTree::PredBoard(msbd, st);
   }
@@ -345,8 +325,11 @@ bool TCFRThread::NoHVBDealHand(void) {
       }
     }
   }
+}
 
-  return true;
+static unsigned int PrecedingPlayer(unsigned int p) {
+  if (p == 0) return Game::NumPlayers() - 1;
+  else        return p - 1;
 }
 
 static double *g_preflop_vals = nullptr;
@@ -364,10 +347,16 @@ void TCFRThread::Run(void) {
   }
   
   while (1) {
-    bool not_done;
-    if (hvb_table_) not_done = HVBDealHand();
-    else            not_done = NoHVBDealHand();
-    if (! not_done) break;
+    // Old
+    // if (it_ == batch_size_ + 1) break;
+    if (*total_its_ >= ((unsigned long long int)batch_size_) * num_threads_) {
+      fprintf(stderr, "Thread %u performed %llu iterations\n",
+	      batch_index_ % num_threads_, it_);
+      break;
+    }
+    
+    if (hvb_table_) HVBDealHand();
+    else            NoHVBDealHand();
 
     if (it_ % 10000000 == 1 && batch_index_ % num_threads_ == 0) {
       fprintf(stderr, "Batch %i it %llu\n", batch_index_, it_);
@@ -402,12 +391,28 @@ void TCFRThread::Run(void) {
 
     for (p_ = 0; p_ < num_players_; ++p_) {
       stack_index_ = 0;
-      T_VALUE val = Process(data_);
+      // Assume the big blind is last to act preflop
+      // Assume the small blind is prior to the big blind
+      unsigned int big_blind_p = PrecedingPlayer(Game::FirstToAct(0));
+      unsigned int small_blind_p = PrecedingPlayer(big_blind_p);
+      for (unsigned int p = 0; p < num_players_; ++p) {
+	folded_[p] = false;
+	if (p == small_blind_p) {
+	  contributions_[p] = Game::SmallBlind();
+	} else if (p == big_blind_p) {
+	  contributions_[p] = Game::BigBlind();
+	} else {
+	  contributions_[p] = 0;
+	}
+      }
+      T_VALUE val = Process(data_, 1000, -1);
       sum_values[p_] += val;
-      denoms[p_] += board_count_;
+      // denoms[p_] += board_count_;
+      ++denoms[p_];
       unsigned int b = hand_buckets_[p_ * (max_street_ + 1)];
       g_preflop_vals[b] += val;
-      g_preflop_nums[b] += board_count_;
+      // g_preflop_nums[b] += board_count_;
+      ++g_preflop_nums[b];
     }
 
     ++it_;
@@ -417,8 +422,14 @@ void TCFRThread::Run(void) {
 		sum_values[p] / (double)denoms[p]);
       }
     }
+    if (it_ % 1000 == 0) {
+      // To reduce the chance of multiple threads trying to update total_its_
+      // at the same time, only update every 1000 iterations.
+      *total_its_ += 1000;
+    }
   }
-  fprintf(stderr, "Batch %i done\n", batch_index_);
+  fprintf(stderr, "Thread %i done; performed %llu iterations\n",
+	  batch_index_ % num_threads_, it_);
   if (batch_index_ % num_threads_ == 0) {
     for (unsigned int p = 0; p < num_players_; ++p) {
       fprintf(stderr, "Batch %i avg P%u val %f\n", batch_index_, p,
@@ -463,99 +474,103 @@ int TCFRThread::Round(double d) {
   }
 }
 
-// This is unfinished.  We have nonterminal fold nodes now.  Need to
-// return when current player folds.  Don't continue on until a terminal
-// node.
-T_VALUE TCFRThread::Process(unsigned char *ptr) {
+T_VALUE TCFRThread::Process(unsigned char *ptr,
+			    unsigned int last_player_acting,
+			    int last_st) {
   ++process_count_;
   if (all_full_) {
     ++full_process_count_;
   }
   unsigned char first_byte = ptr[0];
-  if (first_byte > 1) {
-    // Showdown
+  if (first_byte == 1) {
+    // Terminal node - could be showdown or fold
 
     // Find the best hand value of anyone remaining in the hand, and the
     // total pot size which includes contributions from remaining players
     // and players who folded earlier.
     unsigned int best_hv = 0;
     int pot_size = 0;
+    unsigned int num_remaining = 0;
     for (unsigned int p = 0; p < num_players_; ++p) {
-      pot_size += *(int *)(ptr + 8 + p * 4);
-      // fprintf(stderr, "p %u contribution %i offset %llu\n", p,
-      // *(int *)(ptr + 8 + p * 4),
-      // (unsigned long long int)(ptr - data_));
-      if (ptr[p+1] == 1) {
+      pot_size += contributions_[p];
+      if (! folded_[p]) {
+	++num_remaining;
 	unsigned int hv = hvs_[p];
 	if (hv > best_hv) best_hv = hv;
       }
     }
 
-    // Determine if we won, the number of winners, and the total contribution
-    // of all winners.
-    unsigned int num_winners = 0;
-    int winner_contributions = 0;
-    bool we_win = false;
-    for (unsigned int p = 0; p < num_players_; ++p) {
-      if (ptr[p+1] == 1 && hvs_[p] == best_hv) {
-	winners_[num_winners++] = p;
-	winner_contributions += *(int *)(ptr + 8 + p * 4);
-	we_win |= (p == p_);
-      }
-    }
-
-    int ret;
-    if (we_win) {
-      // Our winnings is:
-      // a) The total pot
-      // b) Minus the contributions of the winners
-      // c) Divided by the number of winners
-      double winnings =
-	(((double)(pot_size - winner_contributions)) /
-	 ((double)num_winners)) * board_count_;
-      // Normally the winnings are a whole number, but not always.
-      ret = Round(winnings);
-#if 0
-      fprintf(stderr, "Winnings %f ps %i bc %i\n", winnings, pot_size,
-	      board_count_);
-#endif
+    if (num_remaining == 1) {
+      // A fold node.  Everyone has folded except one player.  We know the
+      // one remaining player is the target player (p_) because when the
+      // target player folds we return earlier and don't get here.
+      // We want the pot size minus our contribution.  This is what we win.
+      return pot_size - contributions_[p_]; // * board_count_;
     } else {
-	// If we lose at showdown, we lose the amount we contributed to the pot.
-      ret = -*(int *)(ptr + 8 + p_ * 4) * board_count_;
-      // fprintf(stderr, "Losses %i board_count_ %i\n", ret, board_count_);
-    }
-    if (ret <= -100000 || ret >= 100000) {
-      fprintf(stderr, "OOB ret %i bc %i\n", ret, board_count_);
-      exit(-1);
-    }
-    return ret;
-  } else if (first_byte == 1) {
-    // Fold
-    // Assume if we get here that we are the winner.
-    // pot_size is contributions of all players other than ourselves.
-    int pot_size = 0;
-    for (unsigned int p = 0; p < num_players_; ++p) {
-      if (p != p_) {
-	pot_size += *(int *)(ptr + 8 + p * 4);
+      // Showdown
+      
+      // Determine if we won, the number of winners, and the total contribution
+      // of all winners.
+      unsigned int num_winners = 0;
+      int winner_contributions = 0;
+      bool we_win = false;
+      for (unsigned int p = 0; p < num_players_; ++p) {
+	if (! folded_[p] && hvs_[p] == best_hv) {
+	  winners_[num_winners++] = p;
+	  winner_contributions += contributions_[p];
+	  we_win |= (p == p_);
+	}
       }
+      
+      int ret;
+      if (we_win) {
+	// Our winnings is:
+	// a) The total pot
+	// b) Minus the contributions of the winners
+	// c) Divided by the number of winners
+	double winnings =
+	  ((double)(pot_size - winner_contributions)) /
+	  ((double)num_winners); // * board_count_;
+	// Normally the winnings are a whole number, but not always.
+	ret = Round(winnings);
+      } else {
+	// If we lose at showdown, we lose the amount we contributed to the pot.
+	ret = -contributions_[p_]; // * board_count_;
+      }
+      return ret;
     }
-    return pot_size * board_count_;
   } else { // Nonterminal node
+    unsigned int st = ptr[1];
     unsigned int num_succs = ptr[2];
+    // Find the next player to act.  Start with the first candidate and move
+    // forward until we find someone who has not folded.  The first candidate
+    // is either the last player plus one, or, if we are starting a new
+    // betting round, the first player to act on that street.
+    unsigned int player_acting;
+    if ((int)st > last_st) {
+      player_acting = Game::FirstToAct(st);
+    } else {
+      player_acting = last_player_acting + 1;
+    }
+    while (true) {
+      if (player_acting == num_players_) player_acting = 0;
+      if (! folded_[player_acting]) break;
+      ++player_acting;
+    }
     if (num_succs == 1) {
       unsigned long long int succ_offset =
 	*((unsigned long long int *)(SUCCPTR(ptr)));
-      return Process(data_ + succ_offset);
+      return Process(data_ + succ_offset, player_acting, st);
     }
-    unsigned int st = ptr[1];
     unsigned int default_succ_index = 0;
     unsigned int fold_succ_index = ptr[3];
-    unsigned int player_acting = *(unsigned int *)(ptr + 4);
+    unsigned int call_succ_index = ptr[4];
+    // unsigned int player_acting = ptr[5];
     if (player_acting == p_) {
       unsigned int our_bucket = hand_buckets_[p_ * (max_street_ + 1) + st];
 
       unsigned int size_bucket_data;
-      if (quantized_streets_[st]) {
+      if (char_quantized_streets_[st]) {
 	size_bucket_data = num_succs;
       } else if (short_quantized_streets_[st]) {
 	size_bucket_data = num_succs * 2;
@@ -575,7 +590,7 @@ T_VALUE TCFRThread::Process(unsigned char *ptr) {
       // min_r2 is second best regret
       unsigned int min_r = kMaxUInt, min_r2 = kMaxUInt;
 
-      if (quantized_streets_[st]) {
+      if (char_quantized_streets_[st]) {
 	unsigned char *bucket_regrets = ptr1;
 	unsigned char min_qr = 255, min_qr2 = 255;
 	for (unsigned int s = 0; s < num_succs; ++s) {
@@ -645,31 +660,51 @@ T_VALUE TCFRThread::Process(unsigned char *ptr) {
 	  }
 	}
 	if (s == fold_succ_index) {
-	  int contrib = *((int *)(ptr + 8 + p_ * 4));
-	  val = -contrib * board_count_;
+	  val = -contributions_[p_]; // * board_count_;
 	} else {
 	  unsigned long long int succ_offset =
 	    *((unsigned long long int *)(SUCCPTR(ptr) + s * 8));
-	  val = Process(data_ + succ_offset);
+	  int old_contribution = contributions_[p_];
+	  if (s == call_succ_index) {
+	    int last_bet_to = (int)*(unsigned short *)(ptr + 6);
+	    contributions_[p_] = last_bet_to;
+	  } else {
+	    // bet_to amount is store in the child's data
+	    unsigned char *succ_ptr = data_ + succ_offset;
+	    int bet_to = (int)*(unsigned short *)(succ_ptr + 6);
+	    contributions_[p_] = bet_to;
+	  }
+	  val = Process(data_ + succ_offset, player_acting, st);
+	  contributions_[p_] = old_contribution;
 	}
       } else { // Recursing on all succs
 	for (unsigned int s = 0; s < num_succs; ++s) {
-	  unsigned long long int succ_offset =
-	    *((unsigned long long int *)(SUCCPTR(ptr) + s * 8));
-	  
 	  bool prune = false;
-	  if (! quantized_streets_[st] && ! short_quantized_streets_[st]) {
+	  if (! char_quantized_streets_[st] &&
+	      ! short_quantized_streets_[st]) {
 	    T_REGRET *bucket_regrets = (T_REGRET *)ptr1;
 	    prune = (bucket_regrets[s] >= pruning_threshold);
 	  }
 	  if (s == fold_succ_index || ! prune) {
 	    if (s == fold_succ_index) {
-	      int contrib = *((int *)(ptr + 8 + p_ * 4));
-	      succ_values[s] = -contrib * board_count_;
+	      succ_values[s] = -contributions_[p_]; // * board_count_;
 	    } else {
+	      unsigned long long int succ_offset =
+		*((unsigned long long int *)(SUCCPTR(ptr) + s * 8));
+	      int old_contribution = contributions_[p_];
+	      if (s == call_succ_index) {
+		int last_bet_to = (int)*(unsigned short *)(ptr + 6);
+		contributions_[p_] = last_bet_to;
+	      } else {
+		// bet_to amount is store in the child's data
+		unsigned char *succ_ptr = data_ + succ_offset;
+		int bet_to = (int)*(unsigned short *)(succ_ptr + 6);
+		contributions_[p_] = bet_to;
+	      }
 	      ++stack_index_;
-	      succ_values[s] = Process(data_ + succ_offset);
+	      succ_values[s] = Process(data_ + succ_offset, player_acting, st);
 	      --stack_index_;
+	      contributions_[p_] = old_contribution;
 	    }
 	  }
 	}
@@ -680,7 +715,7 @@ T_VALUE TCFRThread::Process(unsigned char *ptr) {
 	int min_regret = kMaxInt;
 	for (unsigned int s = 0; s < num_succs; ++s) {
 	  int ucr;
-	  if (quantized_streets_[st]) {
+	  if (char_quantized_streets_[st]) {
 	    unsigned char *bucket_regrets = ptr1;
 	    ucr = uncompress_[bucket_regrets[s]];
 	  } else if (short_quantized_streets_[st]) {
@@ -720,7 +755,8 @@ T_VALUE TCFRThread::Process(unsigned char *ptr) {
 	int offset = -min_regret;
 	for (unsigned int s = 0; s < num_succs; ++s) {
 	  // Assume no pruning if quantization for now
-	  if (! quantized_streets_[st] && ! short_quantized_streets_[st]) {
+	  if (! char_quantized_streets_[st] &&
+	      ! short_quantized_streets_[st]) {
 	    T_REGRET *bucket_regrets = (T_REGRET *)ptr1;
 	    if (s != fold_succ_index &&
 		bucket_regrets[s] >= pruning_threshold) {
@@ -729,7 +765,7 @@ T_VALUE TCFRThread::Process(unsigned char *ptr) {
 	  }
 	  int i_regret = succ_iregrets[s];
 	  unsigned int r = (unsigned int)(i_regret + offset);
-	  if (quantized_streets_[st]) {
+	  if (char_quantized_streets_[st]) {
 	    unsigned char *bucket_regrets = ptr1;
 	    double rnd = rngs_[rng_index_++];
 	    if (rng_index_ == kNumPregenRNGs) rng_index_ = 0;
@@ -755,7 +791,7 @@ T_VALUE TCFRThread::Process(unsigned char *ptr) {
 
       unsigned char *ptr1 = SUCCPTR(ptr) + num_succs * 8;
       unsigned int size_bucket_data;
-      if (quantized_streets_[st]) {
+      if (char_quantized_streets_[st]) {
 	size_bucket_data = num_succs;
       } else if (short_quantized_streets_[st]) {
 	size_bucket_data = num_succs * 2;
@@ -773,7 +809,7 @@ T_VALUE TCFRThread::Process(unsigned char *ptr) {
 
       unsigned int min_s = default_succ_index;
       // There should always be one action with regret 0
-      if (quantized_streets_[st]) {
+      if (char_quantized_streets_[st]) {
 	unsigned char *bucket_regrets = ptr1;
 	for (unsigned int s = 0; s < num_succs; ++s) {
 	  if (bucket_regrets[s] == 0) {
@@ -809,11 +845,11 @@ T_VALUE TCFRThread::Process(unsigned char *ptr) {
 	}
       }
 
-	// Update sum-probs
+      // Update sum-probs
       if (sumprob_streets_[st] && (all_full_ || ! full_only_avg_update_)) {
 	if (! asymmetric_ || player_acting == target_player_) {
 	  T_SUM_PROB *these_sum_probs;
-	  if (quantized_streets_[st]) {
+	  if (char_quantized_streets_[st]) {
 	    these_sum_probs = (T_SUM_PROB *)(ptr1 + num_succs);
 	  } else if (short_quantized_streets_[st]) {
 	    these_sum_probs = (T_SUM_PROB *)(ptr1 + num_succs * 2);
@@ -835,11 +871,32 @@ T_VALUE TCFRThread::Process(unsigned char *ptr) {
 	}
       }
 
+      unsigned int fold_succ_index = ptr[3];
+      unsigned int call_succ_index = ptr[4];
       unsigned long long int succ_offset =
 	*((unsigned long long int *)(SUCCPTR(ptr) + ss * 8));
+      int old_contribution;
+      if (ss == fold_succ_index) {
+	folded_[player_acting] = true;
+      } else if (ss == call_succ_index) {
+	old_contribution = contributions_[player_acting];
+	int last_bet_to = (int)*(unsigned short *)(ptr + 6);
+	contributions_[player_acting] = last_bet_to;
+      } else {
+	old_contribution = contributions_[player_acting];
+	// bet_to amount is store in the child's data
+	unsigned char *succ_ptr = data_ + succ_offset;
+	int bet_to = (int)*(unsigned short *)(succ_ptr + 6);
+	contributions_[player_acting] = bet_to;
+      }
       ++stack_index_;
-      T_VALUE ret = Process(data_ + succ_offset);
+      T_VALUE ret = Process(data_ + succ_offset, player_acting, st);
       --stack_index_;
+      if (ss == fold_succ_index) {
+	folded_[player_acting] = false;
+      } else {
+	contributions_[player_acting] = old_contribution;
+      }
       return ret;
     }
   }
@@ -852,7 +909,7 @@ void TCFR::ReadRegrets(unsigned char *ptr, Node *node, Reader ***readers,
   if (first_byte != 0) return;
   unsigned int num_succs = ptr[2];
   if (num_succs > 1) {
-    unsigned int pa = *(unsigned int *)(ptr + 4);
+    unsigned int pa = ptr[5];
     unsigned int st = ptr[1];
     unsigned int nt = node->NonterminalID();
     if (seen[st][pa][nt]) return;
@@ -860,7 +917,7 @@ void TCFR::ReadRegrets(unsigned char *ptr, Node *node, Reader ***readers,
     Reader *reader = readers[pa][st];
     unsigned int num_buckets = buckets_.NumBuckets(st);
     unsigned char *ptr1 = SUCCPTR(ptr) + num_succs * 8;
-    if (quantized_streets_[st]) {
+    if (char_quantized_streets_[st]) {
       for (unsigned int b = 0; b < num_buckets; ++b) {
 	for (unsigned int s = 0; s < num_succs; ++s) {
 	  ptr1[s] = reader->ReadUnsignedCharOrDie();
@@ -914,7 +971,7 @@ void TCFR::WriteRegrets(unsigned char *ptr, Node *node, Writer ***writers,
   if (first_byte != 0) return;
   unsigned int num_succs = ptr[2];
   if (num_succs > 1) {
-    unsigned int pa = *(unsigned int *)(ptr + 4);
+    unsigned int pa = ptr[5];
     unsigned int st = ptr[1];
     unsigned int nt = node->NonterminalID();
     if (seen[st][pa][nt]) return;
@@ -922,7 +979,7 @@ void TCFR::WriteRegrets(unsigned char *ptr, Node *node, Writer ***writers,
     Writer *writer = writers[pa][st];
     unsigned int num_buckets = buckets_.NumBuckets(st);
     unsigned char *ptr1 = SUCCPTR(ptr) + num_succs * 8;
-    if (quantized_streets_[st]) {
+    if (char_quantized_streets_[st]) {
       for (unsigned int b = 0; b < num_buckets; ++b) {
 	for (unsigned int s = 0; s < num_succs; ++s) {
 	  writer->WriteUnsignedChar(ptr1[s]);
@@ -976,7 +1033,7 @@ void TCFR::ReadSumprobs(unsigned char *ptr, Node *node, Reader ***readers,
   if (first_byte != 0) return;
   unsigned int num_succs = ptr[2];
   if (num_succs > 1) {
-    unsigned int pa = *(unsigned int *)(ptr + 4);
+    unsigned int pa = ptr[5];
     unsigned int st = ptr[1];
     unsigned int nt = node->NonterminalID();
     if (seen[st][pa][nt]) return;
@@ -986,7 +1043,7 @@ void TCFR::ReadSumprobs(unsigned char *ptr, Node *node, Reader ***readers,
     if (sumprob_streets_[st]) {
       if (! asymmetric_ || target_player_ == pa) {
 	Reader *reader = readers[pa][st];
-	if (quantized_streets_[st]) {
+	if (char_quantized_streets_[st]) {
 	  for (unsigned int b = 0; b < num_buckets; ++b) {
 	    T_SUM_PROB *sum_probs = (T_SUM_PROB *)(ptr1 + num_succs);
 	    for (unsigned int s = 0; s < num_succs; ++s) {
@@ -1029,7 +1086,7 @@ void TCFR::WriteSumprobs(unsigned char *ptr, Node *node, Writer ***writers,
   if (first_byte != 0) return;
   unsigned int num_succs = ptr[2];
   if (num_succs > 1) {
-    unsigned int pa = *(unsigned int *)(ptr + 4);
+    unsigned int pa = ptr[5];
     unsigned int st = ptr[1];
     unsigned int nt = node->NonterminalID();
     if (seen[st][pa][nt]) return;
@@ -1039,7 +1096,7 @@ void TCFR::WriteSumprobs(unsigned char *ptr, Node *node, Writer ***writers,
 	Writer *writer = writers[pa][st];
 	unsigned int num_buckets = buckets_.NumBuckets(st);
 	unsigned char *ptr1 = SUCCPTR(ptr) + num_succs * 8;
-	if (quantized_streets_[st]) {
+	if (char_quantized_streets_[st]) {
 	  for (unsigned int b = 0; b < num_buckets; ++b) {
 	    T_SUM_PROB *sum_probs = (T_SUM_PROB *)(ptr1 + num_succs);
 	    for (unsigned int s = 0; s < num_succs; ++s) {
@@ -1271,6 +1328,7 @@ void TCFR::Run(void) {
     g_preflop_vals[b] = 0;
     g_preflop_nums[b] = 0ULL;
   }
+  total_its_ = 0ULL;
 
   for (unsigned int i = 1; i < num_cfr_threads_; ++i) {
     cfr_threads_[i]->RunThread();
@@ -1326,7 +1384,8 @@ void TCFR::RunBatch(unsigned int batch_size) {
 		     batch_base_ + i, num_cfr_threads_, data_, target_player_,
 		     rngs_, uncompress_, short_uncompress_,
 		     pruning_thresholds_, sumprob_streets_, hvb_table_,
-		     cards_to_indices_, batch_size);
+		     cards_to_indices_, num_raw_boards_, board_table_.get(),
+		     batch_size, &total_its_);
     cfr_threads_[i] = cfr_thread;
   }
 
@@ -1442,60 +1501,31 @@ void TCFR::Run(unsigned int start_batch_base, unsigned int end_batch_base,
 
 // Returns a pointer to the allocation buffer after this node and all of its
 // descendants.
-// New scheme that supports multiplayer:
+// Note: we could use num-succs to encode terminal/nonterminal
 // Terminal
-//   Byte 0:     Number of remaining players
-//   Byte 1-7:   Booleans indicating whether each player remaining
-//   Bytes 8...? Contributions
+//   Byte 0:      1
 // Nonterminal
 //   Byte 0:      0
 //   Byte 1:      Street
 //   Byte 2:      Num succs
 //   Byte 3:      Fold succ index
-//   Bytes 4-7:   Player acting
-//   Bytes 8...?  Contributions
-//   Byte ???:    Beginning of succ ptrs
-// Now:
-// First byte is node type (0=showdown, 1=P1 fold, 2=P2 fold,
-// 3=P1-choice nonterminal,4=P2-choice nonterminal)
-// If nonterminal, second byte is street (bottom two bits) and
-// granularity (remaining bits).
-// If nonterminal, third byte is num succs
-// If nonterminal, fourth byte is fold succ index
-// If terminal, bytes 4-7 are the pot-size/2
-// Remainder is only for nonterminals:
+//   Byte 4:      Call succ index
+//   Byte 5:      Player acting
+//   Bytes 6-7:   Last-bet-to
+//   Byte 8:      Beginning of succ ptrs
 // The next num-succs * 8 bytes are for the succ ptrs
 // For each bucket
 //   num-succs * sizeof(T_REGRET) for the regrets
 //   num-succs * sizeof(T_SUM_PROB) for the sum-probs
-// A little padding is added at the end if necessary to make the number of
-// bytes for a node be a multiple of 8.
 unsigned char *TCFR::Prepare(unsigned char *ptr, Node *node,
-			     bool *folded, unsigned int *contributions,
-			     unsigned int last_bet_to,
+			     unsigned short last_bet_to,
 			     unsigned long long int ***offsets) {
-  unsigned int num_players = Game::NumPlayers();
   if (node->Terminal()) {
-    if (num_players > 7) {
-      fprintf(stderr, "Only support up to 7 players\n");
-      exit(-1);
-    }
-    unsigned int num_remaining = 0;
-    for (unsigned int p = 0; p < num_players; ++p) {
-      if (folded[p]) {
-	ptr[p + 1] = 0;
-      } else {
-	ptr[p + 1] = 1;
-	++num_remaining;
-      }
-    }
-    ptr[0] = num_remaining;
-    for (unsigned int p = 0; p < num_players; ++p) {
-      *(unsigned int *)(ptr + 8 + p * 4) = contributions[p];
-    }
-    return ptr + 8 + num_players * 4;
+    ptr[0] = 1;
+    return ptr + 4;
   }
   unsigned int st = node->Street();
+  unsigned int pa = node->PlayerActing();
   ptr[0] = 0;
   ptr[1] = st;
   unsigned int num_succs = node->NumSuccs();
@@ -1503,19 +1533,19 @@ unsigned char *TCFR::Prepare(unsigned char *ptr, Node *node,
   unsigned int fsi = 255;
   if (node->HasFoldSucc()) fsi = node->FoldSuccIndex();
   ptr[3] = fsi;
-  unsigned int pa = node->PlayerActing();
-  *((unsigned int *)(ptr + 4)) = pa;
-  for (unsigned int p = 0; p < num_players; ++p) {
-    *(unsigned int *)(ptr + 8 + p * 4) = contributions[p];
-  }
-  unsigned char *succ_ptr = ptr + 8 + num_players * 4;
+  unsigned int csi = 255;
+  if (node->HasCallSucc()) csi = node->CallSuccIndex();
+  ptr[4] = csi;
+  ptr[5] = pa;
+  *(unsigned short *)(ptr + 6) = last_bet_to;
+  unsigned char *succ_ptr = ptr + 8;
 
   unsigned char *ptr1 = succ_ptr + num_succs * 8;
   if (num_succs > 1) {
     unsigned int num_buckets = buckets_.NumBuckets(st);
     for (unsigned int b = 0; b < num_buckets; ++b) {
       // Regrets
-      if (quantized_streets_[st]) {
+      if (char_quantized_streets_[st]) {
 	for (unsigned int s = 0; s < num_succs; ++s) {
 	  *ptr1 = 0;
 	  ++ptr1;
@@ -1550,8 +1580,23 @@ unsigned char *TCFR::Prepare(unsigned char *ptr, Node *node,
       unsigned int succ_st = succ->Street();
       unsigned int succ_pa = succ->PlayerActing();
       unsigned int succ_nt = succ->NonterminalID();
-      unsigned int succ_offset = offsets[succ_st][succ_pa][succ_nt];
-      if (succ_offset != kMaxUInt) {
+      unsigned long long int succ_offset = offsets[succ_st][succ_pa][succ_nt];
+      if (succ_offset != 999999999999) {
+	// Temporary
+	// Check last-bet-to's match
+	unsigned short new_bet_to;
+	if (s == fsi || s == csi) {
+	  new_bet_to = last_bet_to;
+	} else {
+	  new_bet_to = succ->LastBetTo();
+	}
+	unsigned short old_bet_to =
+	  *(unsigned short *)(data_ + succ_offset + 6);
+	if (old_bet_to != new_bet_to) {
+	  fprintf(stderr, "bet_to mismatch: %i %i\n", (int)old_bet_to,
+		  (int)new_bet_to);
+	  exit(-1);
+	}
 	*((unsigned long long int *)(succ_ptr + s * 8)) = succ_offset;
 	continue;
       } else {
@@ -1559,46 +1604,11 @@ unsigned char *TCFR::Prepare(unsigned char *ptr, Node *node,
       }
     }
     *((unsigned long long int *)(succ_ptr + s * 8)) = ull_offset;
-    if (s == fsi) {
-      unique_ptr<bool []> new_folded(new bool[num_players]);
-      for (unsigned int p = 0; p < num_players; ++p) {
-	new_folded[p] = folded[p] || p == pa;
-      }
-      ptr1 = Prepare(ptr1, succ, new_folded.get(), contributions, last_bet_to,
-		     offsets);
-    } else if (node->HasCallSucc() && s == node->CallSuccIndex()) {
-      // If I call a bet, need to set new_contributions.
-      unique_ptr<unsigned int []>
-	new_contributions(new unsigned int[num_players]);
-      for (unsigned int p = 0; p < num_players; ++p) {
-	if (p == pa) {
-	  new_contributions[p] = last_bet_to;
-	} else {
-	  new_contributions[p] = contributions[p];
-	}
-      }
-      ptr1 = Prepare(ptr1, succ, folded, new_contributions.get(), last_bet_to,
-		     offsets);
+    if (s == fsi || s == csi) {
+      ptr1 = Prepare(ptr1, succ, last_bet_to, offsets);
     } else {
-      unsigned int new_bet_to;
-      if (num_players == 2) {
-	Node *call = succ->IthSucc(succ->CallSuccIndex());
-	unsigned int new_pot_size = call->PotSize();
-	new_bet_to = new_pot_size / 2;
-      } else {
-	new_bet_to = succ->LastBetTo();
-      }
-      unique_ptr<unsigned int []>
-	new_contributions(new unsigned int[num_players]);
-      for (unsigned int p = 0; p < num_players; ++p) {
-	if (p == pa) {
-	  new_contributions[p] = new_bet_to;
-	} else {
-	  new_contributions[p] = contributions[p];
-	}
-      }
-      ptr1 = Prepare(ptr1, succ, folded, new_contributions.get(), new_bet_to,
-		     offsets);
+      unsigned short new_bet_to = succ->LastBetTo();
+      ptr1 = Prepare(ptr1, succ, new_bet_to, offsets);
     }
   }
   return ptr1;
@@ -1607,7 +1617,7 @@ unsigned char *TCFR::Prepare(unsigned char *ptr, Node *node,
 void TCFR::MeasureTree(Node *node, bool ***seen,
 		       unsigned long long int *allocation_size) {
   if (node->Terminal()) {
-    *allocation_size += 8 + Game::NumPlayers() * 4;
+    *allocation_size += 4;
     return;
   }
 
@@ -1621,7 +1631,7 @@ void TCFR::MeasureTree(Node *node, bool ***seen,
   
   // This is the number of bytes needed for everything else (e.g.,
   // num-succs).
-  unsigned int this_sz = 8 + Game::NumPlayers() * 4;
+  unsigned int this_sz = 8;
 
   unsigned int num_succs = node->NumSuccs();
   // Eight bytes per succ
@@ -1629,7 +1639,7 @@ void TCFR::MeasureTree(Node *node, bool ***seen,
   if (num_succs > 1) {
     // A regret and a sum-prob for each bucket and succ
     unsigned int nb = buckets_.NumBuckets(st);
-    if (quantized_streets_[st]) {
+    if (char_quantized_streets_[st]) {
       this_sz += nb * num_succs;
     } else if (short_quantized_streets_[st]) {
       this_sz += nb * num_succs * 2;
@@ -1648,11 +1658,6 @@ void TCFR::MeasureTree(Node *node, bool ***seen,
   for (unsigned int s = 0; s < num_succs; ++s) {
     MeasureTree(node->IthSucc(s), seen, allocation_size);
   }
-}
-
-static unsigned int PrecedingPlayer(unsigned int p) {
-  if (p == 0) return Game::NumPlayers() - 1;
-  else        return p - 1;
 }
 
 // Allocate one contiguous block of memory that has successors, street,
@@ -1683,7 +1688,8 @@ void TCFR::Prepare(void) {
   delete [] seen;
 
   // Should get amount of RAM from method in Files class
-  if (allocation_size > 2050000000000ULL) {
+  // if (allocation_size > 2050000000000ULL) {}
+  if (allocation_size > 31000000000ULL) {
     fprintf(stderr, "Allocation size %llu too big\n", allocation_size);
     exit(-1);
   }
@@ -1702,28 +1708,12 @@ void TCFR::Prepare(void) {
       unsigned int num_nt = betting_tree_->NumNonterminals(pa, st);
       offsets[st][pa] = new unsigned long long int[num_nt];
       for (unsigned int i = 0; i < num_nt; ++i) {
-	offsets[st][pa][i] = kMaxUInt;
+	offsets[st][pa][i] = 999999999999;
       }
     }
   }
-  unique_ptr<bool []> folded(new bool[num_players_]);
-  for (unsigned int p = 0; p < num_players_; ++p) folded[p] = false;
-  unique_ptr<unsigned int []> contributions(new unsigned int[num_players_]);
-  // Assume the big blind is last to act preflop
-  // Assume the small blind is prior to the big blind
-  unsigned int big_blind_p = PrecedingPlayer(Game::FirstToAct(0));
-  unsigned int small_blind_p = PrecedingPlayer(big_blind_p);
-  for (unsigned int p = 0; p < num_players_; ++p) {
-    if (p == small_blind_p) {
-      contributions[p] = Game::SmallBlind();
-    } else if (p == big_blind_p) {
-      contributions[p] = Game::BigBlind();
-    } else {
-      contributions[p] = 0;
-    }
-  }
-  unsigned char *end = Prepare(data_, betting_tree_->Root(), folded.get(),
-			       contributions.get(), Game::BigBlind(), offsets);
+  unsigned char *end = Prepare(data_, betting_tree_->Root(), Game::BigBlind(),
+			       offsets);
   unsigned long long int sz = end - data_;
   if (sz != allocation_size) {
     fprintf(stderr, "Didn't fill expected number of bytes: sz %llu as %llu\n",
@@ -1738,6 +1728,12 @@ void TCFR::Prepare(void) {
     delete [] offsets[st];
   }
   delete [] offsets;
+}
+
+static unsigned int Factorial(unsigned int n) {
+  if (n == 0) return 1;
+  if (n == 1) return 1;
+  return n * Factorial(n - 1);
 }
 
 TCFR::TCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
@@ -1762,7 +1758,6 @@ TCFR::TCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
   }
 
   BoardTree::Create();
-  BoardTree::BuildBoardCounts();
   BoardTree::BuildPredBoards();
   
   pruning_thresholds_ = new unsigned int[max_street_];
@@ -1788,25 +1783,13 @@ TCFR::TCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
     }
   }
 
-  quantized_streets_ = new bool[max_street_ + 1];
+  char_quantized_streets_.reset(new bool[max_street_ + 1]);
   for (unsigned int st = 0; st <= max_street_; ++st) {
-    quantized_streets_[st] = false;
+    char_quantized_streets_[st] = cfr_config_.CharQuantizedStreet(st);
   }
-  const vector<unsigned int> &qsv = cfr_config_.QuantizedStreets();
-  unsigned int num_qsv = qsv.size();
-  for (unsigned int i = 0; i < num_qsv; ++i) {
-    unsigned int st = qsv[i];
-    quantized_streets_[st] = true;
-  }
-  short_quantized_streets_ = new bool[max_street_ + 1];
+  short_quantized_streets_.reset(new bool[max_street_ + 1]);
   for (unsigned int st = 0; st <= max_street_; ++st) {
-    short_quantized_streets_[st] = false;
-  }
-  const vector<unsigned int> &sqsv = cfr_config_.ShortQuantizedStreets();
-  unsigned int num_sqsv = sqsv.size();
-  for (unsigned int i = 0; i < num_sqsv; ++i) {
-    unsigned int st = sqsv[i];
-    short_quantized_streets_[st] = true;
+    short_quantized_streets_[st] = cfr_config_.ShortQuantizedStreet(st);
   }
 
   if (betting_abstraction_.Asymmetric()) {
@@ -1887,6 +1870,34 @@ TCFR::TCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
     cards_to_indices_ = NULL;
   }
 
+  num_raw_boards_ = 1;
+  unsigned int num_remaining = Game::NumCardsInDeck();
+  for (unsigned int st = 1; st <= max_street_; ++st) {
+    unsigned int num_street_cards = Game::NumCardsForStreet(st);
+    unsigned int multiplier = 1;
+    for (unsigned int n = (num_remaining - num_street_cards) + 1;
+	 n <= num_remaining; ++n) {
+      multiplier *= n;
+    }
+    num_raw_boards_ *= multiplier / Factorial(num_street_cards);
+    num_remaining -= num_street_cards;
+  }
+  board_table_.reset(new unsigned int[num_raw_boards_]);
+  BoardTree::BuildBoardCounts();
+  unsigned int num_boards = BoardTree::NumBoards(max_street_);
+  unsigned int i = 0;
+  for (unsigned int bd = 0; bd < num_boards; ++bd) {
+    unsigned int ct = BoardTree::BoardCount(max_street_, bd);
+    for (unsigned int j = 0; j < ct; ++j) {
+      board_table_[i++] = bd;
+    }
+  }
+  if (i != num_raw_boards_) {
+    fprintf(stderr, "Num raw board mismatch: %u, %u\n", i, num_raw_boards_);
+    exit(-1);
+  }
+  BoardTree::DeleteBoardCounts();
+
   time_t end_t = time(NULL);
   double diff_sec = difftime(end_t, start_t);
   fprintf(stderr, "Initialization took %.1f seconds\n", diff_sec);
@@ -1909,7 +1920,5 @@ TCFR::~TCFR(void) {
   delete [] short_uncompress_;
   delete [] rngs_;
   delete [] data_;
-  delete [] quantized_streets_;
-  delete [] short_quantized_streets_;
   delete [] sumprob_streets_;
 }

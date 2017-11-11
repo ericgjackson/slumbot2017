@@ -24,7 +24,7 @@
 
 using namespace std;
 
-short *RiverHandStrength(const Card *board) {
+static short *RiverHandStrength(const Card *board, bool wins) {
   unsigned int max_street = Game::MaxStreet();
   unsigned int num_board_cards = Game::NumBoardCards(max_street);
 
@@ -56,16 +56,15 @@ short *RiverHandStrength(const Card *board) {
   sort(v.begin(), v.end(), g_puiui_lower_compare);
 
   unsigned int num_enc = (max_card + 1) * (max_card + 1);
-  short *wmls = new short[num_enc];
+  short *values = new short[num_enc];
   // Necessary?
-  for (unsigned int i = 0; i < num_enc; ++i) wmls[i] = 32000;
+  for (unsigned int i = 0; i < num_enc; ++i) values[i] = 32000;
   unsigned int num_cards_in_deck = Game::NumCardsInDeck();
   // The number of possible hole card pairs containing a given card
   unsigned int num_buddies = (num_cards_in_deck - num_board_cards) - 1;
   unsigned int *seen = new unsigned int[max_card + 1];
   for (unsigned int i = 0; i <= max_card; ++i) seen[i] = 0;
   unsigned int *beats = new unsigned int[num_hole_card_pairs];
-  bool last_pos = true;
   unsigned int last_hv = kMaxUInt;
   unsigned int j = 0;
   while (j < num_hole_card_pairs) {
@@ -94,27 +93,33 @@ short *RiverHandStrength(const Card *board) {
       ++seen[hi];
       ++seen[lo];
     }
-    unsigned short base_lose = num_hole_card_pairs - j;
-    for (unsigned int k = begin_range; k < j; ++k) {
-      unsigned int enc = v[k].second;
-      unsigned int hi = enc / (max_card + 1);
-      unsigned int lo = enc % (max_card + 1);
-      // With five-card boards, there should be 46 hole card pairs containing,
-      // say, Kc.  52 cards - 5 on board - Kc
-      short lose = base_lose -
-	((num_buddies - seen[hi]) + (num_buddies - seen[lo]));
-      // beats[k] and lose are the two values we care about
-      // beats[k] - lose is the WML
-      short wml = ((short)beats[k]) - lose;
-      wmls[enc] = wml;
-      // OutputTwoCards(hi, lo);
-      // printf(" %i %i %i %u\n", (int)wml, beats[k], (int)lose, enc);
+    if (wins) {
+      for (unsigned int k = begin_range; k < j; ++k) {
+	unsigned int enc = v[k].second;
+	values[enc] = (short)beats[k];
+      }
+    } else {
+      unsigned short base_lose = num_hole_card_pairs - j;
+      for (unsigned int k = begin_range; k < j; ++k) {
+	unsigned int enc = v[k].second;
+	unsigned int hi = enc / (max_card + 1);
+	unsigned int lo = enc % (max_card + 1);
+	// With five-card boards, there should be 46 hole card pairs containing,
+	// say, Kc.  52 cards - 5 on board - Kc
+	short lose = base_lose -
+	  ((num_buddies - seen[hi]) + (num_buddies - seen[lo]));
+	// beats[k] and lose are the two values we care about
+	// beats[k] - lose is the WML
+	short wml = ((short)beats[k]) - lose;
+	values[enc] = wml;
+	// OutputTwoCards(hi, lo);
+	// printf(" %i %i %i %u\n", (int)wml, beats[k], (int)lose, enc);
+      }
     }
-    last_pos = ! last_pos;
   }
   delete [] seen;
   delete [] beats;
-  return wmls;
+  return values;
 }
 
 static void GetPercentiles(vector<short> &wmls, double *percentiles,
@@ -137,7 +142,8 @@ static void GetPercentiles(vector<short> &wmls, double *percentiles,
 // We need to pool the WMLs for all the variants of each canonical hand.
 // What about for the flop/turn/river?
 static short *ComputePreflopPercentiles(double *percentiles,
-					unsigned int num_percentiles) {
+					unsigned int num_percentiles,
+					bool wins) {
   BoardTree::BuildBoardCounts();
   unsigned int max_street = Game::MaxStreet();
   unsigned int num_ms_board_cards = Game::NumBoardCards(max_street);
@@ -160,7 +166,7 @@ static short *ComputePreflopPercentiles(double *percentiles,
     if (bd % 1000 == 0) fprintf(stderr, "bd %u/%u\n", bd, num_boards);
     const Card *board = BoardTree::Board(max_street, bd);
     unsigned int board_count = BoardTree::BoardCount(max_street, bd);
-    short *river_wmls = RiverHandStrength(board);
+    short *river_wmls = RiverHandStrength(board, wins);
     for (unsigned int enc = 0; enc < num_enc; ++enc) {
       short wml = river_wmls[enc];
       if (wml != 32000) {
@@ -256,13 +262,13 @@ static short *ComputePreflopPercentiles(double *percentiles,
 }
 
 // Not practical for preflop for full-deck holdem.
-static vector<short> *ComputeRollout(Card *board, unsigned int st) {
+static vector<short> *ComputeRollout(Card *board, bool wins, unsigned int st) {
   unsigned int max_street = Game::MaxStreet();
   unsigned int max_card = Game::MaxCard();
   unsigned int num_enc = (max_card + 1) * (max_card + 1);
   vector<short> *wmls = new vector<short>[num_enc];
   if (st == max_street) {
-    short *wmls1 = RiverHandStrength(board);
+    short *wmls1 = RiverHandStrength(board, wins);
     for (unsigned int i = 0; i < num_enc; ++i) {
       short wml = wmls1[i];
       if (wml != 32000) {
@@ -278,7 +284,7 @@ static vector<short> *ComputeRollout(Card *board, unsigned int st) {
       for (unsigned int c = 0; c <= max_card; ++c) {
 	if (InCards(c, board, num_board_cards)) continue;
 	board[num_board_cards] = c;
-	vector<short> *next_wmls = ComputeRollout(board, nst);
+	vector<short> *next_wmls = ComputeRollout(board, wins, nst);
 	for (unsigned int i = 0; i < num_enc; ++i) {
 	  vector<short> &v = next_wmls[i];
 	  unsigned int num = v.size();
@@ -299,7 +305,7 @@ static vector<short> *ComputeRollout(Card *board, unsigned int st) {
 	  board[num_board_cards + 1] = mid;
 	  for (lo = 0; lo < mid; ++lo) {
 	    board[num_board_cards + 2] = lo;
-	    vector<short> *next_wmls = ComputeRollout(board, nst);
+	    vector<short> *next_wmls = ComputeRollout(board, wins, nst);
 	    for (unsigned int i = 0; i < num_enc; ++i) {
 	      vector<short> &v = next_wmls[i];
 	      unsigned int num = v.size();
@@ -323,7 +329,7 @@ static vector<short> *ComputeRollout(Card *board, unsigned int st) {
 // On turn, deal out all river cards.  Compute WML for all hands.
 short *ComputeRollout(unsigned int st, double *percentiles,
 		      unsigned int num_percentiles,
-		      double squashing) {
+		      double squashing, bool wins) {
   unsigned int num_boards = BoardTree::NumBoards(st);
   unsigned int num_board_cards = Game::NumBoardCards(st);
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
@@ -331,7 +337,7 @@ short *ComputeRollout(unsigned int st, double *percentiles,
   unsigned int num_vals = num_hands * num_percentiles;
   short *pct_vals;
   if (st == 0) {
-    pct_vals = ComputePreflopPercentiles(percentiles, num_percentiles);
+    pct_vals = ComputePreflopPercentiles(percentiles, num_percentiles, wins);
   } else {
     pct_vals = new short[num_vals];
     Card board[5];
@@ -342,7 +348,7 @@ short *ComputeRollout(unsigned int st, double *percentiles,
 	board[i] = st_board[i];
       }
       unsigned int h = bd * num_hole_card_pairs;
-      vector<short> *wmls = ComputeRollout(board, st);
+      vector<short> *wmls = ComputeRollout(board, wins, st);
       unsigned int max_card = Game::MaxCard();
       unsigned int num_enc = (max_card + 1) * (max_card + 1);
       for (unsigned int i = 0; i < num_enc; ++i) {

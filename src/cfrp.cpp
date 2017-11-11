@@ -156,13 +156,6 @@ void CFRP::HalfIteration(unsigned int p) {
   if (current_strategy_.get() != nullptr) {
     SetCurrentStrategy(betting_tree_->Root());
   }
-  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
-  unsigned int max_card = Game::MaxCard();
-  unsigned int num_enc;
-  if (num_hole_cards == 1) num_enc = max_card + 1;
-  else                     num_enc = (max_card + 1) * (max_card + 1);
-  double *opp_probs = new double[num_enc];
-  for (unsigned int i = 0; i < num_enc; ++i) opp_probs[i] = 1.0;
 
   if (subgame_street_ <= Game::MaxStreet()) {
     // subgame_running_ should be false for all threads
@@ -176,24 +169,20 @@ void CFRP::HalfIteration(unsigned int p) {
     }
   }
 
-  double *total_card_probs = new double[max_card + 1];
-  double sum_opp_probs;
-  const CanonicalCards *hands = hand_tree_->Hands(0, 0);
-  CommonBetResponseCalcs(0, hands, opp_probs, &sum_opp_probs,
-			 total_card_probs);
-  unsigned int **street_buckets = InitializeStreetBuckets();
-
   if (subgame_street_ <= Game::MaxStreet()) pre_phase_ = true;
-  double *vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-			 total_card_probs, street_buckets, "x", 0);
+  double *opp_probs = AllocateOppProbs(true);
+  unsigned int **street_buckets = AllocateStreetBuckets();
+  VCFRState state(opp_probs, street_buckets, hand_tree_);
+  SetStreetBuckets(0, 0, state);
+  double *vals = Process(betting_tree_->Root(), 0, state, 0);
   if (subgame_street_ <= Game::MaxStreet()) {
     delete [] vals;
     WaitForFinalSubgames();
     pre_phase_ = false;
-    vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-		   total_card_probs, street_buckets, "x", 0);
+    vals = Process(betting_tree_->Root(), 0, state, 0);
   }
   DeleteStreetBuckets(street_buckets);
+  delete [] opp_probs;
 #if 0
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(0);
   for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
@@ -213,8 +202,6 @@ void CFRP::HalfIteration(unsigned int p) {
 #endif
 
   delete [] vals;
-  delete [] total_card_probs;
-  delete [] opp_probs;
 
   if (nn_regrets_ && bucketed_) {
     FloorRegrets(betting_tree_->Root());

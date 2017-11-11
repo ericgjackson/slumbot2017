@@ -3,9 +3,8 @@
 
 #include "cards.h"
 
-short *RiverHandStrength(const Card *board);
 short *ComputeRollout(unsigned int st, double *percentiles,
 		      unsigned int num_percentiles,
-		      double squashing);
+		      double squashing, bool wins);
 
 #endif

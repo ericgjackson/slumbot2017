@@ -52,9 +52,9 @@ private:
   void SetHCPsAndBoards(Card **raw_hole_cards, const Card *raw_board);
   void Play(Node *node, unsigned int b_pos, unsigned int *contributions,
 	    unsigned int last_bet_to, bool *folded, unsigned int num_remaining,
-	    int *outcomes);
+	    unsigned int last_player_acting, int last_st, double *outcomes);
   void PlayDuplicateHand(unsigned long long int h, const Card *cards,
-			 bool deterministic, int *a_sum, int *b_sum);
+			 bool deterministic, double *a_sum, double *b_sum);
 
   unsigned int num_players_;
   BettingTree *betting_tree_;
@@ -67,12 +67,13 @@ private:
   unique_ptr<unsigned int []> hvs_;
   unique_ptr<bool []> winners_;
   unsigned short **sorted_hcps_;
-  unique_ptr<long long int []> sum_pos_outcomes_;
+  unique_ptr<double []> sum_pos_outcomes_;
 };
 
 void Player::Play(Node *node, unsigned int b_pos, unsigned int *contributions,
 		  unsigned int last_bet_to, bool *folded,
-		  unsigned int num_remaining, int *outcomes) {
+		  unsigned int num_remaining, unsigned int last_player_acting,
+		  int last_st, double *outcomes) {
   if (node->Terminal()) {
     if (num_remaining == 1) {
       unsigned int sum_other_contributions = 0;
@@ -87,10 +88,12 @@ void Player::Play(Node *node, unsigned int b_pos, unsigned int *contributions,
       outcomes[remaining_p] = sum_other_contributions;
     } else {
       // Showdown
+      // Temporary?
       if (num_players_ == 2 &&
-	  contributions[0] + contributions[1] != node->PotSize()) {
-	fprintf(stderr, "Mismatch 3 %u %u %u\n", contributions[0],
-		contributions[1], node->PotSize());
+	  (contributions[0] != contributions[1] ||
+	   contributions[0] != node->LastBetTo())) {
+	fprintf(stderr, "Mismatch %u %u %u\n", contributions[0],
+		contributions[1], node->LastBetTo());
 	fprintf(stderr, "TID: %u\n", node->TerminalID());
 	exit(-1);
       }
@@ -136,10 +139,26 @@ void Player::Play(Node *node, unsigned int b_pos, unsigned int *contributions,
     unsigned int nt = node->NonterminalID();
     unsigned int st = node->Street();
     unsigned int num_succs = node->NumSuccs();
-    unsigned int pa = node->PlayerActing();
+    unsigned int orig_pa = node->PlayerActing();
+    // Find the next player to act.  Start with the first candidate and move
+    // forward until we find someone who has not folded.  The first candidate
+    // is either the last player plus one, or, if we are starting a new
+    // betting round, the first player to act on that street.
+    unsigned int actual_pa;
+    if ((int)st > last_st) {
+      actual_pa = Game::FirstToAct(st);
+    } else {
+      actual_pa = last_player_acting + 1;
+    }
+    while (true) {
+      if (actual_pa == num_players_) actual_pa = 0;
+      if (! folded[actual_pa]) break;
+      ++actual_pa;
+    }
+    
     unsigned int dsi = node->DefaultSuccIndex();
     unsigned int bd = boards_[st];
-    unsigned int raw_hcp = raw_hcps_[pa][st];
+    unsigned int raw_hcp = raw_hcps_[actual_pa][st];
     unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
     unsigned int a_offset, b_offset;
     // If card abstraction, hcp on river should be raw.  If no card
@@ -166,37 +185,40 @@ void Player::Play(Node *node, unsigned int b_pos, unsigned int *contributions,
     double cum = 0;
     int s;
     for (s = 0; s < ((int)num_succs) - 1; ++s) {
+      // Look up probabilities with orig_pa which may be different from
+      // actual_pa.
       double prob;
-      if (pa == b_pos) {
-	prob = b_probs_->Prob(pa, st, nt, b_offset, s, num_succs, dsi);
+      if (actual_pa == b_pos) {
+	prob = b_probs_->Prob(orig_pa, st, nt, b_offset, s, num_succs, dsi);
       } else {
-	prob = a_probs_->Prob(pa, st, nt, a_offset, s, num_succs, dsi);
+	prob = a_probs_->Prob(orig_pa, st, nt, a_offset, s, num_succs, dsi);
       }
       cum += prob;
       if (r < cum) break;
     }
     if (s == (int)node->CallSuccIndex()) {
-      contributions[pa] = last_bet_to;
+      contributions[actual_pa] = last_bet_to;
       Play(node->IthSucc(s), b_pos, contributions, last_bet_to, folded,
-	   num_remaining, outcomes);
+	   num_remaining, actual_pa, st, outcomes);
     } else if (s == (int)node->FoldSuccIndex()) {
-      folded[pa] = true;
-      outcomes[pa] = -(int)contributions[pa];
+      folded[actual_pa] = true;
+      outcomes[actual_pa] = -(int)contributions[actual_pa];
       Play(node->IthSucc(s), b_pos, contributions, last_bet_to, folded,
-	   num_remaining - 1, outcomes);
+	   num_remaining - 1, actual_pa, st, outcomes);
     } else {
       Node *succ = node->IthSucc(s);
+#if 0
       unsigned int new_bet_to;
       if (num_players_ == 2) {
 	Node *call = succ->IthSucc(succ->CallSuccIndex());
 	unsigned int new_pot_size = call->PotSize();
 	new_bet_to = new_pot_size / 2;
-      } else {
-	new_bet_to = succ->LastBetTo();
       }
-      contributions[pa] = new_bet_to;
+#endif
+      unsigned int new_bet_to = succ->LastBetTo();
+      contributions[actual_pa] = new_bet_to;
       Play(succ, b_pos, contributions, new_bet_to, folded, num_remaining,
-	   outcomes);
+	   actual_pa, st, outcomes);
     }
   }
 }
@@ -209,8 +231,9 @@ static unsigned int PrecedingPlayer(unsigned int p) {
 // Play one hand of duplicate, which is a pair of regular hands.  Return
 // outcome from A's perspective.
 void Player::PlayDuplicateHand(unsigned long long int h, const Card *cards,
-			       bool deterministic, int *a_sum, int *b_sum) {
-  unique_ptr<int []> outcomes(new int[num_players_]);
+			       bool deterministic, double *a_sum,
+			       double *b_sum) {
+  unique_ptr<double []> outcomes(new double[num_players_]);
   unique_ptr<unsigned int []> contributions(new unsigned int[num_players_]);
   unique_ptr<bool []> folded(new bool[num_players_]);
   // Assume the big blind is last to act preflop
@@ -243,7 +266,7 @@ void Player::PlayDuplicateHand(unsigned long long int h, const Card *cards,
       }
     }
     Play(betting_tree_->Root(), b_pos, contributions.get(), Game::BigBlind(),
-	 folded.get(), num_players_, outcomes.get());
+	 folded.get(), num_players_, 1000, -1, outcomes.get());
     for (unsigned int p = 0; p < num_players_; ++p) {
       if (p == b_pos) {
 	*b_sum += outcomes[p];
@@ -271,8 +294,7 @@ static void DealNCards(Card *cards, unsigned int n) {
   }
 }
 
-void Player::SetHCPsAndBoards(Card **raw_hole_cards,
-			      const Card *raw_board) {
+void Player::SetHCPsAndBoards(Card **raw_hole_cards, const Card *raw_board) {
   unsigned int max_street = Game::MaxStreet();
   for (unsigned int st = 0; st <= max_street; ++st) {
     if (st == 0) {
@@ -307,8 +329,8 @@ void Player::SetHCPsAndBoards(Card **raw_hole_cards,
 
 void Player::Go(unsigned long long int num_duplicate_hands,
 		bool deterministic) {
-  long long int sum_a_outcomes = 0, sum_b_outcomes = 0;
-  long long int sum_sqd_a_outcomes = 0, sum_sqd_b_outcomes = 0;
+  double sum_a_outcomes = 0, sum_b_outcomes = 0;
+  double sum_sqd_a_outcomes = 0, sum_sqd_b_outcomes = 0;
   unsigned int max_street = Game::MaxStreet();
   unsigned int num_board_cards = Game::NumBoardCards(max_street);
   Card cards[100], hand_cards[7];
@@ -350,7 +372,7 @@ void Player::Go(unsigned long long int num_duplicate_hands,
     SetHCPsAndBoards(hole_cards, cards + 2 * num_players_);
     // PlayDuplicateHand() returns the result of a duplicate hand (which is
     // N hands if N is the number of players)
-    int a_outcome, b_outcome;
+    double a_outcome, b_outcome;
     PlayDuplicateHand(h, cards, deterministic, &a_outcome, &b_outcome);
     sum_a_outcomes += a_outcome;
     sum_b_outcomes += b_outcome;
@@ -377,7 +399,7 @@ void Player::Go(unsigned long long int num_duplicate_hands,
 	 mean_b_outcome, b_mbb_g, num_duplicate_hands);
   // Variance is the mean of the squares minus the square of the means
   double var_b =
-    (((double)sum_sqd_b_outcomes) / ((double)num_b_hands)) -
+    (sum_sqd_b_outcomes / ((double)num_b_hands)) -
     (mean_b_outcome * mean_b_outcome);
   double stddev_b = sqrt(var_b);
   double match_stddev = stddev_b * sqrt(num_b_hands);
@@ -407,7 +429,7 @@ Player::Player(BettingTree *betting_tree, const BettingAbstraction &ba,
   num_players_ = Game::NumPlayers();
   hvs_.reset(new unsigned int[num_players_]);
   winners_.reset(new bool[num_players_]);
-  sum_pos_outcomes_.reset(new long long int [num_players_]);
+  sum_pos_outcomes_.reset(new double[num_players_]);
   betting_tree_ = betting_tree;
   BoardTree::Create();
   BoardTree::CreateLookup();
@@ -477,7 +499,7 @@ Player::Player(BettingTree *betting_tree, const BettingAbstraction &ba,
   }
 
   for (unsigned int p = 0; p < num_players_; ++p) {
-    sum_pos_outcomes_[p] = 0LL;
+    sum_pos_outcomes_[p] = 0;
   }
 }
 

@@ -15,13 +15,13 @@ using namespace std;
 
 static void Usage(const char *prog_name) {
   fprintf(stderr, "USAGE: %s <game params> <street> <features name> "
-	  "<squashing> <pct 0> <pct 1>... <pct n>\n", prog_name);
+	  "<squashing> [wins|wmls] <pct 0> <pct 1>... <pct n>\n", prog_name);
   fprintf(stderr, "\nSquashing of 1.0 means no squashing\n");
   exit(-1);
 }
 
 int main(int argc, char *argv[]) {
-  if (argc < 6) Usage(argv[0]);
+  if (argc < 7) Usage(argv[0]);
   Files::Init();
   unique_ptr<Params> game_params = CreateGameParams();
   game_params->ReadFromFile(argv[1]);
@@ -31,17 +31,23 @@ int main(int argc, char *argv[]) {
   string features_name = argv[3];
   double squashing;
   if (sscanf(argv[4], "%lf", &squashing) != 1) Usage(argv[0]);
-  unsigned int num_percentiles = argc - 5;
+  bool wins;
+  string warg = argv[5];
+  if (warg == "wins")      wins = true;
+  else if (warg == "wmls") wins = false;
+  else                     Usage(argv[0]);
+  
+  unsigned int num_percentiles = argc - 6;
   double *percentiles = new double[num_percentiles];
   for (unsigned int i = 0; i < num_percentiles; ++i) {
-    if (sscanf(argv[5 + i], "%lf", &percentiles[i]) != 1) Usage(argv[0]);
+    if (sscanf(argv[6 + i], "%lf", &percentiles[i]) != 1) Usage(argv[0]);
   }
 
   HandValueTree::Create();
   // Need this for ComputeRollout()
   BoardTree::Create();
   short *pct_vals = ComputeRollout(street, percentiles, num_percentiles,
-				   squashing);
+				   squashing, wins);
 
   unsigned int num_boards = BoardTree::NumBoards(street);
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(street);

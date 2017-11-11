@@ -1,0 +1,35 @@
+We can have lots of bet sizes and numbers of bets if we use imperfect
+recall aggressively.
+
+The head-to-head cost of imperfect recall isn't that bad.
+
+mb6b6r0abtaaiamb_params has 44,940 river nonterminals.
+  About the same for flop and turn.  1/2 as many for preflop.
+
+x1e.32xlarge has 4 TB of RAM.
+That's like 89,007,565 bytes per river action.
+5,562,972 river buckets
+Assume 4 bytes per bucket (int regrets, no sumprobs)
+
+8 bytes per bucket (int regret and sumprob)
+44940 * 8000000 * 8 + 44940 * 1000000 * 8 + 44266 * 1286792 * 8 =
+  3.7 TB
+4 bytes per bucket
+44940 * 15000000 * 4 + 44940 * 4000000 * 4 + 44266 * 1286792 * 4 =
+  3.64 TB
+
+If I want one quantized byte per river bucket, I can multiply river
+abstraction by 4.
+
+For multiplayer, will make use of imperfect recall.
+
+Need to trade off:
+  Degree of imperfect recall
+  Size of card abstraction
+  Number of bets
+
+Do I still want lots of bet sizes?  That seemed necessary to reduce
+exploitability.  But maybe I am moving away from focusing on
+exploitability?
+
+Use AllowableBetTos.  Shrinks large trees by up to 10x (?), I think.

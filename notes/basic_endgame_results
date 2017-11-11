@@ -59,7 +59,10 @@ a warmup, which takes a lot longer.
 
 Redo 7/18
 CFR-D, soft warmup of 100 in both base and endgames
-200: Exploitability: 3.05 mbb/g
+  Raw card-level CBRs
+    200/200: Exploitability: 3.05 mbb/g
+  Zero-sum card-level CBRs
+    200/200: Exploitability: 2.95 mbb/g
 CFR-D, soft warmup of 100 in base, hard warmup of 100 in endgames
 200: Exploitability: 2.94 mbb/g MATCHES
 Unsafe, soft warmup of 100 in base, hard warmup of 100 in endgames

@@ -16,7 +16,6 @@ void BettingTreeBuilder::CreateLimitSuccs(unsigned int street,
 					  unsigned int num_bets,
 					  unsigned int last_bettor,
 					  unsigned int player_acting,
-					  unsigned int num_remaining,
 					  unsigned int *terminal_id,
 					  shared_ptr<Node> *call_succ,
 					  shared_ptr<Node> *fold_succ,
@@ -45,21 +44,20 @@ void BettingTreeBuilder::CreateLimitSuccs(unsigned int street,
   if (street < max_street && advance_street) {
     *call_succ = CreateLimitSubtree(street + 1, new_pot_size, 0, 0,
 				    kMaxUInt, Game::FirstToAct(street + 1),
-				    num_remaining, terminal_id);
+				    terminal_id);
   } else if (! advance_street) {
     // Check that does not advance street
     *call_succ = CreateLimitSubtree(street, new_pot_size, 0, 0, last_bettor,
-				    next_player, num_remaining, terminal_id);
+				    next_player, terminal_id);
   } else {
     call_succ->reset(new Node((*terminal_id)++, street, 255, nullptr,
-			      nullptr, nullptr, num_remaining, new_pot_size));
+			      nullptr, nullptr, 2, new_pot_size));
   }
   if (num_bets > 0 || (street == 0 && num_bets == 0 &&
 		       Game::BigBlind() > Game::SmallBlind() &&
 		       pot_size < 2 * Game::BigBlind())) {
     fold_succ->reset(new Node((*terminal_id)++, street, player_acting^1,
-			      nullptr, nullptr, nullptr, num_remaining,
-			      pot_size));
+			      nullptr, nullptr, nullptr, 1, pot_size));
   }
 
   if (num_bets == max_bets) return;
@@ -72,8 +70,7 @@ void BettingTreeBuilder::CreateLimitSuccs(unsigned int street,
 
   shared_ptr<Node> bet = CreateLimitSubtree(street, new_pot_size, new_bet_size,
 					    num_bets + 1, player_acting,
-					    next_player, num_remaining,
-					    terminal_id);
+					    next_player, terminal_id);
   bet_succs->push_back(bet);
 }
 
@@ -86,7 +83,6 @@ BettingTreeBuilder::CreateLimitSubtree(unsigned int street,
 				       unsigned int num_bets,
 				       unsigned int last_bettor,
 				       unsigned int player_acting,
-				       unsigned int num_remaining,
 				       unsigned int *terminal_id) {
   // Node *call_succ, *fold_succ;
   // vector<Node *> bet_succs;
@@ -94,12 +90,11 @@ BettingTreeBuilder::CreateLimitSubtree(unsigned int street,
   shared_ptr<Node> fold_succ(nullptr);
   vector< shared_ptr<Node> > bet_succs;
   CreateLimitSuccs(street, pot_size, last_bet_size, num_bets, last_bettor,
-		   player_acting, num_remaining, terminal_id, &call_succ,
-		   &fold_succ, &bet_succs);
+		   player_acting, terminal_id, &call_succ, &fold_succ,
+		   &bet_succs);
   // Assign nonterminal ID of kMaxUInt for now.
   shared_ptr<Node> node(new Node(kMaxUInt, street, player_acting, call_succ,
-				 fold_succ, &bet_succs, num_remaining,
-				 pot_size));
+				 fold_succ, &bet_succs, 2, pot_size));
 
   return node;
 }
@@ -112,7 +107,6 @@ BettingTreeBuilder::CreateLimitTree(unsigned int *terminal_id) {
   unsigned int player_acting = Game::FirstToAct(initial_street_);
   
   return CreateLimitSubtree(initial_street, initial_pot_size, last_bet_size,
-			    0, kMaxUInt, player_acting, 
-			    Game::NumPlayers(), terminal_id);
+			    0, kMaxUInt, player_acting, terminal_id);
 }
 

@@ -74,10 +74,9 @@ Resolve rivers
     Lots worse.
 
 ms3f1t1r1h5
-nhshshs
+hshshshsbc3
 mb3b3
-Process size 18.3g
-4b: 
+9b: 
 
 
 cfrps
@@ -151,3 +150,179 @@ mb1b1rft/2b vs. mb1b1/1b
 100m: Avg B outcome: -0.006553 (-3.3 mbb/g) over 100000000 dup hands
 mb1b1rft/2b vs. mb1b1/2b
 100m: Avg B outcome: -0.002195 (-1.1 mbb/g) over 100000000 dup hands
+
+-------------------------------------------------------------------
+
+ms3f1t1r1h5
+hshshshsbc3
+
+mb2b2r0/0 vs. mb2b2/112: 
+  Avg B outcome: 0.200096 (100.0 mbb/g) over 10000000 dup hands
+mb2b2r0/8 vs. mb2b2/112: 
+  Avg B outcome: 0.193763 (96.9 mbb/g) over 10000000 dup hands
+
+-------------------------------------------------------------------
+
+ms3f1t1r1h5
+hshshshsbc3
+mb3b3
+5b: Exploitability: 1308.69 mbb/g
+9b: Exploitability: 1090.34 mbb/g
+mb3b3r0
+run_tcfr process size 608 megs
+1b: Exploitability: 9163.54 mbb/g
+2b: Exploitability: 9275.57 mbb/g
+mb3b3r0/1b vs. mb3b3r0/2b: Avg B outcome: 0.059476 (29.7 mbb/g)
+mb3b3/5b (new) vs. mb3b3/9b (old): Avg B outcome: 0.059278 (29.6 mbb/g)
+
+mb3b3r0/1b vs. mb3b3/9b:  Avg B outcome: 0.194682 (97.3 mbb/g)
+mb3b3r0/2b vs. mb3b3/9b:  Avg B outcome: 0.168177 (84.1 mbb/g)
+mb3b3r0/3b vs. mb3b3/9b:  Avg B outcome: 0.154603 (77.3 mbb/g)
+mb3b3r0/4b vs. mb3b3/9b:  Avg B outcome: 0.145537 (72.8 mbb/g)
+mb3b3r0/5b vs. mb3b3/9b:  Avg B outcome: 0.138286 (69.1 mbb/g)
+mb3b3r0/6b vs. mb3b3/9b:  Avg B outcome: 0.133927 (67.0 mbb/g)
+mb3b3r0/7b vs. mb3b3/9b:  Avg B outcome: 0.141548 (70.8 mbb/g)
+mb3b3r0/8b vs. mb3b3/9b:  Avg B outcome: 0.137665 (68.8 mbb/g)
+mb3b3r0/8b vs. mb3b3/16b: Avg B outcome: 0.173830 (86.9 mbb/g)
+
+mb3b3r2/1b vs. mb3b3/9b:   Avg B outcome: 0.174589 (87.3 mbb/g)
+mb3b3r2/2b vs. mb3b3/9b:   Avg B outcome: 0.153776 (76.9 mbb/g)
+mb3b3r2/3b vs. mb3b3/9b:   Avg B outcome: 0.149201 (74.6 mbb/g)
+mb3b3r2/4b vs. mb3b3/9b:   Avg B outcome: 0.146549 (73.3 mbb/g)
+mb3b3r2/5b vs. mb3b3/9b:   Avg B outcome: 0.141907 (71.0 mbb/g)
+mb3b3r2/6b vs. mb3b3/9b:   Avg B outcome: 0.138828 (69.4 mbb/g)
+mb3b3r2/7b vs. mb3b3/9b:   Avg B outcome: 0.136342 (68.2 mbb/g)
+mb3b3r2/8b vs. mb3b3/9b:   Avg B outcome: 0.133325 (66.7 mbb/g)
+mb3b3r2/9b vs. mb3b3/9b:   Avg B outcome: 0.125865 (62.9 mbb/g)
+mb3b3r2/10b vs. mb3b3/9b:  Avg B outcome: 0.125105 (62.6 mbb/g)
+mb3b3r2/10b vs. mb3b3/16b: Avg B outcome: 0.154835 (77.4 mbb/g)
+
+-------------------------------------------------------------------
+
+ms3f1t1r1h5
+hshshshsbc3
+mb3b3r0mr4
+
+mb3b3r0mr4/1b vs. mb3b3/9b:   Avg B outcome: 0.212471 (106.2 mbb/g)
+mb3b3r0mr4/2b vs. mb3b3/9b:   Avg B outcome: 0.162950 (81.5 mbb/g)
+mb3b3r0mr4/3b vs. mb3b3/9b:   Avg B outcome: 0.135880 (67.9 mbb/g)
+mb3b3r0mr4/4b vs. mb3b3/9b:   Avg B outcome: 0.129974 (65.0 mbb/g)
+mb3b3r0mr4/5b vs. mb3b3/9b:   Avg B outcome: 0.124325 (62.2 mbb/g)
+mb3b3r0mr4/6b vs. mb3b3/9b:   Avg B outcome: 0.116870 (58.4 mbb/g)
+mb3b3r0mr4/7b vs. mb3b3/9b:   Avg B outcome: 0.107270 (53.6 mbb/g)
+mb3b3r0mr4/8b vs. mb3b3/9b:   Avg B outcome: 0.098529 (49.3 mbb/g)
+mb3b3r0mr4/9b vs. mb3b3/9b:   Avg B outcome: 0.090158 (45.1 mbb/g)
+mb3b3r0mr4/10b vs. mb3b3/9b:  Avg B outcome: 0.089703 (44.9 mbb/g)
+mb3b3r0mr4/11b vs. mb3b3/9b:  Avg B outcome: 0.088210 (44.1 mbb/g)
+mb3b3r0mr4/12b vs. mb3b3/9b:  Avg B outcome: 0.083937 (42.0 mbb/g)
+mb3b3r0mr4/13b vs. mb3b3/9b:  Avg B outcome: 0.079961 (40.0 mbb/g)
+mb3b3r0mr4/14b vs. mb3b3/9b:  Avg B outcome: 0.078726 (39.4 mbb/g)
+mb3b3r0mr4/15b vs. mb3b3/9b:  Avg B outcome: 0.078297 (39.1 mbb/g)
+mb3b3r0mr4/15b vs. mb3b3/16b: Avg B outcome: 0.100607 (50.3 mbb/g)
+
+-------------------------------------------------------------------
+
+ms3f1t1r1h5
+null
+mb3b3r0mr4
+Process size 6.8g
+
+mb3b3r0mr4/null/1b vs. mb3b3/9b:   Avg B outcome: 0.335779 (167.9 mbb/g)
+mb3b3r0mr4/null/2b vs. mb3b3/9b:   Avg B outcome: 0.227324 (113.7 mbb/g)
+mb3b3r0mr4/null/3b vs. mb3b3/9b:   Avg B outcome: 0.179525 (89.8 mbb/g)
+mb3b3r0mr4/null/4b vs. mb3b3/9b:   Avg B outcome: 0.167816 (83.9 mbb/g)
+mb3b3r0mr4/null/5b vs. mb3b3/9b:   Avg B outcome: 0.136884 (68.4 mbb/g)
+mb3b3r0mr4/null/6b vs. mb3b3/9b:   Avg B outcome: 0.132224 (66.1 mbb/g)
+mb3b3r0mr4/null/7b vs. mb3b3/9b:   Avg B outcome: 0.115138 (57.6 mbb/g)
+mb3b3r0mr4/null/8b vs. mb3b3/9b:   Avg B outcome: 0.101958 (51.0 mbb/g)
+mb3b3r0mr4/null/9b vs. mb3b3/9b:   Avg B outcome: 0.097167 (48.6 mbb/g)
+mb3b3r0mr4/null/10b vs. mb3b3/9b:  Avg B outcome: 0.095920 (48.0 mbb/g)
+mb3b3r0mr4/null/11b vs. mb3b3/9b:  Avg B outcome: 0.090340 (45.2 mbb/g)
+mb3b3r0mr4/null/12b vs. mb3b3/9b:  Avg B outcome: 0.084692 (42.3 mbb/g)
+mb3b3r0mr4/null/13b vs. mb3b3/9b:  Avg B outcome: 0.077047 (38.5 mbb/g)
+mb3b3r0mr4/null/14b vs. mb3b3/9b:  Avg B outcome: 0.078451 (39.2 mbb/g)
+mb3b3r0mr4/null/15b vs. mb3b3/9b:  Avg B outcome: 0.070616 (35.3 mbb/g)
+mb3b3r0mr4/null/15b vs. mb3b3/16b: Avg B outcome: 0.097677 (48.8 mbb/g)
+mb3b3r0mr4/null/28b vs. mb3b3/16b: Avg B outcome: 0.081076 (40.5 mbb/g)
+mb3b3r0mr4/null/51b vs. mb3b3/16b: Avg B outcome: 0.067308 (33.7 mbb/g)
+
+-------------------------------------------------------------------
+
+ms3f1t1r1h5
+hshshshsbc3
+mb3b3r0mr5
+
+mb3b3r0mr5/1b vs. mb3b3/9b:   Avg B outcome: 0.254072 (127.0 mbb/g)
+mb3b3r0mr5/2b vs. mb3b3/9b:   Avg B outcome: 0.176792 (88.4 mbb/g)
+mb3b3r0mr5/3b vs. mb3b3/9b:   Avg B outcome: 0.122777 (61.4 mbb/g)
+mb3b3r0mr5/4b vs. mb3b3/9b:   Avg B outcome: 0.095469 (47.7 mbb/g)
+mb3b3r0mr5/5b vs. mb3b3/9b:   Avg B outcome: 0.091285 (45.6 mbb/g)
+mb3b3r0mr5/9b vs. mb3b3/9b:   Avg B outcome: 0.057142 (28.6 mbb/g)
+mb3b3r0mr5/11b vs. mb3b3/9b:  Avg B outcome: 0.037790 (18.9 mbb/g)
+mb3b3r0mr5/11b vs. mb3b3/16b: Avg B outcome: 0.076838 (38.4 mbb/g)
+mb3b3r0mr5/12b vs. mb3b3/16b: Avg B outcome: 0.068566 (34.3 mbb/g)
+mb3b3r0mr5/13b vs. mb3b3/16b: Avg B outcome: 0.066071 (33.0 mbb/g)
+
+-------------------------------------------------------------------
+
+ms3f1t1r1h5
+hshshshsbc3
+mb3b3r3
+
+mb3b3r3/1b vs. mb3b3/16b:  Avg B outcome: 0.368941 (184.5 mbb/g)
+mb3b3r3/2b vs. mb3b3/16b:  Avg B outcome: 0.286438 (143.2 mbb/g)
+mb3b3r3/3b vs. mb3b3/16b:  Avg B outcome: 0.245662 (122.8 mbb/g)
+mb3b3r3/4b vs. mb3b3/16b:  Avg B outcome: 0.230518 (115.3 mbb/g)
+mb3b3r3/5b vs. mb3b3/16b:  Avg B outcome: 0.220288 (110.1 mbb/g)
+mb3b3r3/6b vs. mb3b3/16b:  Avg B outcome: 0.202950 (101.5 mbb/g)
+mb3b3r3/7b vs. mb3b3/16b:  Avg B outcome: 0.186464 (93.2 mbb/g)
+mb3b3r3/9b vs. mb3b3/16b:  Avg B outcome: 0.172427 (86.2 mbb/g)
+mb3b3r3/20b vs. mb3b3/16b: Avg B outcome: 0.137310 (68.7 mbb/g)
+
+Up through 6b, we were doing less than 8b its per batch.  More like 4b.
+
+-------------------------------------------------------------------
+
+ms3f1t1r1h5
+hshshshsbc3
+mb3b3r0la
+Use last-aggressor as key
+
+mb3b3r0la/1b vs. mb3b3/16b: Avg B outcome: 0.194666 (97.3 mbb/g)
+mb3b3r0la/2b vs. mb3b3/16b: Avg B outcome: 0.165347 (82.7 mbb/g)
+mb3b3r0la/3b vs. mb3b3/16b: Avg B outcome: 0.154302 (77.2 mbb/g)
+mb3b3r0la/4b vs. mb3b3/16b: Avg B outcome: 0.158413 (79.2 mbb/g)
+mb3b3r0la/5b vs. mb3b3/16b: Avg B outcome: 0.145345 (72.7 mbb/g)
+mb3b3r0la/6b vs. mb3b3/16b: Avg B outcome: 0.147655 (73.8 mbb/g)
+mb3b3r0la/7b vs. mb3b3/16b: Avg B outcome: 0.137705 (68.9 mbb/g)
+mb3b3r0la/8b vs. mb3b3/16b: Avg B outcome: 0.136453 (68.2 mbb/g)
+mb3b3r0la/9b vs. mb3b3/16b: Avg B outcome: 0.140766 (70.4 mbb/g)
+mb3b3r0la/9b vs. mb3b3/16b: Avg B outcome: 0.148439 (74.2 mbb/g) (100m)
+
+-------------------------------------------------------------------
+
+ms3f1t1r1h5
+hshshshsbc3
+mb3b3r0lapfk
+Use last-aggressor as key
+User preflop action as key
+657m for 7b.  Almost 100m for 1b.
+
+mb3b3r0lapfk/6b vs. mb3b3/16b: Avg B outcome: 0.126861 (63.4 mbb/g)
+mb3b3r0lapfk/7b vs. mb3b3/16b: Avg B outcome: 0.118188 (59.1 mbb/g)
+
+
+Summary
+
+System            Iterations  Vs. mb3b3/16b  Tree size
+-------           ----------  -------------  ---------
+mb3b3r0           8b          -86.9          74k
+mb3b3r0la         8b          -68.2          83k
+mb3b3r0lapfk      7b          -59.1          834k
+mb3b3r2           10b         -77.4          159k
+mb3b3r0mr4        15b         -50.3          349k
+mb3b3r0mr4/null   15b         -48.8          349k
+                  51b         -33.7          349k
+mb3b3r0mr5        13b         -33.0          1.3 megs
+mb3b3r3           ~17b        -68.7          1.0 megs
+mb3b3             16b         0              5.2 megs

@@ -277,3 +277,53 @@ about bet sizes?  Well, I'm happy to assume the bets will not be too
 big or too small, but I'm not sure I want to assume anything about
 5/8 pot bets, say, happening or not happening.
 
+---------------------------------------------------------------------
+
+How many information sets can we handle?  Assume we use quantization on the
+river and the current strategy.
+
+4TB machine for each of P1 and P2?
+
+Do I want to use imperfect recall on the river because I will be resolving
+rivers?
+
+350,413 betting sequences in each
+263,412 river actions in each
+
+If I assign 3 TB to river and have 263,412 river actions and one byte per
+action, then 11.4m river buckets.
+
+If I assign 500 GB to turn and have 50,000 turn actions and two bytes per
+action, then 5m turn buckets.  There are only 1.5m unique turn object
+based on hs9 features.
+
+If I have 1,286,792 flop buckets and 20,000 turn actions and four bytes per
+action, that's 103 GB.  Eight bytes per action is 206 GB.  Might as well
+maintain int sumprobs.
+
+If I don't need to store river strategy, then I should not be constrained
+by disk space, should I?
+
+50,000 turn actions, 5m turn buckets, 1/4 byte per action?
+62.5 GB.
+
+May need sumprobs for turn so that we can get good mixed ranges to support
+river endgame solving.  So, 8 bytes per turn bucket.
+
+big6asym
+263,412 river actions in each
+77,200 turn actions in each
+9,362 flop actions in each
+
+10m for river, 1m for turn, null for flop:
+10000000 * 263412 * 1 +
+1000000 * 77200 * 8 +
+1286792 * 9362 * 8 =
+3,348,095,573,632
+
+5m for river, 700k for turn, null for flop
+5000000 * 263412 * 1 +
+700000 * 77200 * 8 +
+1286792 * 9362 * 8 =
+1,845,755,573,632
+Fits on 2 TB x1 instance

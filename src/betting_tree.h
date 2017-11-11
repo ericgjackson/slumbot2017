@@ -19,9 +19,9 @@ public:
   Node(unsigned int id, unsigned int street, unsigned int player_acting,
        const shared_ptr<Node> &call_succ, const shared_ptr<Node> &fold_succ,
        vector< shared_ptr<Node> > *bet_succs, unsigned int num_remaining,
-       unsigned int pot_size);
+       unsigned int bet_to);
   Node(Node *node);
-  Node(unsigned int id, unsigned int pot_size, unsigned int num_succs,
+  Node(unsigned int id, unsigned int last_bet_to, unsigned int num_succs,
        unsigned short flags, unsigned char player_acting,
        unsigned char num_remaining);
   ~Node(void);
@@ -37,7 +37,6 @@ public:
   Node *IthSucc(int i) const {return succs_[i].get();}
   unsigned int NumRemaining(void) const {return num_remaining_;}
   bool Showdown(void) const {return Terminal() && num_remaining_ > 1;}
-  unsigned int PotSize(void) const {return pot_size_;}
   unsigned int LastBetTo(void) const {return last_bet_to_;}
   unsigned int CallSuccIndex(void) const;
   unsigned int FoldSuccIndex(void) const;
@@ -70,13 +69,7 @@ public:
  private:
   shared_ptr<Node> *succs_;
   unsigned int id_;
-  // For multiplayer it is more convenient to record a last_bet_to
-  // quantity.  Eventually, we should do that for heads-up as well.
-  union {
-    // Any pending bets are not included in the pot size
-    unsigned short pot_size_;
-    unsigned short last_bet_to_;
-  };
+  unsigned short last_bet_to_;
   unsigned short num_succs_;
   unsigned short flags_;
   unsigned char player_acting_;
@@ -95,8 +88,6 @@ class BettingTree {
     return num_nonterminals_[p][st];
   }
   unsigned int **NumNonterminals(void) const {return num_nonterminals_;}
-  Node *GetNodeFromName(const char *str);
-  bool GetPathToNamedNode(const char *str, vector<Node *> *path);
   unsigned int InitialStreet(void) const {return initial_street_;}
 
   static BettingTree *BuildTree(const BettingAbstraction &ba);
@@ -111,8 +102,6 @@ class BettingTree {
   void FillTerminalArray(Node *node);
   void GetStreetInitialNodes(Node *node, unsigned int street,
 			     vector<Node *> *nodes);
-  Node *GetNodeFromName(const char *str, Node *node);
-  bool GetPathToNamedNode(const char *str, Node *node, vector<Node *> *path);
   shared_ptr<Node> Clone(Node *old_n, unsigned int *num_terminals);
   void Initialize(unsigned int target_player, const BettingAbstraction &ba);
   shared_ptr<Node>

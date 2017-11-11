@@ -94,6 +94,46 @@ Object::Object(void) {
 Object::~Object(void) {
 }
 
+class State {
+public:
+  State(void);
+  ~State(void) {}
+  State(const State &other);
+private:
+  shared_ptr<unsigned int *> street_buckets_;
+  shared_ptr<double> opp_probs_;
+  shared_ptr<double> total_card_probs_;
+};
+
+State::State(void) {
+#if 0
+  unsigned int max_street = Game::MaxStreet();
+  shared_ptr<unsigned int *> sb(new unsigned int *[max_street + 1]);
+  street_buckets_ = sb;
+#endif
+  street_buckets_ = make_shared<unsigned int *>();
+#if 0
+  for (unsigned int st = 0; st <= max_street; ++st) {
+    street_buckets_[st] = new unsigned int[1000];
+  }
+#endif
+  shared_ptr<double> op(new double[1000]);
+  opp_probs_ = op;
+  shared_ptr<double> tcp(new double[50]);
+  total_card_probs_ = tcp;
+}
+
+State::State(const State &other) {
+  street_buckets_ = other.street_buckets_;
+  opp_probs_ = other.opp_probs_;
+  total_card_probs_ = other.total_card_probs_;
+}
+
+static void TestSharedPointers(void) {
+  State state;
+  State copy = state;
+}
+
 static void Usage(const char *prog_name) {
   fprintf(stderr, "USAGE: %s <game params>\n", prog_name);
   exit(-1);
@@ -105,6 +145,15 @@ int main(int argc, char *argv[]) {
   unique_ptr<Params> game_params = CreateGameParams();
   game_params->ReadFromFile(argv[1]);
   Game::Initialize(*game_params);
+
+  TestSharedPointers();
+  exit(0);
+  
+  string a = "foobar";
+  string b = string(a, 3);
+  printf("%s\n", b.c_str());
+  exit(0);
+  
   char *buf = new char[10];
   for (unsigned int i = 0; i < 10; ++i) {
     buf[i] = 1;
@@ -112,7 +161,6 @@ int main(int argc, char *argv[]) {
   // Test byte alignment
   unsigned long long int ull = *(unsigned long long int *)&buf[2];
   fprintf(stderr, "ULL %llu\n", ull);
-  exit(0);
 
   Writer xwriter("/home/eric/nntorch/nn/xxx");
   xwriter.WriteDouble(4.5);

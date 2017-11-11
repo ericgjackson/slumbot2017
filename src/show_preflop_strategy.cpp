@@ -58,11 +58,13 @@ void Show(Node *node, const string &action_sequence,
 	double sum = 0;
 	if (i_values) {
 	  for (unsigned int s = 0; s < num_succs; ++s) {
-	    sum += i_values[offset + s];
+	    int iv = i_values[offset + s];
+	    if (iv > 0) sum += iv;
 	  }
 	} else {
 	  for (unsigned int s = 0; s < num_succs; ++s) {
-	    sum += d_values[offset + s];
+	    double dv = d_values[offset + s];
+	    if (dv > 0) sum += dv;
 	  }
 	}
 	if (sum == 0) {
@@ -72,9 +74,13 @@ void Show(Node *node, const string &action_sequence,
 	} else {
 	  for (unsigned int s = 0; s < num_succs; ++s) {
 	    if (i_values) {
-	      printf(" %f", i_values[offset + s] / sum);
+	      int iv = i_values[offset + s];
+	      printf(" %f (%i)", iv > 0 ? iv / sum : 0,
+		     i_values[offset + s]);
 	    } else {
-	      printf(" %f", d_values[offset + s] / sum);
+	      double dv = d_values[offset + s];
+	      printf(" %f (%f)", dv > 0 ? dv / sum : 0,
+		     d_values[offset + s]);
 	    }
 	  }
 	}
@@ -92,12 +98,12 @@ void Show(Node *node, const string &action_sequence,
 
 static void Usage(const char *prog_name) {
   fprintf(stderr, "USAGE: %s <game params> <card params> <betting params> "
-	  "<CFR params> <it>\n", prog_name);
+	  "<CFR params> <it> [current|cum]\n", prog_name);
   exit(-1);
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 6) Usage(argv[0]);
+  if (argc != 7) Usage(argv[0]);
   Files::Init();
   unique_ptr<Params> game_params = CreateGameParams();
   game_params->ReadFromFile(argv[1]);
@@ -116,7 +122,16 @@ int main(int argc, char *argv[]) {
     cfr_config(new CFRConfig(*cfr_params));
   unsigned int it;
   if (sscanf(argv[5], "%u", &it) != 1) Usage(argv[0]);
+  bool current;
+  string c = argv[6];
+  if (c == "current")  current = true;
+  else if (c == "cum") current = false;
+  else                 Usage(argv[0]);
 
+  if (current) {
+    fprintf(stderr, "Current not supported yet\n");
+    exit(-1);
+  }
   // Excessive to load all buckets.  Only need buckets for the preflop.
   Buckets buckets(*card_abstraction, false);
   unique_ptr<BettingTree>
@@ -126,8 +141,8 @@ int main(int argc, char *argv[]) {
   for (unsigned int st = 0; st <= max_street; ++st) {
     streets[st] = (st == 0);
   }
-  CFRValues sumprobs(nullptr, true, streets.get(), betting_tree.get(), 0, 0,
-		     *card_abstraction, buckets, nullptr);
+  CFRValues sumprobs(nullptr, ! current, streets.get(), betting_tree.get(), 0,
+		     0, *card_abstraction, buckets, nullptr);
   char dir[500];
   sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
 	  Game::GameName().c_str(), Game::NumPlayers(),

@@ -95,9 +95,6 @@ BCBRThread::BCBRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
     players[p] = p != p_;
   }
   if (trunk) {
-    root_bd_st_ = 0;
-    root_bd_ = 0;
-    hand_tree_ = trunk_hand_tree_;
     // Should handle asymmetric systems
     // Should honor sumprobs_streets_
     sumprobs_.reset(new CFRValues(players.get(), true, nullptr,
@@ -172,9 +169,6 @@ BCBRThread::BCBRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
     }
   } else {
     // We are not the trunk thread
-    root_bd_st_ = kSplitStreet;
-    root_bd_ = kMaxUInt;
-    hand_tree_ = nullptr;
     sumprobs_.reset(nullptr);
   }
 }
@@ -208,10 +202,6 @@ BCBRThread::~BCBRThread(void) {
     delete [] best_succs_[st];
   }
   delete [] best_succs_;
-
-  // Don't delete hand_tree_.  In the trunk it is identical to trunk_hand_tree_
-  // which is owned by the caller (BCBRBuilder).  In the endgames it is
-  // deleted in AfterSplit().
 }
 
 void BCBRThread::WriteValues(Node *node, unsigned int gbd, bool alt,
@@ -237,24 +227,20 @@ void BCBRThread::WriteValues(Node *node, unsigned int gbd, bool alt,
 static unsigned int g_bcbr_limp_count = 0;
 static unsigned int g_bcbr_nolimp_count = 0;
 
-double *BCBRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
-			      double sum_opp_probs, double *total_card_probs,
-			      unsigned int **street_buckets,
-			      const string &action_sequence) {
+double *BCBRThread::OurChoice(Node *node, unsigned int lbd,
+			      const VCFRState &state) {
   unsigned int st = node->Street();
   double *vals;
   
   if (first_pass_ || st < target_st_) {
-    vals = VCFR::OurChoice(node, lbd, opp_probs, sum_opp_probs,
-			   total_card_probs, street_buckets, action_sequence);
+    vals = VCFR::OurChoice(node, lbd, state);
   } else {
     unsigned int nt = node->NonterminalID();
     unsigned int num_succs = node->NumSuccs();
     double **succ_card_vals = new double *[num_succs];
     for (unsigned int s = 0; s < num_succs; ++s) {
-      succ_card_vals[s] = Process(node->IthSucc(s), lbd, opp_probs,
-				  sum_opp_probs, total_card_probs,
-				  street_buckets, action_sequence, st);
+      VCFRState succ_state(state, node, s);
+      succ_card_vals[s] = Process(node->IthSucc(s), lbd, succ_state, st);
     }
     
     unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
@@ -263,7 +249,8 @@ double *BCBRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
     if (st == target_st_) {
       alt_vals = new double[num_hole_card_pairs];
     }
-  
+
+    unsigned int **street_buckets = state.StreetBuckets();
     for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
       unsigned int b = street_buckets[st][i];
       unsigned int s = best_succs_[st][nt][b];
@@ -293,9 +280,12 @@ double *BCBRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
 
     if (st == target_st_) {
       unsigned int gbd = 0;
-      if (st > 0) gbd = BoardTree::GlobalIndex(root_bd_st_, root_bd_, st, lbd);
-      WriteValues(node, gbd, false, action_sequence, vals);
-      WriteValues(node, gbd, true, action_sequence, alt_vals);
+      if (st > 0) {
+	gbd = BoardTree::GlobalIndex(state.RootBdSt(), state.RootBd(), st,
+				     lbd);
+      }
+      WriteValues(node, gbd, false, state.ActionSequence(), vals);
+      WriteValues(node, gbd, true, state.ActionSequence(), alt_vals);
     }
   }
   
@@ -304,33 +294,26 @@ double *BCBRThread::OurChoice(Node *node, unsigned int lbd, double *opp_probs,
 
 // Can't skip succ even if succ_sum_opp_probs is zero.  I need to write
 // out BCBR values at every node.
-double *BCBRThread::OppChoice(Node *node, unsigned int lbd, double *opp_probs,
-			      double sum_opp_probs, double *total_card_probs,
-			      unsigned int **street_buckets,
-			      const string &action_sequence) {
-  double *vals = VCFR::OppChoice(node, lbd, opp_probs, sum_opp_probs,
-				 total_card_probs, street_buckets,
-				 action_sequence);
+double *BCBRThread::OppChoice(Node *node, unsigned int lbd, 
+			      const VCFRState &state) {
+  double *vals = VCFR::OppChoice(node, lbd, state);
 
   unsigned int st = node->Street();
   if (! first_pass_ && st == target_st_) {
     unsigned int gbd = 0;
-    if (st > 0) gbd = BoardTree::GlobalIndex(root_bd_st_, root_bd_, st, lbd);
-    WriteValues(node, gbd, false, action_sequence, vals);
+    if (st > 0) {
+      gbd = BoardTree::GlobalIndex(state.RootBdSt(), state.RootBd(), st, lbd);
+    }
+    WriteValues(node, gbd, false, state.ActionSequence(), vals);
   }
 
   return vals;
 }
 
-double *BCBRThread::Process(Node *node, unsigned int lbd, double *opp_probs,
-			    double sum_opp_probs, double *total_card_probs,
-			    unsigned int **street_buckets,
-			    const string &action_sequence,
-			    unsigned int last_st) {
+double *BCBRThread::Process(Node *node, unsigned int lbd, 
+			    const VCFRState &state, unsigned int last_st) {
   unsigned int st = node->Street();
-  double *vals = VCFR::Process(node, lbd, opp_probs, sum_opp_probs,
-			       total_card_probs, street_buckets,
-			       action_sequence, last_st);
+  double *vals = VCFR::Process(node, lbd, state, last_st);
   if (first_pass_) {
     if (node->Terminal()) {
       unsigned int tid = node->TerminalID();
@@ -344,6 +327,7 @@ double *BCBRThread::Process(Node *node, unsigned int lbd, double *opp_probs,
 	terminal_bucket_vals_[tid] = bucket_vals;
       }
       unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
+      unsigned int **street_buckets = state.StreetBuckets();
       for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
 	unsigned int b = street_buckets[st][i];
 	bucket_vals[b] += vals[i];
@@ -364,6 +348,7 @@ double *BCBRThread::Process(Node *node, unsigned int lbd, double *opp_probs,
 	si_bucket_vals_[st][nt] = bucket_vals;
       }
       unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(pst);
+      unsigned int **street_buckets = state.StreetBuckets();
       for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
 	unsigned int b = street_buckets[pst][i];
 	bucket_vals[b] += vals[i];
@@ -457,24 +442,15 @@ double *BCBRThread::SecondPass(Node *node, unsigned int last_st) {
 void BCBRThread::CardPass(bool first_pass) {
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(0);
   unsigned int num_hole_cards = Game::NumCardsForStreet(0);
-  unsigned int max_card = Game::MaxCard();
-  unsigned int num;
-  if (num_hole_cards == 1) num = max_card + 1;
-  else                     num = (max_card + 1) * (max_card + 1);
-  double *opp_probs = new double[num];
-  for (unsigned int i = 0; i < num; ++i) opp_probs[i] = 1.0;
-  const CanonicalCards *hands = hand_tree_->Hands(0, 0);
 
-  double sum_opp_probs;
-  double *total_card_probs = new double[num_hole_card_pairs];
-  CommonBetResponseCalcs(0, hands, opp_probs, &sum_opp_probs,
-			 total_card_probs);
-  unsigned int **street_buckets = InitializeStreetBuckets();
   first_pass_ = first_pass;
-  double *vals = Process(betting_tree_->Root(), 0, opp_probs, sum_opp_probs,
-			 total_card_probs, street_buckets, "x", 0);
+  double *opp_probs = AllocateOppProbs(true);
+  unsigned int **street_buckets = AllocateStreetBuckets();
+  VCFRState state(opp_probs, street_buckets, trunk_hand_tree_);
+  SetStreetBuckets(0, 0, state);
+  double *vals = Process(betting_tree_->Root(), 0, state, 0);
   DeleteStreetBuckets(street_buckets);
-  delete [] total_card_probs;
+  delete [] opp_probs;
 
   if (! first_pass) {
     // EVs for our hands are summed over all opponent hole card pairs.  To
@@ -496,7 +472,6 @@ void BCBRThread::CardPass(bool first_pass) {
     fflush(stdout);
   }
 
-  delete [] opp_probs;
   delete [] vals;
 }
 

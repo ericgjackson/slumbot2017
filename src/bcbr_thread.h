@@ -31,17 +31,9 @@ private:
   
   void WriteValues(Node *node, unsigned int gbd, bool alt,
 		   const string &action_sequence, double *vals);
-  double *OurChoice(Node *node, unsigned int lbd, double *opp_probs,
-		    double sum_opp_probs, double *total_card_probs,
-		    unsigned int **street_buckets,
-		    const string &action_sequence);
-  double *OppChoice(Node *node, unsigned int lbd, double *opp_probs,
-		    double sum_opp_probs, double *total_card_probs,
-		    unsigned int **street_buckets,
-		    const string &action_sequence);
-  double *Process(Node *node, unsigned int lbd, double *opp_probs,
-		  double sum_opp_probs, double *total_card_probs,
-		  unsigned int **street_buckets, const string &action_sequence,
+  double *OurChoice(Node *node, unsigned int lbd, const VCFRState &state);
+  double *OppChoice(Node *node, unsigned int lbd, const VCFRState &state);
+  double *Process(Node *node, unsigned int lbd, const VCFRState &state,
 		  unsigned int last_st);
   void CardPass(bool first_pass);
 

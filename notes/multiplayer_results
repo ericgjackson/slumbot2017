@@ -62,6 +62,8 @@ Batch 40
   Avg P1 outcome: -0.531431
   Avg P2 outcome: 0.957491
 
+Are these results old?
+
 ---------------------------------------------------------
 
 p6ms0h5
@@ -90,6 +92,8 @@ Wasn't saving sumprobs
   Avg B outcome: -0.000671 (-0.3 mbb/g) over 10000000 dup hands
 
 Weird.  Head-to-head gets worse over time, but not by much.
+
+Are these results old?
 
 ---------------------------------------------------------
 
@@ -145,60 +149,256 @@ betting tree is so big.
 9m vs. 10m (100m):
   Avg B outcome: -0.000257 (-0.1 mbb/g) over 100000000 dup hands
 
------------------------------------------------------------------
-
-p6ms3h5
-hs3
-mb1b1
-tcfr: 100m
-tcfr2: 1b
-
-100m: 9m17s
-1b:   85m
-
-1m vs. 10m:   Avg B outcome: 0.433074 (216.5 mbb/g) over 10000000 dup hands
-10m vs. 100m: Avg B outcome: 0.250052 (125.0 mbb/g) over 10000000 dup hands
-100m vs. 1b:  Avg B outcome: 0.117541 (58.8 mbb/g) over 10000000 dup hands
-10b vs. 11b:  Avg B outcome: 0.005797 (2.9 mbb/g) over 10000000 dup hands
-11b vs. 12b:  Avg B outcome: 0.005827 (2.9 mbb/g) over 10000000 dup hands
-
-
-Batch 88:
-  Batch 88 avg P0 val -0.667325
-  Batch 88 avg P1 val -1.029668
-  Batch 88 avg P2 val 0.318947
-  Batch 88 avg P3 val 0.430462
-  Batch 88 avg P4 val 0.291217
-  Batch 88 avg P5 val 0.602028
-
-p5ms3h5
-hs3
-mb1b1
+Are these results old?
 
 -----------------------------------------------------------------
 
 p6ms3h5
 hshs3
 mb1b1
+tcfr
 19.5g process size
-tcfr: 100m
+1b batches
 
-300m:
-  Batch 16 avg P0 val -0.720696
-  Batch 16 avg P1 val -1.204425
-  Batch 16 avg P2 val 0.261188
-  Batch 16 avg P3 val 0.353324
-  Batch 16 avg P4 val 0.308134
-  Batch 16 avg P5 val 0.473592
-400m:
-  Batch 24 avg P0 val -0.718553
-  Batch 24 avg P1 val -1.189446
-  Batch 24 avg P2 val 0.268789
-  Batch 24 avg P3 val 0.363833
-  Batch 24 avg P4 val 0.316150
-  Batch 24 avg P5 val 0.506511
+Batch 0 avg P0 val -0.648912
+Batch 0 avg P1 val -1.246545
+Batch 0 avg P2 val 0.221719
+Batch 0 avg P3 val 0.293735
+Batch 0 avg P4 val 0.414511
+Batch 0 avg P5 val 0.642987
+
+Batch 8 avg P0 val -0.639003
+Batch 8 avg P1 val -1.226280
+Batch 8 avg P2 val 0.240867
+Batch 8 avg P3 val 0.317430
+Batch 8 avg P4 val 0.454859
+Batch 8 avg P5 val 0.721140
+
+Batch 16 avg P0 val -0.639431
+Batch 16 avg P1 val -1.226803
+Batch 16 avg P2 val 0.242629
+Batch 16 avg P3 val 0.323292
+Batch 16 avg P4 val 0.464161
+Batch 16 avg P5 val 0.739099
+
+Batch 32 avg P0 val -0.641873
+Batch 32 avg P1 val -1.216471
+Batch 32 avg P2 val 0.247377
+Batch 32 avg P3 val 0.329093
+Batch 32 avg P4 val 0.466459
+Batch 32 avg P5 val 0.749389
+
+Batch 120 avg P0 val -0.635876
+Batch 120 avg P1 val -1.241517
+Batch 120 avg P2 val 0.252525
+Batch 120 avg P3 val 0.344987
+Batch 120 avg P4 val 0.479368
+Batch 120 avg P5 val 0.771977
 
 
-100m vs. 200m: Avg B outcome: 0.079889 (39.9 mbb/g) over 10000000 dup hands
-200m vs. 300m: Avg B outcome: 0.042470 (21.2 mbb/g) over 10000000 dup hands
-300m vs. 400m: Avg B outcome: 0.027276 (13.6 mbb/g) over 10000000 dup hands
+play 1b vs. 1b, 10m
+  Avg P0 outcome: -0.633572
+  Avg P1 outcome: -1.199576
+  Avg P2 outcome: 0.249120
+  Avg P3 outcome: 0.339944
+  Avg P4 outcome: 0.491739
+  Avg P5 outcome: 0.752345
+play 2b vs. 2b, 10m
+  Avg P0 outcome: -0.634145
+  Avg P1 outcome: -1.207936
+  Avg P2 outcome: 0.253265
+  Avg P3 outcome: 0.336812
+  Avg P4 outcome: 0.486993
+  Avg P5 outcome: 0.765012
+play 3b vs. 3b, 10m
+  Avg P0 outcome: -0.632152
+  Avg P1 outcome: -1.205824
+  Avg P2 outcome: 0.251280
+  Avg P3 outcome: 0.334699
+  Avg P4 outcome: 0.492336
+  Avg P5 outcome: 0.759663
+play 5b vs. 5b, 10m
+  Avg P0 outcome: -0.631946
+  Avg P1 outcome: -1.212926
+  Avg P2 outcome: 0.251909
+  Avg P3 outcome: 0.335085
+  Avg P4 outcome: 0.489047
+  Avg P5 outcome: 0.768830
+play 16b vs. 16b, 10m
+  Avg P0 outcome: -0.637561
+  Avg P1 outcome: -1.215430
+  Avg P2 outcome: 0.251595
+  Avg P3 outcome: 0.337581
+  Avg P4 outcome: 0.491998
+  Avg P5 outcome: 0.771817
+play 15b vs. 16b, 10m:  Avg B outcome: 0.006050 (3.0 mbb/g)
+play 15b vs. 16b, 10m0: Avg B outcome: 0.001783 (0.9 mbb/g)
+
+---------------------------------------------------------
+
+mb1b1r3
+Reentrant only on river
+Key on street, player acting, bet to, last bet size, num players remaining,
+num players to act.
+
+mb1b1r3/1b vs. mb1b1/1b (10m):    Avg B outcome: 0.018673 (9.3 mbb/g)
+mb1b1r3/2b vs. mb1b1/2b (10m):    Avg B outcome: 0.024935 (12.5 mbb/g)
+mb1b1r3/16b vs. mb1b1/16b (100m): Avg B outcome: 0.028328 (14.2 mbb/g)
+
+---------------------------------------------------------
+
+mb1b1r2
+Reentrant on turn and river
+Key on street, player acting, bet to, last bet size, num players remaining,
+num players to act.
+
+1b:
+  Batch 0 avg P0 val -0.632528
+  Batch 0 avg P1 val -1.208549
+  Batch 0 avg P2 val 0.251982
+  Batch 0 avg P3 val 0.340951
+  Batch 0 avg P4 val 0.486465
+  Batch 0 avg P5 val 0.727463
+
+mb1b1r2/1b vs. mb1b1/1b (10m):     Avg B outcome: -0.020304 (-10.2 mbb/g)
+mb1b1r2/2b vs. mb1b1/2b (10m):     Avg B outcome: -0.003072 (-1.5 mbb/g)
+mb1b1r2/1b vs. mb1b1r2/2b (10m):   Avg B outcome: 0.016442 (8.2 mbb/g)
+mb1b1r2/16b vs. mb1b1r2/16b (10m): Avg B outcome: 0.024991 (12.5 mbb/g)
+
+---------------------------------------------------------
+
+mb1b1r1
+Reentrant on flop, turn and river
+Key on street, player acting, bet to, last bet size, num players remaining,
+num players to act.
+
+1b:
+  Batch 0 avg P0 val -0.581379
+  Batch 0 avg P1 val -1.183946
+  Batch 0 avg P2 val 0.242421
+  Batch 0 avg P3 val 0.333695
+  Batch 0 avg P4 val 0.471379
+  Batch 0 avg P5 val 0.698871
+
+mb1b1r1/1b vs. mb1b1/16b (10m): Avg B outcome: 0.036009 (18.0 mbb/g) OLD?
+mb1b1r1/2b vs. mb1b1/16b (10m): Avg B outcome: 0.035984 (18.0 mbb/g) OLD?
+mb1b1r1/3b vs. mb1b1/16b (10m): Avg B outcome: 0.037984 (19.0 mbb/g) OLD?
+
+
+---------------------------------------------------------
+
+mb1b1r0
+Reentrant on all streets
+
+Key on street, player acting, bet to, last bet size, num players remaining,
+num players to act.
+
+1b:
+  Batch 0 avg P0 val -0.604727
+  Batch 0 avg P1 val -1.329009
+  Batch 0 avg P2 val 0.307820
+  Batch 0 avg P3 val 0.382295
+  Batch 0 avg P4 val 0.498080
+  Batch 0 avg P5 val 0.730799
+
+mb1b1r0/1b vs. mb1b1/16b (10m):   Avg B outcome: 0.033162 (16.6 mbb/g) OLD?
+mb1b1r0/2b vs. mb1b1/16b (10m):   Avg B outcome: 0.032023 (16.0 mbb/g) OLD?
+mb1b1r0/3b vs. mb1b1/16b (10m):   Avg B outcome: 0.027887 (13.9 mbb/g) OLD?
+mb1b1r0/16b vs. mb1b1/16b (100m): Avg B outcome: 0.032627 (16.3 mbb/g) OLD?
+
+---------------------------------------------------------
+
+mr2: merge rules: min bets 2 everywhere (all streets and all num-rem)
+
+mb1b1r0mr2
+
+mb1b1r0mr2/1b vs. mb1b1/16b (10m):  Avg B outcome: 0.030454 (15.2 mbb/g) OLD?
+mb1b1r0mr2/1b vs. mb1b1/16b (100m): Avg B outcome: 0.028775 (14.4 mbb/g) OLD?
+mb1b1r0mr2/2b vs. mb1b1/16b (10m):  Avg B outcome: 0.030210 (15.1 mbb/g) OLD?
+
+---------------------------------------------------------
+
+p3ms1f1
+null
+mb1b1
+tcfrf
+
+100m:
+Batch 0 avg P0 val -0.168582
+Batch 0 avg P1 val -0.376824
+Batch 0 avg P2 val 0.532188
+200m:
+Batch 8 avg P0 val -0.168324
+Batch 8 avg P1 val -0.372802
+Batch 8 avg P2 val 0.536370
+
+
+100m vs. 200m (100m): Avg B outcome: 0.000785 (0.4 mbb/g)
+Avg P0 outcome: -0.167659
+Avg P1 outcome: -0.371007
+Avg P2 outcome: 0.538666
+
+run_mp_rgbr
+
+---------------------------------------------------------
+
+p3ms0
+null
+mb1b1
+tcfrp
+
+100m:
+It 100000000 avg P0 val -0.088735
+It 100000000 avg P1 val -0.441172
+It 100000000 avg P2 val 0.528797
+
+run_mp_rgbr
+P0 best response: 0.006397 (3.20 mbb/g)
+P1 best response: 0.015123 (7.56 mbb/g)
+P2 best response: 0.006903 (3.45 mbb/g)
+Gap: 0.028423
+Exploitability: 4.74 mbb/g
+
+Cool!  Seems to be working, albeit very slow.  28m49s.
+Redid with pruning of opp zero prob hands: 22m55s
+Could remember last bettor.
+Should keep track of total number of bets.  Only collapse after minimum
+  number of bets.  Could potentially make the total number of bets a key.
+
+----------------------------------------------------------------
+
+p6holdem_params
+mp1000_params
+mb1b1_params
+tcfr_params
+
+Process size 45 gigs.
+
+mb1b1r0_params
+Process size 10.3 gigs
+
+mb1b1r0/0 vs. mb1b1/0: Avg B outcome: 0.040989 (20.5 mbb/g)
+mb1b1r0/0 vs. mb1b1/8: Avg B outcome: 0.045242 (22.6 mbb/g)
+
+----------------------------------------------------------------
+
+p6holdem_params
+mp1000_params
+tcfr_params
+
+mb2b2r0_params
+Process size
+0 vs. 36:   Avg B outcome: 0.007148 (3.6 mbb/g) over 10000000 dup hands
+36 vs. 72:  Avg B outcome: 0.003688 (1.8 mbb/g) over 10000000 dup hands
+72 vs. 108: Avg B outcome: 0.003956 (2.0 mbb/g) over 100000000 dup hands
+
+mb2b2r0mr3_params
+Process size 41.3g
+mb2b2r0/108 vs. mb2b2r0mr3/0:  Avg B outcome: 0.022221 (11.1 mbb/g)
+mb2b2r0/108 vs. mb2b2r0mr3/72: Avg B outcome: 0.034577 (17.3 mbb/g)
+
+mb2b2r0mr3/mp1000 vs. mb2b2r0/k100k: 
+  72 vs. 0:    Avg B outcome: -0.022432 (-11.2 mbb/g) over 100000000 dup hands
+  72 vs. 180:  Avg B outcome: 0.022606 (11.3 mbb/g) over 100000000 dup hands
+  180 vs. 180: Avg B outcome: 0.019598 (9.8 mbb/g) over 100000000 dup hands
+  216 vs. 180: Avg B outcome: 0.019136 (9.6 mbb/g) over 100000000 dup hands

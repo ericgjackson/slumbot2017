@@ -77,7 +77,6 @@ unsigned char CompressRegret(unsigned int r, double rnd,
   } else {
     return (unsigned char)255;
   }
-#if 1
   // This is the fixed version of quantization.
   // below can't be 255, can it?
   int below = d;
@@ -90,22 +89,6 @@ unsigned char CompressRegret(unsigned int r, double rnd,
   } else {
     return below;
   }
-#else
-  // This is the old buggy version of quantization that was used for
-  // Slumbot2016.
-  int trunc = d;
-  double rem = d - trunc;
-  // double rnd = RandZeroToOne();
-  if (rnd < rem) {
-    if (trunc == 255) {
-      fprintf(stderr, "trunc 255\n");
-      exit(-1);
-    }
-    return (unsigned char)(trunc + 1);
-  } else {
-    return (unsigned char)trunc;
-  }
-#endif
 }
 
 unsigned int UncompressRegret(unsigned char cr) {

@@ -135,6 +135,40 @@ bool **BettingAbstraction::ParseMinBets(const string &value) {
   return min_bets;
 }
 
+static unsigned int **ParseMergeRules(const string &value) {
+  unsigned int max_street = Game::MaxStreet();
+  unsigned int num_players = Game::NumPlayers();
+  vector<string> v1;
+  Split(value.c_str(), ';', true, &v1);
+  if (v1.size() != max_street + 1) {
+    fprintf(stderr, "ParseMergeRules: expected %u street values\n",
+	    max_street + 1);
+    exit(-1);
+  }
+  unsigned int **merge_rules = new unsigned int *[max_street + 1];
+  for (unsigned int st = 0; st <= max_street; ++st) {
+    const string &sv = v1[st];
+    vector<string> v2;
+    Split(sv.c_str(), ',', false, &v2);
+    if (v2.size() != num_players + 1) {
+      fprintf(stderr,
+	      "ParseMergeRules: expected v2 size to be num players + 1\n");
+      exit(-1);
+    }
+    merge_rules[st] = new unsigned int[num_players + 1];
+    for (unsigned int p = 0; p <= num_players; ++p) {
+      const string &str = v2[p];
+      unsigned int nb;
+      if (sscanf(str.c_str(), "%u", &nb) != 1) {
+	fprintf(stderr, "ParseMergeRules: couldn't parse %s\n", value.c_str());
+	exit(-1);
+      }
+      merge_rules[st][p] = nb;
+    }
+  }
+  return merge_rules;
+}
+
 BettingAbstraction::BettingAbstraction(const Params &params) {
   betting_abstraction_name_ = params.GetStringValue("BettingAbstractionName");
   limit_ = params.GetBooleanValue("Limit");
@@ -332,6 +366,31 @@ BettingAbstraction::BettingAbstraction(const Params &params) {
     }
   }
   min_reentrant_pot_ = params.GetIntValue("MinReentrantPot");
+  if (params.IsSet("MergeRules")) {
+    merge_rules_ = ParseMergeRules(params.GetStringValue("MergeRules"));
+  } else {
+    merge_rules_ = nullptr;
+  }
+  if (params.IsSet("AllowableBetTos")) {
+    vector<unsigned int> v;
+    ParseUnsignedInts(params.GetStringValue("AllowableBetTos"), &v);
+    unsigned int num = v.size();
+    allowable_bet_tos_.reset(new bool[stack_size_ + 1]);
+    for (unsigned int bt = 0; bt <= stack_size_; ++bt) {
+      allowable_bet_tos_[bt] = false;
+    }
+    for (unsigned int i = 0; i < num; ++i) {
+      unsigned int bt = v[i];
+      if (bt > stack_size_) {
+	fprintf(stderr, "OOB bet to %u\n", bt);
+	exit(-1);
+      }
+      allowable_bet_tos_[bt] = true;
+    }
+  } else {
+    allowable_bet_tos_.reset(nullptr);
+  }
+  last_aggressor_key_ = params.GetBooleanValue("LastAggressorKey");
 }
 
 BettingAbstraction::~BettingAbstraction(void) {
@@ -339,5 +398,12 @@ BettingAbstraction::~BettingAbstraction(void) {
   delete [] max_bets_;
   delete [] our_max_bets_;
   delete [] opp_max_bets_;
+  if (merge_rules_) {
+    unsigned int max_street = Game::MaxStreet();
+    for (unsigned int st = 0; st <= max_street; ++st) {
+      delete [] merge_rules_[st];
+    }
+    delete [] merge_rules_;
+  }
 }
 

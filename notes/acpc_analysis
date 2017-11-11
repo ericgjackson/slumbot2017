@@ -1,0 +1,305 @@
+vs. Intermission
+
+Avg our dup pair outcome: -12.69
+Avg our dup outcome: -63.44 mbb/g (-103.22...-23.66)
+Avg our P1 outcome: 8.28
+Avg our P2 outcome: -20.96
+Avg our preflop outcome: 13.79 (2985758.0/216460)
+Avg our flop outcome: -29.22 (-3192419.0/109255)
+Avg our turn outcome: 18.26 (1320325.0/72301)
+Avg our river outcome: -24.36 (-4920290.0/201984)
+
+Avg our showdown outcome: 32.87 (3931701.0/119623)
+Avg our river fold outcome: -112.85 (-9191991.0/81451)
+
+We fold preflop: 32.5% (94193/289807)
+We fold flop: 53.4% (56814/106442)
+We fold turn: 46.6% (34526/74156)
+We fold river: 58.3% (44928/77009)
+They fold preflop: 35.5% (122267/344185)
+They fold flop: 40.8% (52441/128389)
+They fold turn: 39.7% (37775/95077)
+They fold river: 47.6% (36523/76794)
+
+Big hands:
+1/0
+STATE:24:r200r882r2400r6098r20000c///:QhQs|AsKd/6d6c7s/Qd/Th:20000|-20000:Interm
+ission_2pn_2017|Slumbot_2pn_2017
+  Race preflop
+STATE:33:r223r600c/r1200c/r3600c/r7200r20000c:KcAh|2sQs/2d7dAs/2h/6h:-20000|2000
+0:Slumbot_2pn_2017|Intermission_2pn_2017
+  Stacking off with TPTK?  Dry board.
+STATE:298:r200r882c/r1537c/r7679c/r20000c:2h2d|JcQh/Jd4h5d/9s/Qc:-20000|20000:In
+termission_2pn_2017|Slumbot_2pn_2017
+  Win with top two pair.
+STATE:630:r200r1544r4200r20000c///:QhQd|AhKh/Jd4dAc/3d/Ad:20000|-20000:Intermiss
+ion_2pn_2017|Slumbot_2pn_2017
+  Race preflop.
+STATE:1125:cr300c/cr495c/cr841c/cr7569r20000c:ThQd|TsKc/2cKhTc/Td/Qc:-20000|2000
+0:Slumbot_2pn_2017|Intermission_2pn_2017
+  Boat under boat.
+STATE:1197:cr300r860r2700c/r5400c/r10800r20000c/:AdAh|TcTd/8hQc4d/2c/5s:20000|-2
+0000:Slumbot_2pn_2017|Intermission_2pn_2017
+  AA overpair on turn.
+STATE:1631:r330r900r2452r8100r20000c///:JhJc|KhKs/4s2hTc/8d/7s:-20000|20000:Slum
+bot_2pn_2017|Intermission_2pn_2017
+  KK/JJ preflop
+STATE:2387:r273r750c/r2250c/cr4032r13500c/cc:KhQc|7s9s/3dTc6s/Ts/6h:13500|-13500
+:Slumbot_2pn_2017|Intermission_2pn_2017
+  Check-raise bluff turned into win with king high!
+STATE:2391:r223r600r1389c/cr3271c/cr7642c/cr20000c:TdJd|AdAh/3hJh4d/6c/Tc:20000|
+-20000:Slumbot_2pn_2017|Intermission_2pn_2017
+  Won with two pair
+STATE:2472:r200r662r1800r4578c/r8030c/r13767c/r20000c:6hKh|KcAh/6d3hKd/Tc/Qs:200
+00|-20000:Intermission_2pn_2017|Slumbot_2pn_2017
+  Stacked off with TPTK.
+
+2/0
+STATE:72:r200r882c/r1537r3200c/cr9600c/cr20000c:7h9s|Jc7c/7s6h7d/2s/Jh:-20000|20
+000:Intermission_2pn_2017|Slumbot_2pn_2017
+  Boat over trips.
+STATE:78:r200r882r2400c/cc/r6620r20000c/:9d8d|9h6h/Td6s7d/Js/As:20000|-20000:Int
+ermission_2pn_2017|Slumbot_2pn_2017
+  Bluff snapped off.  We 4-bet bluffed preflop too.
+STATE:103:r330r900r2844r8100r20000c///:JsJc|KcAc/Kd8d4d/As/7s:-20000|20000:Slumb
+ot_2pn_2017|Intermission_2pn_2017
+  Race preflop.
+STATE:146:r200r882c/r1537c/cr4800r11108c/r20000c:9d9h|TsQs/Kd9sKs/Js/Th:-20000|2
+0000:Intermission_2pn_2017|Slumbot_2pn_2017
+  Straight over set.
+STATE:416:r200r1544c/cr2800r6545c/r15064r20000c/:8h6h|QcKc/7c9hTc/Qh/Kd:20000|-2
+0000:Intermission_2pn_2017|Slumbot_2pn_2017
+  Two pair under straight.
+STATE:655:r223r600c/r1200r2611c/r4800r12743r20000c/:AcAh|9hJc/5h9sJh/3d/As:20000
+|-20000:Slumbot_2pn_2017|Intermission_2pn_2017
+  Got money in good on turn with two pair; bad river
+STATE:1245:r223r600c/r1200c/r3600c/r10800c:7c8c|2cAc/Kc6h5c/Ad/6s:-10800|10800:S
+lumbot_2pn_2017|Intermission_2pn_2017
+  Bluff snapped off by weak top pair.
+STATE:1352:r200c/cr400r1039c/r2562r7200r20000c/:8d2d|9sTs/Td2s8s/4d/8c:20000|-20
+000:Intermission_2pn_2017|Slumbot_2pn_2017
+  Weird.  Called river 3-bet all-in with only top pair.
+STATE:1833:r223r600c/r1800c/r5400c/r10800r20000c:Jc9s|TsKs/6c3sKc/Qs/Td:20000|-2
+0000:Slumbot_2pn_2017|Intermission_2pn_2017
+  Straight over two pair.
+STATE:1877:r273r750c/r1500r3263r9000r20000c//:6sKs|Ts8s/6dJsQs/5d/6h:20000|-2000
+0:Slumbot_2pn_2017|Intermission_2pn_2017
+  Flush draw with pair over flush draw with gutshot.
+STATE:1921:r223r600c/cr1480c/cr2651r8100c/r20000c:9sTh|8s6h/8c2h7h/6c/Qs:20000|-
+20000:Slumbot_2pn_2017|Intermission_2pn_2017
+  Straight over two pair.
+STATE:1952:r200r662c/r1559c/cr5400c/cr20000c:7s4s|4h7h/Qd3h6h/5h/Jc:-20000|20000
+:Intermission_2pn_2017|Slumbot_2pn_2017
+  Flush over straight.
+STATE:2341:r223r600r1920r5400r20000c///:AsAh|QcQd/7c5sAd/8d/2s:20000|-20000:Slum
+bot_2pn_2017|Intermission_2pn_2017
+  AA vs. QQ aipf
+STATE:2354:r200r882r2400r6098r20000c///:JhJd|KdAd/2c9hQc/7s/7h:20000|-20000:Inte
+rmission_2pn_2017|Slumbot_2pn_2017
+  JJ vs. AKs aipf
+STATE:2392:r200r662c/cr1200c/cr3600c/cr7200r20000c:JsAh|6dKh/Th4d2h/3h/5h:20000|
+-20000:Intermission_2pn_2017|Slumbot_2pn_2017
+  2nd nut flush under nut flush
+STATE:2676:r200r882c/r1537r3200c/cr6400c/cr12800r20000f:AcQh|Ad5s/5cAh4c/2d/4d:1
+2800|-12800:Intermission_2pn_2017|Slumbot_2pn_2017
+  Folded two pair to river push?  Any 3 makes straight.  Any 4 has trips.
+STATE:2958:r200r662r1800r4578r20000c///:TdTc|KhKs/6c8hTh/2s/6s:20000|-20000:Inte
+rmission_2pn_2017|Slumbot_2pn_2017
+  KK vs. TT aipf
+
+Puzzling cases
+
+STATE:1352:r200c/cr400r1039c/r2562r7200r20000c/:8d2d|9sTs/Td2s8s/4d/8c:20000|-20
+000:Intermission_2pn_2017|Slumbot_2pn_2017
+  Weird.  Called river 3-bet all-in with only top pair.
+STATE:2676:r200r882c/r1537r3200c/cr6400c/cr12800r20000f:AcQh|Ad5s/5cAh4c/2d/4d:1
+2800|-12800:Intermission_2pn_2017|Slumbot_2pn_2017
+  Folded two pair to river push?  Any 3 makes straight.  Any 4 has trips.
+
+-----------------------------------------------
+
+Feste vs. Slumbot
+
+We fold preflop: 38.7% (115740/299039)
+We fold flop: 51.1% (44165/86509)
+We fold turn: 46.2% (33834/73286)
+We fold river: 62.6% (46867/74921)
+They fold preflop: 29.3% (96765/330704)
+They fold flop: 40.8% (57009/139640)
+They fold turn: 41.0% (41344/100861)
+They fold river: 47.5% (37915/79846)
+
+Avg our showdown outcome: 38.95 (4888769.0/125502)
+Avg our river fold outcome: -90.06 (-7635692.0/84782)
+
+Avg our dup pair outcome: -0.75
+Hand SD: 15535.171620 mbb/g
+Avg our dup outcome: -3.76 mbb/g (-43.87...36.35)
+Avg our P1 outcome: 13.05
+Avg our P2 outcome: -13.81
+Avg our preflop outcome: -10.54 (-2239350.0/212505)
+Avg our flop outcome: 20.39 (2062712.0/101174)
+Avg our turn outcome: 43.07 (3237858.0/75178)
+Avg our river outcome: -15.57 (-3286923.0/211143)
+
+-----------------------------------------------
+
+HITSZ vs. Slumbot
+
+We fold preflop: 44.9% (115408/256819)
+We fold flop: 55.3% (53169/96196)
+We fold turn: 48.7% (32342/66357)
+We fold river: 65.6% (39334/59996)
+They fold preflop: 37.1% (129231/348403)
+They fold flop: 47.7% (53235/111518)
+They fold turn: 42.4% (37513/88550)
+They fold river: 48.1% (33098/68748)
+
+Avg our showdown outcome: 104.52 (11004461.0/105283)
+Avg our river fold outcome: -134.50 (-9742235.0/72432)
+
+
+Avg our dup pair outcome: 21.15
+Hand SD: 16102.554508 mbb/g
+Avg our dup outcome: 105.75 mbb/g (64.17...147.32)
+Avg our P1 outcome: 24.93
+Avg our P2 outcome: -3.78
+Avg our preflop outcome: 2.61 (639658.0/244639)
+Avg our flop outcome: -1.40 (-148921.0/106404)
+Avg our turn outcome: 5.04 (351796.0/69855)
+Avg our river outcome: 30.72 (5502226.0/179102)
+
+-----------------------------------------------
+
+Robot Shark IRO vs. Slumbot
+
+We fold preflop: 29.3% (88295/301851)
+We fold flop: 45.5% (51304/112787)
+We fold turn: 37.8% (35720/94467)
+We fold river: 54.1% (49101/90799)
+They fold preflop: 28.3% (95105/336468)
+They fold flop: 41.4% (61003/147189)
+They fold turn: 36.8% (39055/105990)
+They fold river: 44.3% (38786/87610)
+
+
+Avg our showdown outcome: 37.70 (5320430.0/141134)
+Avg our river fold outcome: -116.07 (-10201462.0/87887)
+
+Avg our dup pair outcome: -7.64
+Avg our dup outcome: -38.19 mbb/g (-79.53...3.15)
+Avg our P1 outcome: 9.54
+Avg our P2 outcome: -17.18
+Avg our preflop outcome: -11.78 (-2160134.0/183400)
+Avg our flop outcome: 41.13 (4619209.0/112307)
+Avg our turn outcome: 33.31 (2490437.0/74775)
+Avg our river outcome: -31.55 (-7241032.0/229518)
+
+-----------------------------------------------
+
+PokerBot5 vs. Slumbot
+
+We fold: 60.5% (362925/600000)
+They fold: 29.3% (176064/600000)
+
+We fold preflop: 54.9% (113706/207228)
+We fold flop: 79.3% (114655/144589)
+We fold turn: 44.2% (80599/182532)
+We fold river: 58.6% (53965/92032)
+They fold preflop: 32.0% (102967/322146)
+They fold flop: 16.1% (22900/142379)
+They fold turn: 44.8% (25512/56898)
+They fold river: 72.5% (24685/34038)
+
+We bet flop: 142379
+We fold flop: 114655
+They bet flop: 144589
+They fold flop: 22900
+
+
+Avg our showdown outcome: 785.68 (47550204.0/60521)
+Avg our river fold outcome: -425.94 (-33499967.0/78650)
+
+Avg our dup outcome: -763.48 mbb/g (-810.88...-716.08)
+Avg our P1 outcome: -75.47
+Avg our P2 outcome: -77.23
+Avg our preflop outcome: -7.84 (-1698550.0/216673)
+Avg our flop outcome: -249.06 (-34259195.0/137555)
+Avg our turn outcome: -212.43 (-22541195.0/106111)
+Avg our river outcome: 90.86 (12690237.0/139661)
+
+We're getting kill on the flop.  Why?  Seems like they almost never fold
+the flop.  That would explain discrepancy on the flop, but then why don't
+we make it up on later streets.
+
+Our fold-flop seems absurdly high.
+
+We fold 46,085 flops as P0.
+We fold 68,570 flops as P1.
+  10,437 of those are r200c/r466f.
+  48,124 of those are r200c/cr400r933f.
+
+PokerBot5 checkraises flop hyperaggresively.
+It's a bet of 533 into a pot of 800.
+We can't fold 45% of the time to that sort of raise, can we?
+
+PokerBot5 vs. Slumbot
+r200:             269,947
+r200c:            230,101 (85.2%)
+r200c/c:          199,058 (86.5%)
+r200c/cr:         118,166 (59.4%)
+r200c/cr400:      118,166
+r200c/cr400r:     106,111 (89.8%)
+r200c/cr400r933:  106,111
+r200c/cr400r933f: 48,124 (45.4%)
+
+Hands 10-99:
+r200c/cr400: 2365
+r200c/cr933: 1430 (60.5%)
+
+Hands 0-9:
+r200c/cr400:     232
+r200c/cr400r933: 177 (76.3%)
+
+
+
+PokerBot5 vs. Intermission
+r223:             108,699
+r223c:            81,105 (74.6%)
+r223c/c:          44,849 (55.3%)
+r223c/cr:         27,100 (c-bet over half the time)
+r223c/cr383:      19,413
+r223c/cr383r:     6,376
+r223c/cr383r893:  6,376
+r223c/cr383r893f: 2,951 (46.3%)
+
+It's a bet of 510 into a pot of 766.
+Isn't Intermission also folding way too much?
+He's just lucky not to face so many checkraises.
+
+PokerBot5 vs. Feste
+r200:            112,726
+r200c:           99,551 (88.3%)
+r200c/c:         60,210 (60.5%)
+r200c/cr:        33,155 (55.1%)
+r200c/cr400:     30,970
+r200c/cr400r:    9,150  (29.5%)
+r200c/cr400r933: 9,150
+
+Hands 0-9:
+r200c/cr400:     83
+r200c/cr400r933: 67 (80.7%)
+
+Hands 2000-2999
+r200c/cr400:     11113
+r200c/cr400r933: 3213 (28.9%)
+
+
+PokerBot5 open checks flop after r200c much more against Slumbot than against
+Feste.  And he check raises much much much more against me.  Is it adaptive?
+Looks like PokerBot5's default behavior is to checkraise the flop with a
+very high percentage.  Against Feste it backs down, but against Slumbot it
+does not.
+
+
+

@@ -41,8 +41,10 @@ unique_ptr<Params> CreateCFRParams(void) {
   params->AddParam("CloseThreshold", P_INT);
   params->AddParam("ActiveMod", P_INT);
   params->AddParam("ActiveConditions", P_STRING);
-  params->AddParam("UseAvgForCurrentIt", P_INT);
   params->AddParam("Uniform", P_BOOLEAN);
+  params->AddParam("CharQuantizedStreets", P_STRING);
+  params->AddParam("ShortQuantizedStreets", P_STRING);
+  params->AddParam("ScaledStreets", P_STRING);
 
   return params;
 }

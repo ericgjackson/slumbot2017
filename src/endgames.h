@@ -49,12 +49,11 @@ public:
   bool GetPath(Node *base_node, Node *endgame_node, Node *base_target,
 	       Node *endgame_target, vector<Node *> *rev_base_path);
   void BRGo(double *p0_br, double *p1_br);
+  double *Process(Node *node, unsigned int lbd, const VCFRState &state,
+		  unsigned int last_st);
 private:
   void GetReachProbs(const vector<Node *> *base_path, const Card *board,
 		     unsigned int *prior_bds, double **reach_probs);
-  double *Process(Node *node, unsigned int lbd, double *opp_probs,
-		  double sum_opp_probs, double *total_card_probs,
-		  unsigned int **street_buckets, unsigned int last_st);
 
   unsigned int solve_street_;
   ResolvingMethod method_;
@@ -65,6 +64,7 @@ private:
   double *****br_vals_;
   bool card_level_;
   unsigned int **num_nonterminals_;
+  const HandTree *hand_tree_;
 };
 
 #endif

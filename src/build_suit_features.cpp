@@ -14,6 +14,105 @@
 
 using namespace std;
 
+// Return 5 if five of a suit on the board
+// Return 4 if four or more of a suit on the board
+// Return 3 if three of a suit on the board
+// Return 2 if two of a suit on the board by the flop
+// Return 1 if two of a suit on the board by the turn
+// return 0 otherwise
+static unsigned int CategorizeBoardS4(const Card *board,
+				      unsigned int num_board_cards) {
+  if (num_board_cards != 5) exit(-1);
+  unsigned int suit_counts[4];
+  for (unsigned int s = 0; s < 4; ++s) suit_counts[s] = 0;
+  for (unsigned int i = 0; i < num_board_cards; ++i) {
+    ++suit_counts[Suit(board[i])];
+  }
+  for (unsigned int s = 0; s < 4; ++s) {
+    if (suit_counts[s] >= 5) return 5;
+    if (suit_counts[s] >= 4) return 4;
+    if (suit_counts[s] == 3) return 3;
+  }
+  
+  unsigned int flop_suit_counts[4];
+  for (unsigned int s = 0; s < 4; ++s) flop_suit_counts[s] = 0;
+  for (unsigned int i = 0; i < 3; ++i) {
+    ++flop_suit_counts[Suit(board[i])];
+  }
+  for (unsigned int s = 0; s < 4; ++s) {
+    if (flop_suit_counts[s] == 2) return 2;
+  }
+  
+  unsigned int turn_suit_counts[4];
+  for (unsigned int s = 0; s < 4; ++s) turn_suit_counts[s] = 0;
+  for (unsigned int i = 0; i < 4; ++i) {
+    ++turn_suit_counts[Suit(board[i])];
+  }
+  for (unsigned int s = 0; s < 4; ++s) {
+    if (turn_suit_counts[s] == 2) return 1;
+  }
+  return 0;
+}
+
+// Return 4 if four or more of a suit on the board
+// Return 3 if three of a suit on the board
+// Return 2 if two of a suit on the board by the flop
+// Return 1 if two of a suit on the board by the turn
+// return 0 otherwise
+static unsigned int CategorizeBoardS3(const Card *board,
+				      unsigned int num_board_cards) {
+  if (num_board_cards != 5) exit(-1);
+  unsigned int suit_counts[4];
+  for (unsigned int s = 0; s < 4; ++s) suit_counts[s] = 0;
+  for (unsigned int i = 0; i < num_board_cards; ++i) {
+    ++suit_counts[Suit(board[i])];
+  }
+  for (unsigned int s = 0; s < 4; ++s) {
+    if (suit_counts[s] >= 4) return 4;
+  }
+  for (unsigned int s = 0; s < 4; ++s) {
+    if (suit_counts[s] == 3) return 3;
+  }
+  
+  unsigned int flop_suit_counts[4];
+  for (unsigned int s = 0; s < 4; ++s) flop_suit_counts[s] = 0;
+  for (unsigned int i = 0; i < 3; ++i) {
+    ++flop_suit_counts[Suit(board[i])];
+  }
+  for (unsigned int s = 0; s < 4; ++s) {
+    if (flop_suit_counts[s] == 2) return 2;
+  }
+  
+  unsigned int turn_suit_counts[4];
+  for (unsigned int s = 0; s < 4; ++s) turn_suit_counts[s] = 0;
+  for (unsigned int i = 0; i < 4; ++i) {
+    ++turn_suit_counts[Suit(board[i])];
+  }
+  for (unsigned int s = 0; s < 4; ++s) {
+    if (turn_suit_counts[s] == 2) return 1;
+  }
+  return 0;
+}
+
+// Return 2 if four or more of a suit on the board
+// Return 1 if three of a suit on the board
+// Return 0 otherwise
+static unsigned int CategorizeBoardS2(const Card *board,
+				      unsigned int num_board_cards) {
+  unsigned int suit_counts[4];
+  for (unsigned int s = 0; s < 4; ++s) suit_counts[s] = 0;
+  for (unsigned int i = 0; i < num_board_cards; ++i) {
+    ++suit_counts[Suit(board[i])];
+  }
+  for (unsigned int s = 0; s < 4; ++s) {
+    if (suit_counts[s] >= 4) return 2;
+  }
+  for (unsigned int s = 0; s < 4; ++s) {
+    if (suit_counts[s] == 3) return 1;
+  }
+  return 0;
+}
+
 // Return 1 if three or more of a suit on the board
 // Return 0 otherwise
 static unsigned int CategorizeBoardS1(const Card *board,
@@ -45,11 +144,15 @@ int main(int argc, char *argv[]) {
   if (sscanf(argv[2], "%u", &street) != 1) Usage(argv[0]);
   string features_name = argv[3];
 
-  if (features_name != "s1") {
+  if (features_name != "s1" && features_name != "s2" &&
+      features_name != "s3" && features_name != "s4") {
     fprintf(stderr, "Unknown features name \"%s\"\n", features_name.c_str());
     exit(-1);
   }
   bool s1 = (features_name == "s1");
+  bool s2 = (features_name == "s2");
+  bool s3 = (features_name == "s3");
+  bool s4 = (features_name == "s4");
   
   BoardTree::Create();
 
@@ -58,11 +161,7 @@ int main(int argc, char *argv[]) {
 	  Game::GameName().c_str(), Game::NumRanks(), features_name.c_str(),
 	  street);
   Writer writer(buf);
-  if (s1) {
-    writer.WriteUnsignedInt(1);
-  } else {
-    exit(-1);
-  }
+  writer.WriteUnsignedInt(1);
 
   unsigned int num_boards = BoardTree::NumBoards(street);
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(street);
@@ -74,6 +173,12 @@ int main(int argc, char *argv[]) {
     short fv;
     if (s1) {
       fv = CategorizeBoardS1(board, num_board_cards);
+    } else if (s2) {
+      fv = CategorizeBoardS2(board, num_board_cards);
+    } else if (s3) {
+      fv = CategorizeBoardS3(board, num_board_cards);
+    } else if (s4) {
+      fv = CategorizeBoardS4(board, num_board_cards);
     } else {
       exit(-1);
     }

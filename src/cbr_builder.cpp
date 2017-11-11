@@ -37,11 +37,10 @@ CBRBuilder::CBRBuilder(const CardAbstraction &ca, const BettingAbstraction &ba,
   
   HandValueTree::Create();
   unsigned int max_street = Game::MaxStreet();
-  unsigned int num_trunk_streets = CBRThread::kSplitStreet - 1;
-  if (num_trunk_streets > max_street + 1) num_trunk_streets = max_street + 1;
+  unsigned int num_trunk_streets = max_street + 1;
   trunk_hand_tree_ = new HandTree(0, 0, num_trunk_streets - 1);
   
-  if (Game::MaxStreet() < CBRThread::kSplitStreet) {
+  if (Game::MaxStreet() < 1000) {
     threads_ = NULL;
   } else {
     threads_ = new CBRThread *[num_threads_];
@@ -59,8 +58,8 @@ CBRBuilder::CBRBuilder(const CardAbstraction &ca, const BettingAbstraction &ba,
 				threads_, true);
 
   char dir[500], buf[500];
-  sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s", Files::NewCFRBase(),
-	  Game::GameName().c_str(),
+  sprintf(dir, "%s/%s.%u.%s.%i.%i.%i.%s.%s", Files::NewCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
 	  card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	  Game::NumSuits(), Game::MaxStreet(),
 	  betting_abstraction_.BettingAbstractionName().c_str(), 

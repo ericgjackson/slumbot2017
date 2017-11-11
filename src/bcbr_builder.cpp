@@ -33,7 +33,6 @@ BCBRBuilder::BCBRBuilder(const CardAbstraction &ca,
   BoardTree::Create();
 
   betting_tree_ = BettingTree::BuildTree(betting_abstraction_);
-  
   HandValueTree::Create();
   unsigned int max_street = Game::MaxStreet();
   // For now

@@ -26,7 +26,7 @@ double *Showdown(Node *node, const CanonicalCards *hands, double *opp_probs,
   for (Card c = 0; c < max_card1; ++c) cum_card_probs[c] = 0;
   unsigned int num_hole_card_pairs = hands->NumRaw();
   double *win_probs = new double[num_hole_card_pairs];
-  double half_pot = (node->PotSize() / 2);
+  double half_pot = node->LastBetTo();
   double *vals = new double[num_hole_card_pairs];
 
   unsigned int j = 0;
@@ -81,10 +81,11 @@ double *Fold(Node *node, unsigned int p, const CanonicalCards *hands,
   // Sign of half_pot reflects who wins the pot
   double half_pot;
   // Player acting encodes player remaining at fold nodes
+  // LastBetTo() doesn't include the last called bet
   if (p == node->PlayerActing()) {
-    half_pot = (node->PotSize() / 2);
+    half_pot = node->LastBetTo();
   } else {
-    half_pot = -(double)(node->PotSize() / 2);
+    half_pot = -(double)node->LastBetTo();
   }
   unsigned int num_hole_card_pairs = hands->NumRaw();
   double *vals = new double[num_hole_card_pairs];
@@ -247,9 +248,9 @@ void ProcessOppProbsBucketed(Node *node, unsigned int **street_buckets,
 }
 
 // Unabstracted, int cs_vals, int sumprobs
-void ProcessOppProbs(Node *node, const CanonicalCards *hands,
-		     bool nonneg, bool uniform, double explore,
-		     unsigned int it, unsigned int soft_warmup,
+void ProcessOppProbs(Node *node, const CanonicalCards *hands, bool bucketed,
+		     unsigned int **street_buckets, bool nonneg, bool uniform,
+		     double explore, unsigned int it, unsigned int soft_warmup,
 		     unsigned int hard_warmup, bool update_sumprobs,
 		     double *sumprob_scaling, double *opp_probs,
 		     double **succ_opp_probs, int *cs_vals, int *sumprobs) {
@@ -286,10 +287,21 @@ void ProcessOppProbs(Node *node, const CanonicalCards *hands,
 	succ_opp_probs[s][enc] = 0;
       }
     } else {
-      int *my_cs_vals = cs_vals + i * num_succs;
+      int *my_cs_vals;
+      if (bucketed) {
+	unsigned int b = street_buckets[st][i];
+	my_cs_vals = cs_vals + b * num_succs;
+      } else {
+	my_cs_vals = cs_vals + i * num_succs;
+      }
       int *my_sumprobs = nullptr;
       if (update_sumprobs) {
-	my_sumprobs = sumprobs + i * num_succs;
+	if (bucketed) {
+	  unsigned int b = street_buckets[st][i];
+	  my_sumprobs = sumprobs + b * num_succs;
+	} else {
+	  my_sumprobs = sumprobs + i * num_succs;
+	}
       }
       RegretsToProbs(my_cs_vals, num_succs, nonneg, uniform,
 		     default_succ_index, explore, num_nonterminal_succs,
@@ -331,9 +343,9 @@ void ProcessOppProbs(Node *node, const CanonicalCards *hands,
 }
 
 // Unabstracted, double cs_vals, double sumprobs
-void ProcessOppProbs(Node *node, const CanonicalCards *hands,
-		     bool nonneg, bool uniform, double explore, 
-		     unsigned int it, unsigned int soft_warmup,
+void ProcessOppProbs(Node *node, const CanonicalCards *hands, bool bucketed,
+		     unsigned int **street_buckets, bool nonneg, bool uniform,
+		     double explore, unsigned int it, unsigned int soft_warmup,
 		     unsigned int hard_warmup, bool update_sumprobs,
 		     double *opp_probs, double **succ_opp_probs,
 		     double *cs_vals, double *sumprobs) {
@@ -370,10 +382,21 @@ void ProcessOppProbs(Node *node, const CanonicalCards *hands,
 	succ_opp_probs[s][enc] = 0;
       }
     } else {
-      double *my_cs_vals = cs_vals + i * num_succs;
+      double *my_cs_vals;
+      if (bucketed) {
+	unsigned int b = street_buckets[st][i];
+	my_cs_vals = cs_vals + b * num_succs;
+      } else {
+	my_cs_vals = cs_vals + i * num_succs;
+      }
       double *my_sumprobs = nullptr;
       if (update_sumprobs) {
-	my_sumprobs = sumprobs + i * num_succs;
+	if (bucketed) {
+	  unsigned int b = street_buckets[st][i];
+	  my_sumprobs = sumprobs + b * num_succs;
+	} else {
+	  my_sumprobs = sumprobs + i * num_succs;
+	}
       }
       RegretsToProbs(my_cs_vals, num_succs, nonneg, uniform,
 		     default_succ_index, explore, num_nonterminal_succs,
@@ -404,9 +427,9 @@ void ProcessOppProbs(Node *node, const CanonicalCards *hands,
 }
 
 // Unabstracted, int cs_vals, double sumprobs
-void ProcessOppProbs(Node *node, const CanonicalCards *hands,
-		     bool nonneg, bool uniform, double explore, 
-		     unsigned int it, unsigned int soft_warmup,
+void ProcessOppProbs(Node *node, const CanonicalCards *hands, bool bucketed,
+		     unsigned int **street_buckets, bool nonneg, bool uniform,
+		     double explore, unsigned int it, unsigned int soft_warmup,
 		     unsigned int hard_warmup, bool update_sumprobs,
 		     double *opp_probs, double **succ_opp_probs,
 		     int *cs_vals, double *sumprobs) {
@@ -443,10 +466,21 @@ void ProcessOppProbs(Node *node, const CanonicalCards *hands,
 	succ_opp_probs[s][enc] = 0;
       }
     } else {
-      int *my_cs_vals = cs_vals + i * num_succs;
+      int *my_cs_vals;
+      if (bucketed) {
+	unsigned int b = street_buckets[st][i];
+	my_cs_vals = cs_vals + b * num_succs;
+      } else {
+	my_cs_vals = cs_vals + i * num_succs;
+      }
       double *my_sumprobs = nullptr;
       if (update_sumprobs) {
-	my_sumprobs = sumprobs + i * num_succs;
+	if (bucketed) {
+	  unsigned int b = street_buckets[st][i];
+	  my_sumprobs = sumprobs + b * num_succs;
+	} else {
+	  my_sumprobs = sumprobs + i * num_succs;
+	}
       }
       RegretsToProbs(my_cs_vals, num_succs, nonneg, uniform,
 		     default_succ_index, explore, num_nonterminal_succs,
@@ -561,6 +595,7 @@ static void MPTerminalVal(const Card *our_hole_cards, Card *opp_hole_cards,
 		  hands, showdown_val, fold_val, sum_weights);
   } else {
     unsigned int num_hole_card_pairs = hands->NumRaw();
+    unsigned int max_card1 = Game::MaxCard() + 1;
     *showdown_val = 0;
     *fold_val = 0;
     *sum_weights = 0;
@@ -570,6 +605,9 @@ static void MPTerminalVal(const Card *our_hole_cards, Card *opp_hole_cards,
       if (InCards(opp_hi, our_hole_cards, 2)) continue;
       Card opp_lo = hole_cards[1];
       if (InCards(opp_lo, our_hole_cards, 2)) continue;
+      unsigned int enc = opp_hi * max_card1 + opp_lo;
+      double this_opp_prob = opp_probs[opp][enc];
+      if (this_opp_prob == 0) continue;
       unsigned int opp_hv = hands->HandValue(i);
       bool new_lost = lost || opp_hv > our_hv;
       unsigned int new_num_chop;
@@ -588,9 +626,7 @@ static void MPTerminalVal(const Card *our_hole_cards, Card *opp_hole_cards,
 	opp_hole_cards[opp * 2] = opp_hi;
 	opp_hole_cards[opp * 2 + 1] = opp_lo;
       }
-      unsigned int max_card1 = Game::MaxCard() + 1;
-      unsigned int enc = opp_hi * max_card1 + opp_lo;
-      double new_joint_prob = joint_prob * opp_probs[opp][enc];
+      double new_joint_prob = joint_prob * this_opp_prob;
       double this_showdown_val, this_fold_val, this_sum_weights;
       MPTerminalVal(our_hole_cards, opp_hole_cards, new_joint_prob, our_hv,
 		    new_lost, new_num_chop, choppers, p, opp + 1,

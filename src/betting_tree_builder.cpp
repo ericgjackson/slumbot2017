@@ -43,7 +43,7 @@ void BettingTreeBuilder::Write(Node *node, unsigned int **num_nonterminals,
     node->SetNonterminalID(id);
   }
   writer->WriteUnsignedInt(id);
-  writer->WriteUnsignedShort(node->PotSize());
+  writer->WriteUnsignedShort(node->LastBetTo());
   writer->WriteUnsignedShort(node->NumSuccs());
   writer->WriteUnsignedShort(node->Flags());
   writer->WriteUnsignedChar(pa);
@@ -83,7 +83,14 @@ void BettingTreeBuilder::Write(void) {
   
   Writer writer(buf);
   Write(root_.get(), num_nonterminals, &writer);
-  for (unsigned int pa = 0; pa <= 1; ++pa) {
+  for (unsigned int st = 0; st <= max_street; ++st) {
+    unsigned int sum = 0;
+    for (unsigned int pa = 0; pa < num_players; ++pa) {
+      sum += num_nonterminals[pa][st];
+    }
+    fprintf(stderr, "St %u num nonterminals %u\n", st, sum);
+  }
+  for (unsigned int pa = 0; pa < num_players; ++pa) {
     delete [] num_nonterminals[pa];
   }
   delete [] num_nonterminals;

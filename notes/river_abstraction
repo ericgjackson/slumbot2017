@@ -14,8 +14,10 @@ Batch 16:  Est. expl: 312.301112 mbb/g
 Batch 24:  Est. expl: 309.225058 mbb/g
 Batch 32:  Est. expl: 309.564484 mbb/g
 Batch 96:  Est. expl: 321.867723 mbb/g
+Batch 104: Est. expl: 324.277771 mbb/g
 
 two7m
+hshsbc1 for river
 Process size 18.3g
 Batch 0:   Est. expl: 378.491070 mbb/g
 Batch 8:   Est. expl: 342.084617 mbb/g
@@ -86,6 +88,33 @@ Batch 8 (+49m):  Est. expl: 323.229673 mbb/g
 Batch 16 (+50m): Est. expl: 317.439875 mbb/g
 Batch 24 (+51m): Est. expl: 313.080618 mbb/g
 Batch 32 (+49m): Est. expl: 311.220294 mbb/g
+
+k1000hswins
+960,446 river buckets
+Batch 0 (47m):  Est. expl: 341.360819 mbb/g
+Batch 8 (46m):  Est. expl: 326.439389 mbb/g
+Batch 16 (51m): Est. expl: 324.763461 mbb/g
+
+k4khswins0.5
+1,168,922 river buckets
+Batch 0 (71m):  Est. expl: 336.838156 mbb/g
+Batch 8 (55m):  Est. expl: 332.929102 mbb/g
+Batch 16 (57m): Est. expl: 337.044226 mbb/g
+
+k4khs0.9wins0.5
+994,377 river bucket
+
+hswins0.5bc3s4
+642,783 buckets
+Batch 0 (67m): Est. expl: 431.736446 mbb/g
+Batch 8:       Est. expl: 445.573906 mbb/g
+
+So bad.  Is there a bug?  Worse than 100k.
+
+hs0.9wins0.5hc: 100,000 buckets
+hs0.5hs0.9wins0.5hc
+1,042,698 buckets
+Batch 0 (68m): Est. expl: 344.138493 mbb/g
 
 
 10k->100k: 10x buckets, gain 81 mbb/g exploitability

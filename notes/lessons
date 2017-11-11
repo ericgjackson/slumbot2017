@@ -42,5 +42,37 @@ get sufficiently large.  0.2 * all-in-pot-size is a better test of
 It works really well to do the following.  Give the opp a range of bets
 like 1 BB, 4 BB, 16 BB, 64 BB, etc.  Use translation to get strategies
 for the in-between bet sizes.  Seems to be very little loss in
-exploitability.
+exploitability.  Update: this is only true when there is a single bet
+to interpolate.
 
+Imperfect recall
+* Exploitability harmed a lot when we introduce imperfect recall.
+  From 1000 mbb/g to 9000 mbb/g, for example.
+* Heads-up, aggressive reentrancy loses about 70 mbb/g compared
+  to no reentrancy (mb3b3r0 vs. mb3b3).  Betting tree is around
+  1/70 the size of the non-reentrant tree.
+* Using merge rules, can reduce that.
+  * mr5 tree is 1/4 the size of the non-reentrant tree, and loss is around
+    30 mbb/g.
+  * mr4 tree is 1/15 the size of the non-reentrant tree, and loss is around
+    50 mbb/g
+  * Is this a lot or a little?
+* Can dedicate space savings of reentrant tree to card abstraction.
+  So I tried mr4 with null card abstraction, but it appears I gained nothing.
+* Doing reentrancy only on later streets - even just on river - seems to
+  offer no benefit over doing reentrancy on all streets.
+
+Multiplayer
+* On mb1b1, lose surprisingly little with aggressive reentrancy.
+  About 23 mbb/g (mb1b1r0 vs. mb1b1).
+* mr3 on mb2b2r0 gains us ~17 mbb/g but makes the tree 109 times bigger.
+* Bigger card abstraction (100x) but smaller betting abstraction
+  (~100x smaller; no mr3) yields advantage of about 10 mbb/g.
+
+When we are very far from equilibrium, the current strategy beats the
+cumulative strategy.  As we get closer to equilibrium, the gap narrows.
+
+Current strategy also does better than the cumulative strategy when using
+an abstracted strategy against a near-equilibrium unabstracted strategy.
+
+Quantizing river regrets to one byte seems to work fine.

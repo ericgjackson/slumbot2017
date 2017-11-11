@@ -70,7 +70,7 @@ double *DynamicCBR::OurChoice(Node *node, unsigned int lbd,
       // base or computed by endgame solving.
       unsigned int nt = node->NonterminalID();
       bool bucketed = ! buckets.None(st) &&
-	node->PotSize() < card_abstraction.BucketThreshold(st);
+	node->LastBetTo() < card_abstraction.BucketThreshold(st);
       
       double *d_sumprobs = nullptr;
       int *i_sumprobs = nullptr;
@@ -183,7 +183,7 @@ double *DynamicCBR::OppChoice(Node *node, unsigned int lbd,
     // complication is that this could either be a strategy read from the
     // base or computed by endgame solving.
     bool bucketed = ! buckets.None(st) &&
-      node->PotSize() < card_abstraction.BucketThreshold(st);
+      node->LastBetTo() < card_abstraction.BucketThreshold(st);
 
     double *d_sumprobs = nullptr;
     int *i_sumprobs = nullptr;

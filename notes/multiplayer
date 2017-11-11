@@ -1,30 +1,77 @@
 Not sure we can support in CFR+.  No efficient Showdown() method.
 
-Want to support in TCFR.
+Results with p6ms3f1t1r1h5/mb1b1r3 look promising.
 
-Need richer encoding of nodes in Prepare().
+Fewer than 100 river nonterminals (per player acting).
+Fewer than 1000 river terminals.
+Fewer than 40,000 turn nonterminals (per player acting).
+Fewer than 40,000 turn terminals
+Fewer than 3,000 flop nonterminals (per player acting).
+Fewer than 40,000 flop terminals
 
-Bit field for all active players.  Or maintain who is active in Process()?
+About 5m betting sequences overall.
+About 4.7m river betting sequences
+About 230k turn betting sequences
+15,707 flop betting sequences
 
-Hmm, not too hard to do it in Process().
+Note that the number of distinct betting sequences is much much less than
+the number of exhaustive betting sequences.  Why is the tree file on disk
+only a bit less than 10% of the size of the full tree?
+Let's look at size of data files.
+9.8 gigs for non-reentrant tree
+5 gigs for reentrant tree
+4.8 gigs for river non-reentrant tree
+1 meg for river reentrant tree!
 
-Pass down folded array of booleans and num active.
+Do we only need reentrancy at street-initial nodes?  Maybe not.
 
-When we get to fold succ, update array and num active.
+Keying on:
+  Street
+  Player acting
+  Bet to
+  Last bet size
+  Num players remaining
+  Num players to act
 
-Terminate hand if one man standing.
+Could I get rid of player acting?  Seems like it might be possible, but
+it's not a sure thing.  If we're mostly merging at street-initial nodes,
+does it matter?  Maybe we're not always merging at street-initial nodes.
 
-Need to record player acting at nonterminals.  Not just simple 0/1 bit.
+Would like to more aggressively share when betting state is rarely reached.
 
-Have TCFR running, but probably buggy.
+Would like to more aggressively share when the reduction to the total tree
+size is greater.  For example, more aggressively share on later streets.
 
-Very negative CVs for weak hands.  Why aren't we learning to open fold?
-Or if we are open folding, why isn't CV much less?
+Betting states with more bets are more rarely reached.
+Betting states with more players are more rarely reached.
 
-Need to return from Process() when current player folds.  Don't continue
-until end.  (Is that true?  What about for updating other player's
-strategies?  Maybe not.)
+So we want a boolean function of street, num bets, num players.
 
-Need to store pot size in nonterminal nodes so that we can return correct
-CV when we fold.
+Can I express such a function easily with params?
 
+Could have 24 functions for every combination of street and num players.
+The function just says: merge when number of bets is >= X.
+
+What kind of size tree can we target?  Allow 1/4, 1/2, 1x and all-in
+bet sizes?  Up to 5 bets per street?  Obviously will need very aggressive
+sharing.
+
+Should I tune bet sizes to maximize sharing?
+
+Does an asymmetric system help?
+
+Betting tree sizes:
+
+Betting Abstraction  Reentrant Streets  Size
+-------------------  -----------------  ----
+mb1b1                None               60 megs
+mb1b1                River              5 megs
+mb1b1                Turn, river        368k
+mb1b2                Turn, river        1.3 megs
+mb2b2                Turn, river        196 megs
+mb2b2                Flop, turn, river  893k
+mb3b3                Flop, turn, river  13 megs
+
+Extra bet sizes doesn't add that much.  But an extra raise is huge.
+
+Flop num nonterminals is by far the biggest.

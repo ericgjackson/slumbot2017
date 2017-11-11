@@ -1,0 +1,71 @@
+TCFR on ms1f1
+Try with and without flop char quantization
+
+tcfr_params
+Single threaded
+1m:   Exploitability: 123.32 mbb/g
+10m:  Exploitability: 25.24 mbb/g
+100m: Exploitability: 8.91 mbb/g
+
+tcfrcq1_params
+Single threaded
+10m:  Exploitability: 23.03 mbb/g
+100m: Exploitability: 8.16 mbb/g
+
+-----------------------------------------------
+
+TCFR on ms3f1t1r1h5/mb1b1
+
+tcfr_params
+Single threaded
+1x1m:    Exploitability: 2457.37 mbb/g
+1x10m:   Exploitability: 1145.45 mbb/g
+1x100m:  Exploitability: 524.72 mbb/g
+16x100m: Exploitability: 263.35 mbb/g
+1x1b:    Exploitability: 283.50 mbb/g (35m)
+
+tcfrcq3_params
+1m:   Exploitability: 2361.42 mbb/g
+10m:  Exploitability: 1105.96 mbb/g
+100m: Exploitability: 561.84 mbb/g
+1b:   Exploitability: 450.41 mbb/g (29.5m)
+
+Starts well, but stalls out.  Add ScalingStreet?
+
+Add ScaledStreets 3.
+1x1m:    Exploitability: 2549.64 mbb/g
+1x10m:   Exploitability: 1155.92 mbb/g
+1x100m:  Exploitability: 505.56 mbb/g
+16x100m: Exploitability: 237.01 mbb/g
+
+Rewrote code to not use board_count_
+8x1m:   Exploitability: 907.28 mbb/g
+8x10m:  Exploitability: 451.23 mbb/g
+8x100m: Exploitability: 262.83 mbb/g
+8x1b:   Exploitability: 189.10 mbb/g
+
+
+-----------------------------------------------
+
+mb3b3
+cq3
+162m for batch 0
+tcfr/0 vs. tcfr/120:      Avg B outcome: 0.348998 (174.5 mbb/g)
+tcfr/8 vs. tcfr/120:      Avg B outcome: 0.212251 (106.1 mbb/g)
+tcfr/16 vs. tcfr/120:     Avg B outcome: 0.146895 (73.4 mbb/g)
+tcfr/24 vs. tcfr/120:     Avg B outcome: 0.114069 (57.0 mbb/g)
+tcfr/32 vs. tcfr/120:     Avg B outcome: 0.082516 (41.3 mbb/g)
+
+Got rid of scaling by board count; scaling of 0.05 16-threaded
+237m for batch 0
+215m for batch 8
+212m for batch 16
+tcfrcq3/0 vs. tcfr/120:  Avg B outcome: 0.116166 (58.1 mbb/g)
+tcfrcq3/16 vs. tcfr/120: Avg B outcome: 0.066404 (33.2 mbb/g)
+tcfrcq3/32 vs. tcfr/120: Avg B outcome: 0.034389 (17.2 mbb/g)
+tcfrcq3/48 vs. tcfr/120: Avg B outcome: 0.023228 (11.6 mbb/g)
+tcfrcq3/64 vs. tcfr/120: Avg B outcome: 0.012752 (6.4 mbb/g)
+tcfrcq3/72 vs. tcfr/120: Avg B outcome: 0.004547 (2.3 mbb/g)
+tcfrcq3/80 vs. tcfr/120: Avg B outcome: -0.001983 (-1.0 mbb/g)
+
+q23

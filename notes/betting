@@ -177,7 +177,8 @@ the river.
 2) CloseToAllInFrac 0.5
 350,413 betting sequences in each
 263,412 river actions in each
-
+77,200 turn actions in each
+9,362 flop actions in each
 
 -----------------------------
 
