@@ -62,6 +62,7 @@
 #include "hand_tree.h"
 #include "io.h"
 #include "bcbr_thread.h"
+#include "vcfr_state.h"
 #include "vcfr.h"
 
 using namespace std;
@@ -102,8 +103,8 @@ BCBRThread::BCBRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
 				  buckets_, compressed_streets_));
 
     char dir[500];
-    sprintf(dir, "%s/%s.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
-	    Game::GameName().c_str(),
+    sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
+	    Game::GameName().c_str(), Game::NumPlayers(),
 	    card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	    Game::NumSuits(), Game::MaxStreet(),
 	    betting_abstraction_.BettingAbstractionName().c_str(),
@@ -208,8 +209,8 @@ void BCBRThread::WriteValues(Node *node, unsigned int gbd, bool alt,
 			     const string &action_sequence, double *vals) {
   char dir[500], buf[500];
   unsigned int street = node->Street();
-  sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s/bcbrs.%u.p%u/%s",
-	  Files::NewCFRBase(), Game::GameName().c_str(),
+  sprintf(dir, "%s/%s.%u.%s.%i.%i.%i.%s.%s/bcbrs.%u.p%u/%s",
+	  Files::NewCFRBase(), Game::GameName().c_str(), Game::NumPlayers(),
 	  card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	  Game::NumSuits(), Game::MaxStreet(),
 	  betting_abstraction_.BettingAbstractionName().c_str(), 
@@ -446,7 +447,7 @@ void BCBRThread::CardPass(bool first_pass) {
   first_pass_ = first_pass;
   double *opp_probs = AllocateOppProbs(true);
   unsigned int **street_buckets = AllocateStreetBuckets();
-  VCFRState state(opp_probs, street_buckets, trunk_hand_tree_);
+  VCFRState state(opp_probs, street_buckets, trunk_hand_tree_, p_);
   SetStreetBuckets(0, 0, state);
   double *vals = Process(betting_tree_->Root(), 0, state, 0);
   DeleteStreetBuckets(street_buckets);

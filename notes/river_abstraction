@@ -16,6 +16,43 @@ Batch 32:  Est. expl: 309.564484 mbb/g
 Batch 96:  Est. expl: 321.867723 mbb/g
 Batch 104: Est. expl: 324.277771 mbb/g
 
+Redo 11/11
+Batch 0 (70m):  Est. expl: 341.468763 mbb/g
+Batch 8 (61m):  Est. expl: 338.254085 mbb/g
+Batch 16 (56m): Est. expl: 341.143469 mbb/g
+                Est. expl: 358.498172 mbb/g (sample prob 0.01)
+Redo 11/11 with code in old_slumbot2017
+Batch 0 (49m):  Est. expl: 343.030047 mbb/g
+Batch 8:        Est. expl: 319.060462 mbb/g
+Batch 16:       Est. expl: 310.900605 mbb/g
+Batch 24:       Est. expl: 308.331204 mbb/g
+Backported board_table, board count fix to old_slumbot2017
+Batch 8:        Est. expl: 337.549625 mbb/g
+Batch 24:       Est. expl: 344.767160 mbb/g
+Cap regrets at 200m
+Batch 8:        Est. expl: 337.247894 mbb/g
+Go back to sampling canonical boards, scaling by board count
+  But using new board counts
+  And go back to capping regrets at 2b
+Batch 8:        Est. expl: 324.047397 mbb/g
+Batch 16:       Est. expl: 317.613913 mbb/g
+                Est. expl: 337.180317 mbb/g (sample prob 0.01)
+  Hmm, much better, but not quite as good as original system with buggy
+  board counts?!?
+New code, weight all updates by 10
+Batch 0:  Est. expl: 349.948623 mbb/g
+Batch 8:  Est. expl: 329.782986 mbb/g
+Batch 16: Est. expl: 322.645011 mbb/g
+Batch 24: Est. expl: 322.155676 mbb/g
+Better than original, but worse than old_slumbot2017.
+New code, no close threshold (don't weight all updates by 10)
+tcfrnct_params
+Batch 0 (50-53m): Est. expl: 355.554437 mbb/g
+Batch 8 (~51m):   Est. expl: 325.353631 mbb/g
+Batch 16 (57m):   Est. expl: 318.840236 mbb/g
+Batch 24 (53m):   Est. expl: 318.705072 mbb/g
+
+
 two7m
 hshsbc1 for river
 Process size 18.3g
@@ -80,6 +117,8 @@ Batch 16: Est. expl: 438.333012 mbb/g
 Batch 24: Est. expl: 443.017317 mbb/g
 Batch 32: Est. expl: 448.363463 mbb/g
 
+--------
+
 rk100kbc1s1
 100k kmeans bucketing crossproducted with bc1 and s1
 About 1.1m river buckets
@@ -89,11 +128,58 @@ Batch 16 (+50m): Est. expl: 317.439875 mbb/g
 Batch 24 (+51m): Est. expl: 313.080618 mbb/g
 Batch 32 (+49m): Est. expl: 311.220294 mbb/g
 
+Sampling raw boards, no board_count weighting
+No close threshold
+tcfrnct_params
+Batch 8:  Est. expl: 325.070981 mbb/g
+          Est. expl: 324.607975 mbb/g
+Batch 24: Est. expl: 310.230989 mbb/g
+
+Sampling canonical boards; weighting by board count
+No close threshold
+tcfrnctscb_params
+Batch 8 (90m):  Est. expl: 322.700680 mbb/g
+Batch 16 (52m): Est. expl: 310.383864 mbb/g
+Batch 24 (49m): Est. expl: 308.412903 mbb/g
+Batch 32 (48m): Est. expl: 306.843779 mbb/g
+
+Sampling canonical boards; weighting by board count
+No *river* close threshold
+tcfrnrctscb_params
+Batch 0 (~50m): Est. expl: 353.556932 mbb/g
+  Process count: 134265525669
+Batch 8 (48m):  Est. expl: 327.103603 mbb/g
+  Process count: 142600703622
+Batch 24:       Est. expl: 314.758059 mbb/g
+Batch 32:       Est. expl: 313.821375 mbb/g
+
+Could make sense that it is worse, but why isn't it faster?
+
+Sampling canonical boards; weighting by board count
+River close threshold of 10k (other streets 2k)
+tcfrrct10kscb_params
+Batch 0 (51m): Est. expl: 345.468531 mbb/g
+  Process count: 134535045161
+Batch 24:      Est. expl: 308.104776 mbb/g
+  Process count: 147484318209
+Batch 32:      Est. expl: 307.893083 mbb/g
+
+--------
+
 k1000hswins
 960,446 river buckets
 Batch 0 (47m):  Est. expl: 341.360819 mbb/g
 Batch 8 (46m):  Est. expl: 326.439389 mbb/g
 Batch 16 (51m): Est. expl: 324.763461 mbb/g
+
+Sampling raw boards, no board_count weighting
+No close threshold
+tcfrnct_params
+5 batches in 233m
+Batch 24: Est. expl: 319.075262 mbb/g
+Batch 32: Est. expl: 317.430835 mbb/g
+
+--------
 
 k4khswins0.5
 1,168,922 river buckets
@@ -101,8 +187,22 @@ Batch 0 (71m):  Est. expl: 336.838156 mbb/g
 Batch 8 (55m):  Est. expl: 332.929102 mbb/g
 Batch 16 (57m): Est. expl: 337.044226 mbb/g
 
+--------
+
 k4khs0.9wins0.5
-994,377 river bucket
+994,277 river bucket
+Batch 0:         Est. expl: 335.166258 mbb/g
+Batch 8:         Est. expl: 335.503588 mbb/g
+Batch 16:        Est. expl: 339.401236 mbb/g
+Batch 24 (225m): Est. expl: 342.021153 mbb/g
+
+Sampling canonical boards; weighting by board count
+No close threshold
+tcfrnctscb_params
+Batch 24:        Est. expl: 310.484396 mbb/g
+Batch 32 (220m): Est. expl: 311.059935 mbb/g
+
+--------
 
 hswins0.5bc3s4
 642,783 buckets
@@ -111,12 +211,51 @@ Batch 8:       Est. expl: 445.573906 mbb/g
 
 So bad.  Is there a bug?  Worse than 100k.
 
+--------
+
 hs0.9wins0.5hc: 100,000 buckets
 hs0.5hs0.9wins0.5hc
 1,042,698 buckets
 Batch 0 (68m): Est. expl: 344.138493 mbb/g
+Batch 8 (56m): Est. expl: 349.154242 mbb/g
 
+Sampling canonical boards; weighting by board count
+No close threshold
+tcfrnctscb_params
+Batch 8:  Est. expl: 322.349279 mbb/g
+Batch 16: Est. expl: 319.941929 mbb/g
+Batch 24: Est. expl: 320.143984 mbb/g
+Batch 32: Est. expl: 321.922047 mbb/g
+
+--------
+
+rk20kbc2
+895,304 river buckets
+Sampling canonical boards; weighting by board count
+No close threshold
+tcfrnctscb_params
+
+Batch 8 (96m): Est. expl: 340.270808 mbb/g
+
+
+--------
 
 10k->100k: 10x buckets, gain 81 mbb/g exploitability
 100k->1m:  10x buckets, gain 45 mbb/g exploitability (but 1m not kmeans)
 1m->10m:   10x buckets, gain 63 mbb/g exploitability (neither kmeans)
+
+onem_systems
+Sampling raw boards, no board_count weighting
+No close threshold
+tcfrnct_params
+
+Card Abstraction    Method             Best Exploitability
+----------------    ------             -------------------
+onem                Samp. raw, ct0     318.7@24
+rk100kbc1s1         Samp. raw, ct0     310.2@24
+rk100kbc1s1         Samp. can, ct0     306.8@32
+rk100kbc1s1         Samp. can, nrct    313.8@32
+rk100kbc1s1         Samp. can, rct10k  307.9
+k1000hswins         Samp. raw, ct0     317.4@32
+k4khs0.9wins0.5     Samp. can, ct0     310.5@24
+hs0.5hs0.9wins0.5hc Samp. can, ct0     320.0@16

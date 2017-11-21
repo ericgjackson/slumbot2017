@@ -36,6 +36,7 @@
 #include "hand_tree.h"
 #include "io.h"
 #include "bcfr_thread.h"
+#include "vcfr_state.h"
 #include "vcfr.h"
 
 using namespace std;
@@ -171,7 +172,7 @@ void BCFRThread::Go(void) {
 
   double *opp_probs = AllocateOppProbs(true);
   unsigned int **street_buckets = AllocateStreetBuckets();
-  VCFRState state(opp_probs, street_buckets, trunk_hand_tree_);
+  VCFRState state(opp_probs, street_buckets, trunk_hand_tree_, p_);
   SetStreetBuckets(0, 0, state);
   double *vals = Process(betting_tree_->Root(), 0, state, 0);
   DeleteStreetBuckets(street_buckets);

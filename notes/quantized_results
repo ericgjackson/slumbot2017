@@ -58,8 +58,8 @@ tcfr/32 vs. tcfr/120:     Avg B outcome: 0.082516 (41.3 mbb/g)
 
 Got rid of scaling by board count; scaling of 0.05 16-threaded
 237m for batch 0
-215m for batch 8
-212m for batch 16
+215m for batch 8  (did I mean batch 16?)
+212m for batch 16 (did I mean batch 32?)
 tcfrcq3/0 vs. tcfr/120:  Avg B outcome: 0.116166 (58.1 mbb/g)
 tcfrcq3/16 vs. tcfr/120: Avg B outcome: 0.066404 (33.2 mbb/g)
 tcfrcq3/32 vs. tcfr/120: Avg B outcome: 0.034389 (17.2 mbb/g)
@@ -68,4 +68,126 @@ tcfrcq3/64 vs. tcfr/120: Avg B outcome: 0.012752 (6.4 mbb/g)
 tcfrcq3/72 vs. tcfr/120: Avg B outcome: 0.004547 (2.3 mbb/g)
 tcfrcq3/80 vs. tcfr/120: Avg B outcome: -0.001983 (-1.0 mbb/g)
 
+Est. 1088m to 6.4 mbb/g
+Est. 1512m to -1.0 mbb/g
+
 q23
+236m for batch 0
+tcfrq23/0 vs. tcfr/120:  Avg B outcome: 0.121974 (61.0 mbb/g)
+tcfrq23/16 vs. tcfr/120: Avg B outcome: 0.069424 (34.7 mbb/g)
+tcfrq23/32 vs. tcfr/120: Avg B outcome: 0.045893 (22.9 mbb/g)
+tcfrq23/48 vs. tcfr/120: Avg B outcome: 0.026113 (13.1 mbb/g)
+tcfrq23/64 vs. tcfr/120: Avg B outcome: 0.017034 (8.5 mbb/g)
+tcfrq23/80 vs. tcfr/120: Avg B outcome: 0.008987 (4.5 mbb/g)
+tcfrq23/96 vs. tcfr/120: Avg B outcome: 0.006648 (3.3 mbb/g)
+
+q23s23
+310m for batch 0
+Scaling for turn and river
+tcfrq23s23/0 vs. tcfr/120:  Avg B outcome: 0.129225 (64.6 mbb/g)
+tcfrq23s23/16 vs. tcfr/120: Avg B outcome: 0.074760 (37.4 mbb/g)
+
+q3s01
+Scaling of 0.01
+tcfrq3s01/0 vs. tcfr/120:          Avg B outcome: 0.123243 (61.6 mbb/g)
+tcfrq3s01/16 vs. tcfr/120:         Avg B outcome: 0.053994 (27.0 mbb/g)
+tcfrq3s01/32 vs. tcfr/120:         Avg B outcome: 0.022944 (11.5 mbb/g)
+tcfrq3s01/48 vs. tcfr/120:         Avg B outcome: 0.007662 (3.8 mbb/g)
+tcfrq3s01/64 vs. tcfr/120:         Avg B outcome: -0.001580 (-0.8 mbb/g)
+tcfrq3s01/80 vs. tcfr/120:         Avg B outcome: -0.012799 (-6.4 mbb/g)
+tcfrq3s01/96 (195m) vs. tcfr/120:  Avg B outcome: -0.019570 (-9.8 mbb/g)
+  Process count: 1432594196125
+tcfrq3s01/112 (194m) vs. tcfr/120: Avg B outcome: -0.024865 (-12.4 mbb/g)
+  Process count: 1425947951389
+tcfrq3s01/128 (194m) vs. tcfr/120: Avg B outcome: -0.030402 (-15.2 mbb/g)
+  Process count: 1432948196697
+Batch times: 233m, 214m, 207m, 203m, 201m
+Batch 80 in 201m
+1058m to -0.8
+
+q3nct
+No close threshold; scaling of 0.05
+tcfrq3nct/0 (161m) vs. tcfr/120:  Avg B outcome: 0.205174 (102.6 mbb/g)
+  Process count: 1135247945640
+tcfrq3nct/16 (173m) vs. tcfr/120: Avg B outcome: 0.103258 (51.6 mbb/g)
+  Process count: 1257896215564
+tcfrq3nct/32 (177m) vs. tcfr/120: Avg B outcome: 0.070939 (35.5 mbb/g)
+  Process count: 1282384705976
+tcfrq3nct/48 (177m) vs. tcfr/120: Avg B outcome: 0.043953 (22.0 mbb/g)
+  Process count: 1294005810642
+tcfrq3nct/64 (178m) vs. tcfr/120: Avg B outcome: 0.026238 (13.1 mbb/g)
+  Process count: 1305306756731
+tcfrq3nct/80 (179m) vs. tcfr/120: Avg B outcome: 0.012698 (6.3 mbb/g)
+  Process count: 1311814364490
+tcfrq3nct/96 (182m) vs. tcfr/120: Avg B outcome: 0.011442 (5.7 mbb/g)
+  Process count: 1312396912132
+
+1045m to 6.3 mbb/g
+
+q3s001
+Scaling of 0.001
+Close threshold
+tcfrq3s001/0 (219m) vs. tcfr/120: Avg B outcome: 0.219914 (110.0 mbb/g)
+  Process count: 1592357423790
+tcfrq3s001/16 (205m) vs. tcfr/120: Avg B outcome: 0.118280 (59.1 mbb/g)
+  Process count: 1496839193099
+tcfrq3s001/32 (202m) vs. tcfr/120: Avg B outcome: 0.089393 (44.7 mbb/g)
+  Process count: 1471095003713
+tcfrq3s001/48 (200m) vs. tcfr/120: Avg B outcome: 0.061914 (31.0 mbb/g)
+  Process count: 1462444774919
+tcfrq3s001/64 (199m) vs. tcfr/120: Avg B outcome: 0.034822 (17.4 mbb/g)
+  Process count: 1446918803616
+
+q3scbs001
+Close threshold 2000
+Sampling canonical boards, scaling by board count
+Scaling of 0.001
+Faster than q3s001 because scaling means that close threshold gets
+  exceeded more.
+  
+tcfrq3scbs001/0 (164m) vs. tcfr/120: Avg B outcome: 0.220001 (110.0 mbb/g)
+  Process count: 1169084347686
+tcfrq3scbs001/16 (179m) vs. tcfr/120: Avg B outcome: 0.116717 (58.4 mbb/g)
+  Process count: 1287210801280
+tcfrq3scbs001/32 (182m) vs. tcfr/120: Avg B outcome: 0.079585 (39.8 mbb/g)
+  Process count: 1306242618183
+tcfrq3scbs001/48 (182m) vs. tcfr/120: Avg B outcome: 0.050920 (25.5 mbb/g)
+  Process count: 1323292748015
+tcfrq3scbs001/64 (185m) vs. tcfr/120: Avg B outcome: 0.031543 (15.8 mbb/g)
+  Process count: 1335945120097
+tcfrq3scbs001/80 (184m) vs. tcfr/120: Avg B outcome: 0.016450 (8.2 mbb/g)
+  Process count: 1343042683619
+tcfrq3scbs001/96 (183m) vs. tcfr/120: Avg B outcome: 0.004259 (2.1 mbb/g)
+  Process count: 1342621419305
+
+1259m to 2.1
+
+q3s02
+Scaling of 0.02
+tcfrq3s02/0 (234m) vs. tcfr/120:  Avg B outcome: 0.122805 (61.4 mbb/g)
+  Process count: 1682610291278
+tcfrq3s02/16 (215m) vs. tcfr/120: Avg B outcome: 0.065669 (32.8 mbb/g)
+  Process count: 1551646879988
+tcfrq3s02/32 (208m) vs. tcfr/120: Avg B outcome: 0.034832 (17.4 mbb/g)
+  Process count: 1509548572857
+
+q3s005
+Scaling of 0.005
+tcfrq3s005/0 (231m) vs. tcfr/120:  Avg B outcome: 0.136427 (68.2 mbb/g)
+  Process count: 1667380196597
+tcfrq3s005/16 (213m) vs. tcfr/120: Avg B outcome: 0.066984 (33.5 mbb/g)
+  Process count: 1535144442191
+tcfrq3s005/32 (208m) vs. tcfr/120: Avg B outcome: 0.030492 (15.2 mbb/g)
+  Process count: 1503891048810
+tcfrq3s005/48 (204m) vs. tcfr/120: Avg B outcome: 0.010629 (5.3 mbb/g)
+  Process count: 1481264969751
+tcfrq3s005/64 (203m) vs. tcfr/120: Avg B outcome: -0.006594 (-3.3 mbb/g)
+  Process count: 1472497449415
+tcfrq3s005/80 (202m) vs. tcfr/120: Avg B outcome: -0.013520 (-6.8 mbb/g)
+  Process count: 1469579952916
+tcfrq3s005/96 (200m) vs. tcfr/120: Avg B outcome: -0.028878 (-14.4 mbb/g)
+  Process count: 1466079277054
+tcfrq3s005/112 (198m) vs. tcfr/120: Avg B outcome: -0.034033 (-17.0 mbb/g)
+  Process count: 1449964636207
+tcfrq3s005/128 (198m) vs. tcfr/120: Avg B outcome: -0.043478 (-21.7 mbb/g)
+  Process count: 1453845235809

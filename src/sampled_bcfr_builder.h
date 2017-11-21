@@ -44,7 +44,8 @@ private:
   double *StreetInitial(Node *node, unsigned int plbd, 
 			const VCFRState &state, double **ret_norms);
   void Write(Node *node, string *action_sequences);
-  
+
+  unsigned int p_;
   HandTree *trunk_hand_tree_;
   // Indexed by street, player acting, NT, and bucket/succ
   float ****bucket_sum_vals_;

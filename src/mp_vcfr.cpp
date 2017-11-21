@@ -269,9 +269,10 @@ double *MPVCFR::OppChoice(Node *node, unsigned int lbd,
 	    ! (value_calculation_ || i_sumprobs == nullptr ||
 	       (hard_warmup_ > 0 && it_ <= hard_warmup_));
 	  ProcessOppProbs(node, hands, bucketed, street_buckets, nonneg,
-			  uniform_, explore, it_, soft_warmup_, hard_warmup_,
-			  update_sumprobs, sumprob_scaling_, opp_probs[pa],
-			  pa_succ_opp_probs, i_cs_vals, i_sumprobs);
+			  uniform_, explore, ProbMethod::REGRET_MATCHING,  it_,
+			  soft_warmup_, hard_warmup_, update_sumprobs,
+			  sumprob_scaling_, opp_probs[pa], pa_succ_opp_probs,
+			  i_cs_vals, i_sumprobs);
 	}
       } else {
 	// Double regrets and sumprobs

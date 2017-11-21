@@ -98,7 +98,7 @@ public:
   unsigned int max_street_;
   bool all_full_;
   bool *full_;
-  unsigned int close_threshold_;
+  unique_ptr<unsigned int []> close_thresholds_;
   unsigned long long int process_count_;
   unsigned long long int full_process_count_;
   unsigned int active_mod_;
@@ -110,11 +110,9 @@ public:
   unsigned int batch_size_;
   unsigned long long int *total_its_;
   struct drand48_data rand_buf_;
-#if 0
   // Keep this as a signed int so we can use it in winnings calculation
   // without casting.
   int board_count_;
-#endif
 };
 
 class TCFR : public CFR {

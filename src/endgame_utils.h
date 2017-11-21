@@ -24,15 +24,15 @@ CFRValues *ReadBaseEndgameStrategy(const CardAbstraction &
 				   const BettingTree *base_betting_tree,
 				   const Buckets &base_buckets,
 				   const Buckets &endgame_buckets,
-				   unsigned int base_it,
-				   Node *base_node, unsigned int gbd,
+				   unsigned int base_it, Node *base_node,
+				   unsigned int gbd,
 				   const string &action_sequence,
-				   double **reach_probs,
-				   BettingTree *subtree,
-				   unsigned int target_p);
+				   double **reach_probs, BettingTree *subtree,
+				   bool current, unsigned int target_p);
 double ***GetSuccReachProbs(Node *node, unsigned int gbd, HandTree *hand_tree,
 			    const Buckets &buckets, const CFRValues *sumprobs,
-			    double **reach_probs, bool in_resolve_region);
+			    double **reach_probs, unsigned int root_bd_st,
+			    unsigned int root_bd, bool purify);
 void DeleteAllEndgames(const CardAbstraction &base_card_abstraction,
 		       const CardAbstraction &endgame_card_abstraction,
 		       const BettingAbstraction &base_betting_abstraction,
@@ -63,5 +63,10 @@ CFRValues *ReadEndgame(const string &action_sequence,
 		       const Buckets &endgame_buckets,
 		       ResolvingMethod method, unsigned int root_bd_st,
 		       unsigned int root_bd, unsigned int target_p);
+void FloorCVs(Node *subtree_root, double *opp_reach_probs,
+	      const CanonicalCards *hands, double *cvs);
+void ZeroSumCVs(double *p0_cvs, double *p1_cvs,
+		unsigned int num_hole_card_pairs, double **reach_probs,
+		const CanonicalCards *hands);
 
 #endif

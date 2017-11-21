@@ -28,7 +28,6 @@ private:
   const BettingTree *betting_tree_;
   HandTree *trunk_hand_tree_;
   CBRThread *trunk_thread_;
-  CBRThread **threads_;
 };
 
 #endif

@@ -17,6 +17,7 @@
 #include "cbr_builder.h"
 #include "cbr_thread.h"
 #include "cfr_config.h"
+#include "cfr_values.h"
 #include "files.h"
 #include "game.h"
 #include "hand_tree.h"
@@ -40,22 +41,9 @@ CBRBuilder::CBRBuilder(const CardAbstraction &ca, const BettingAbstraction &ba,
   unsigned int num_trunk_streets = max_street + 1;
   trunk_hand_tree_ = new HandTree(0, 0, num_trunk_streets - 1);
   
-  if (Game::MaxStreet() < 1000) {
-    threads_ = NULL;
-  } else {
-    threads_ = new CBRThread *[num_threads_];
-    for (unsigned int i = 0; i < num_threads_; ++i) {
-      threads_[i] = new CBRThread(card_abstraction_, betting_abstraction_,
-				  cfr_config_, buckets, betting_tree_, cfrs, p,
-				  trunk_hand_tree_, i, num_threads_, it, NULL,
-				  false);
-    }
-  }
-  
   trunk_thread_ = new CBRThread(card_abstraction_, betting_abstraction_,
 				cfr_config_, buckets, betting_tree_, cfrs, p,
-				trunk_hand_tree_, 0, num_threads_, it,
-				threads_, true);
+				trunk_hand_tree_, num_threads_, it);
 
   char dir[500], buf[500];
   sprintf(dir, "%s/%s.%u.%s.%i.%i.%i.%s.%s", Files::NewCFRBase(),
@@ -78,12 +66,6 @@ CBRBuilder::CBRBuilder(const CardAbstraction &ca, const BettingAbstraction &ba,
 }
 
 CBRBuilder::~CBRBuilder(void) {
-  if (threads_) {
-    for (unsigned int i = 0; i < num_threads_; ++i) {
-      delete threads_[i];
-    }
-    delete [] threads_;
-  }
   delete trunk_thread_;
   delete trunk_hand_tree_;
   delete betting_tree_;

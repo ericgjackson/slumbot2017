@@ -39,15 +39,17 @@
 #include "game.h"
 #include "hand_tree.h"
 #include "io.h"
-#include "vcfr.h"
+#include "vcfr_state.h"
 #include "vcfr_subgame.h"
+#include "vcfr.h"
 
 using namespace std;
 
 VCFRSubgame::VCFRSubgame(const CardAbstraction &ca,
 			 const BettingAbstraction &ba, const CFRConfig &cc,
 			 const Buckets &buckets, Node *root,
-			 unsigned int root_bd, const string &action_sequence,
+			 unsigned int root_bd, unsigned int p,
+			 const string &action_sequence,
 			 VCFR *cfr) :
   VCFR(ca, ba, cc, buckets, nullptr, 1), action_sequence_(action_sequence) {
   subgame_ = true;
@@ -55,6 +57,7 @@ VCFRSubgame::VCFRSubgame(const CardAbstraction &ca,
   root_bd_ = root_bd;
   root_bd_st_ = root->Street() - 1;
   cfr_ = cfr;
+  p_ = p;
   
   unsigned int max_street = Game::MaxStreet();
 
@@ -231,8 +234,8 @@ void VCFRSubgame::Go(void) {
   }
   // Should set action sequence
   unsigned int **street_buckets = AllocateStreetBuckets();
-  VCFRState state(opp_probs_, hand_tree_, root_bd_st_, 0, action_sequence_,
-		  root_bd_, root_bd_st_, street_buckets);
+  VCFRState state(opp_probs_, hand_tree_, 0, action_sequence_, root_bd_,
+		  root_bd_st_, street_buckets, p_);
   SetStreetBuckets(root_bd_st_, root_bd_, state);
   final_vals_ = Process(subtree_->Root(), 0, state, subtree_st - 1);
   DeleteStreetBuckets(street_buckets);

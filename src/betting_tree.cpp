@@ -117,19 +117,6 @@ string Node::ActionName(unsigned int s) {
 	exit(-1);
       }
       bet_size = b->LastBetTo() - LastBetTo();
-#if 0
-      unsigned int csi = b->CallSuccIndex();
-      Node *bc = b->IthSucc(csi);
-      unsigned int pot_size;
-      if (HasCallSucc()) {
-	// I want the pot size including the current bet.
-	Node *c = IthSucc(CallSuccIndex());
-	pot_size = c->PotSize();
-      } else {
-	pot_size = PotSize();
-      }
-      bet_size = (bc->PotSize() - pot_size) / 2;
-#endif
     }
     char buf[100];
     sprintf(buf, "b%u", bet_size);
@@ -490,7 +477,6 @@ BettingTree *BettingTree::BuildAsymmetricTree(const BettingAbstraction &ba,
 // A subtree constructor
 BettingTree *BettingTree::BuildSubtree(Node *subtree_root) {
   BettingTree *tree = new BettingTree();
-  // tree->pool_ = new Pool();
   unsigned int subtree_street = subtree_root->Street();
   tree->initial_street_ = subtree_street;
   tree->num_terminals_ = 0;
@@ -501,8 +487,6 @@ BettingTree *BettingTree::BuildSubtree(Node *subtree_root) {
 }
 
 BettingTree::~BettingTree(void) {
-  // delete root_;
-  // delete pool_;
   delete [] terminals_;
   unsigned int num_players = Game::NumPlayers();
   for (unsigned int p = 0; p < num_players; ++p) {

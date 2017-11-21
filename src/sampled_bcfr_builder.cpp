@@ -24,6 +24,7 @@
 #include "io.h"
 #include "rand.h"
 #include "sampled_bcfr_builder.h"
+#include "vcfr_state.h"
 
 using namespace std;
 
@@ -607,9 +608,9 @@ double *SampledBCFRBuilder::OppChoice(Node *node, unsigned int lbd,
 	    ! (value_calculation_ || i_sumprobs == nullptr ||
 	       (hard_warmup_ > 0 && it_ <= hard_warmup_));
 	  ProcessOppProbs(node, hands, bucketed, street_buckets, nonneg,
-			  uniform_, explore, it_, soft_warmup_, hard_warmup_,
-			  update_sumprobs, sumprob_scaling_, opp_probs,
-			  succ_opp_probs, i_cs_vals, i_sumprobs);
+			  uniform_, explore, prob_method_, it_, soft_warmup_,
+			  hard_warmup_, update_sumprobs, sumprob_scaling_,
+			  opp_probs, succ_opp_probs, i_cs_vals, i_sumprobs);
 	}
       } else {
 	// Double regrets and sumprobs
@@ -678,7 +679,8 @@ public:
   SBCFRThread(SampledBCFRBuilder *builder, unsigned int thread_index,
 	      unsigned int num_threads, Node *node,
 	      const string &action_sequence, double *opp_probs,
-	      const HandTree *hand_tree, unsigned int *prev_canons);
+	      const HandTree *hand_tree, unsigned int p,
+	      unsigned int *prev_canons);
   ~SBCFRThread(void);
   void Run(void);
   void Join(void);
@@ -693,6 +695,7 @@ private:
   const string &action_sequence_;
   double *opp_probs_;
   const HandTree *hand_tree_;
+  unsigned int p_;
   unsigned int *prev_canons_;
   double *ret_vals_;
   double *ret_norms_;
@@ -703,7 +706,7 @@ SBCFRThread::SBCFRThread(SampledBCFRBuilder *builder,
 			 unsigned int thread_index, unsigned int num_threads,
 			 Node *node, const string &action_sequence,
 			 double *opp_probs, const HandTree *hand_tree,
-			 unsigned int *prev_canons) :
+			 unsigned int p, unsigned int *prev_canons) :
   action_sequence_(action_sequence) {
   builder_ = builder;
   thread_index_ = thread_index;
@@ -711,6 +714,7 @@ SBCFRThread::SBCFRThread(SampledBCFRBuilder *builder,
   node_ = node;
   opp_probs_ = opp_probs;
   hand_tree_ = hand_tree;
+  p_ = p;
   prev_canons_ = prev_canons;
 }
 
@@ -747,8 +751,8 @@ void SBCFRThread::Go(void) {
   }
   for (unsigned int bd = thread_index_; bd < num_boards; bd += num_threads_) {
     unsigned int **street_buckets = AllocateStreetBuckets();
-    VCFRState state(opp_probs_, hand_tree_, st, bd, action_sequence_, 0, 0,
-		    street_buckets);
+    VCFRState state(opp_probs_, hand_tree_, bd, action_sequence_, 0, 0,
+		    street_buckets, p_);
     // Initialize buckets for this street
     builder_->SetStreetBuckets(st, bd, state);
     double *bd_norms;
@@ -790,7 +794,7 @@ void SampledBCFRBuilder::Split(Node *node, double *opp_probs,
   unique_ptr<SBCFRThread * []> threads(new SBCFRThread *[num_threads_]);
   for (unsigned int t = 0; t < num_threads_; ++t) {
     threads[t] = new SBCFRThread(this, t, num_threads_, node, action_sequence,
-				 opp_probs, hand_tree, prev_canons);
+				 opp_probs, hand_tree, p_, prev_canons);
   }
   for (unsigned int t = 1; t < num_threads_; ++t) {
     threads[t]->Run();
@@ -913,8 +917,9 @@ double *SampledBCFRBuilder::StreetInitial(Node *node, unsigned int plbd,
       unsigned int ngbd = BoardTree::LookupBoard(canon_board, nst);
       HandTree hand_tree(nst, ngbd, Game::MaxStreet());
       unsigned int **street_buckets = AllocateStreetBuckets();
-      VCFRState new_state(state.OppProbs(), &hand_tree, nst, 0,
-			  state.ActionSequence(), ngbd, nst, street_buckets);
+      VCFRState new_state(state.OppProbs(), &hand_tree, 0,
+			  state.ActionSequence(), ngbd, nst, street_buckets,
+			  p_);
       SetStreetBuckets(nst, ngbd, new_state);
       double *next_norms;
       double *next_vals = Process(node, 0, new_state, nst, &next_norms);
@@ -1029,7 +1034,7 @@ void SampledBCFRBuilder::Go(void) {
 
   double *opp_probs = AllocateOppProbs(true);
   unsigned int **street_buckets = AllocateStreetBuckets();
-  VCFRState state(opp_probs, street_buckets, trunk_hand_tree_);
+  VCFRState state(opp_probs, street_buckets, trunk_hand_tree_, p_);
   SetStreetBuckets(0, 0, state);
   double *norms;
   double *vals = Process(betting_tree_->Root(), 0, state, 0, &norms);

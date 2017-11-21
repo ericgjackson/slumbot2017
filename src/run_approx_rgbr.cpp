@@ -18,9 +18,12 @@
 // chooses regardless of the cards he holds.  These would all allow a tiny
 // amount of cheating.
 //
-// Why do I read the sumprobs multiple times?
-//
-// With a bucketed system, we will have to read all the sumprobs, no?
+// What's the deal with the sumprobs?  I think I had the idea that I could
+// save memory if I read only the needed sumprobs when I got to each
+// subgame.  But with a bucketed system, I cannot read sumprobs just for
+// the current board.  Maybe I could read them just for the current betting
+// subtree, but the current CFRValues reading code doesn't support that, I
+// think.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,7 +40,7 @@
 #include "cfr_params.h"
 #include "cfr_utils.h"
 #include "cfr_values.h"
-#include "dynamic_cbr.h"
+#include "dynamic_cbr2.h"
 #include "files.h"
 #include "game.h"
 #include "game_params.h"
@@ -58,9 +61,8 @@ public:
   void Go(void);
 private:
   double GetBRVal(Node *node, double **reach_probs, unsigned int bd,
-		  unsigned int p, CFRValues *sumprobs, HandTree *hand_tree,
-		  double *br_norm);
-  CFRValues *GetSumprobs(void);
+		  unsigned int p, HandTree *hand_tree, double *br_norm);
+  void SetSumprobs(void);
   void SampledCompute(Node *node, double **reach_probs, double *total_br_vals,
 		      double *total_br_norms);
   void AlwaysCallSampledCompute(Node *node, double **reach_probs,
@@ -81,10 +83,9 @@ private:
   Buckets buckets_;
   unsigned int it_;
   unique_ptr<BettingTree> betting_tree_;
-  unique_ptr<DynamicCBR> dynamic_cbr_;
+  unique_ptr<DynamicCBR2> dynamic_cbr2_;
   unique_ptr<HandTree> trunk_hand_tree_;
   unique_ptr<CFRValues> trunk_sumprobs_;
-  CFRValues *subgame_sumprobs_;
   unique_ptr<unsigned int []> board_samples_;
   unsigned int terminal_scaling_;
 };
@@ -164,7 +165,9 @@ ApproxRGBR::ApproxRGBR(const CardAbstraction &ca, const BettingAbstraction &ba,
     trunk_hand_tree_.reset(new HandTree(0, 0, target_st_ - 1));
   }
 
-  dynamic_cbr_.reset(new DynamicCBR());
+  dynamic_cbr2_.reset(new DynamicCBR2(card_abstraction_, betting_abstraction_,
+				      cfr_config_, buckets_,
+				      betting_tree_.get(), 1));
 
 #if 0
   // This is an inefficient way of computing the total number of raw
@@ -195,20 +198,18 @@ ApproxRGBR::ApproxRGBR(const CardAbstraction &ca, const BettingAbstraction &ba,
     // the particular hole cards in question?
     terminal_scaling_ += num_samples;
   }
-
-  subgame_sumprobs_ = GetSumprobs();
+  SetSumprobs();
 }
 
 ApproxRGBR::~ApproxRGBR(void) {
-  delete subgame_sumprobs_;
 }
 
 double ApproxRGBR::GetBRVal(Node *node, double **reach_probs, unsigned int bd,
-			    unsigned int p, CFRValues *sumprobs,
-			    HandTree *hand_tree, double *br_norm) {
-  double *cbrs = dynamic_cbr_->Compute(node, reach_probs, bd, hand_tree,
-				       sumprobs, target_st_, bd, buckets_,
-				       card_abstraction_, p, false, false);
+			    unsigned int p, HandTree *hand_tree,
+			    double *br_norm) {
+  double *cbrs = dynamic_cbr2_->Compute(node, reach_probs, bd, hand_tree,
+                                        target_st_, bd, p, false, false,
+					false, false);
   // hand_tree is local to this board
   const CanonicalCards *hands = hand_tree->Hands(target_st_, 0);
   double sum_joint_probs = 0;
@@ -243,7 +244,7 @@ double ApproxRGBR::GetBRVal(Node *node, double **reach_probs, unsigned int bd,
   return sum_weighted_cbrs;
 }
 
-CFRValues *ApproxRGBR::GetSumprobs(void) {
+void ApproxRGBR::SetSumprobs(void) {
   fprintf(stderr, "Reading sumprobs\n");
   unsigned int max_street = Game::MaxStreet();
   char dir[500];
@@ -274,12 +275,12 @@ CFRValues *ApproxRGBR::GetSumprobs(void) {
   }
   // Pass in 0/0 for root_bd_st/root_bd.  We will have globally indexed
   // sumprobs.
-  CFRValues *sumprobs =
+  unique_ptr<CFRValues> sumprobs(
     new CFRValues(nullptr, true, streets.get(), betting_tree_.get(), 0, 0,
-		  card_abstraction_, buckets_, nullptr);
+		  card_abstraction_, buckets_, nullptr));
   sumprobs->Read(dir, it_, betting_tree_->Root(), "x", kMaxUInt);
   fprintf(stderr, "Read sumprobs\n");
-  return sumprobs;
+  dynamic_cbr2_->MoveSumprobs(sumprobs);
 
 }
 
@@ -289,7 +290,7 @@ void ApproxRGBR::SampledCompute(Node *node, double **reach_probs,
 				double *total_br_vals,
 				double *total_br_norms) {
   // CFRValues *sumprobs = GetSumprobs();
-  CFRValues *sumprobs = subgame_sumprobs_;
+  // CFRValues *sumprobs = subgame_sumprobs_;
   unsigned int num_players = Game::NumPlayers();
   unsigned int num_boards = BoardTree::NumBoards(target_st_);
   for (unsigned int bd = 0; bd < num_boards; ++bd) {
@@ -299,8 +300,7 @@ void ApproxRGBR::SampledCompute(Node *node, double **reach_probs,
     HandTree hand_tree(target_st_, bd, Game::MaxStreet());
     for (unsigned int p = 0; p < num_players; ++p) {
       double br_norm;
-      double br_val = GetBRVal(node, reach_probs, bd, p, sumprobs, &hand_tree,
-			       &br_norm);
+      double br_val = GetBRVal(node, reach_probs, bd, p, &hand_tree, &br_norm);
       total_br_vals[p] += br_val * num_samples;
       total_br_norms[p] += br_norm * num_samples;
     }
@@ -311,7 +311,8 @@ void ApproxRGBR::SampledCompute(Node *node, double **reach_probs,
 void ApproxRGBR::AlwaysCallSampledCompute(Node *node, double **reach_probs,
 					  double *total_br_vals,
 					  double *total_br_norms) {
-  CFRValues *sumprobs = GetSumprobs();
+  // CFRValues *sumprobs = GetSumprobs();
+  // CFRValues *sumprobs = subgame_sumprobs_;
   unsigned int num_players = Game::NumPlayers();
   unsigned int num_boards = BoardTree::NumBoards(target_st_);
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(target_st_);
@@ -341,13 +342,13 @@ void ApproxRGBR::AlwaysCallSampledCompute(Node *node, double **reach_probs,
 	my_reach_probs[1] = all_ones;
       }
       double br_norm;
-      double br_val = GetBRVal(node, my_reach_probs, bd, p, sumprobs,
-			       &hand_tree, &br_norm);
+      double br_val = GetBRVal(node, my_reach_probs, bd, p, &hand_tree,
+			       &br_norm);
       total_br_vals[p] += br_val * num_samples;
       total_br_norms[p] += br_norm * num_samples;
     }
   }
-  delete sumprobs;
+  // delete sumprobs;
   delete [] all_ones;
   delete [] my_reach_probs;
 }

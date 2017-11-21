@@ -23,6 +23,7 @@
 #include "os_cfr.h"
 #include "pcs_cfr.h"
 #endif
+#include "vcfr_state.h"
 
 using namespace std;
 
@@ -198,13 +199,13 @@ void EndgameSolver::BRGo(double *p0_br, double *p1_br) {
   hand_tree_ = new HandTree(0, 0, solve_street_);
   double *opp_probs = AllocateOppProbs(true);
   unsigned int **street_buckets = AllocateStreetBuckets();
-  VCFRState state(opp_probs, street_buckets, hand_tree_);
+  VCFRState state(opp_probs, street_buckets, hand_tree_, 0);
   SetStreetBuckets(0, 0, state);
 
-  p_ = 0;
+  state.SetP(0);
   double *p0_vals = Process(betting_tree_->Root(), 0, state, 0);
 
-  p_ = 1;
+  state.SetP(1);
   double *p1_vals = Process(betting_tree_->Root(), 0, state, 0);
 
   DeleteStreetBuckets(street_buckets);
@@ -236,8 +237,9 @@ double *EndgameSolver::Process(Node *node, unsigned int lbd,
     // loop over the boards on solve_street_.
     unsigned int nt = node->NonterminalID();
     unsigned int pa = node->PlayerActing();
-    double *vals = br_vals_[p_][pa][nt][lbd];
-    br_vals_[p_][pa][nt][lbd] = nullptr;
+    unsigned int p = state.P();
+    double *vals = br_vals_[p][pa][nt][lbd];
+    br_vals_[p][pa][nt][lbd] = nullptr;
     return vals;
   } else {
     return VCFR::Process(node, lbd, state, last_st);
@@ -322,6 +324,9 @@ void EndgameSolver::SolveSafe(Node *solve_root, Node *target_root,
     fprintf(stderr, "EndgameSolver::Solver: street != solve_street_?!?\n");
     exit(-1);
   }
+  fprintf(stderr, "Resolve %s st %u nt %u gbd %u\n",
+	  action_sequence.c_str(), street, solve_root->NonterminalID(),
+	  solve_bd);
   unsigned int max_street = Game::MaxStreet();
   unsigned int *prior_bds = new unsigned int[max_street + 1];
   prior_bds[0] = 0;

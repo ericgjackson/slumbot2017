@@ -51,23 +51,23 @@ int main(int argc, char *argv[]) {
   if (sscanf(argv[7], "%u", &end_it) != 1)        Usage(argv[0]);
   if (sscanf(argv[8], "%u", &batch_size) != 1)    Usage(argv[0]);
   if (sscanf(argv[9], "%u", &save_interval) != 1) Usage(argv[0]);
-  bool p1_target = true;
+  unsigned int target_p = kMaxUInt;
   if (argc == 11) {
     if (! betting_abstraction->Asymmetric()) {
       fprintf(stderr, "Don't specify p1/p2 when using symmetric betting "
 	      "abstraction\n");
       exit(-1);
     }
-    string p1_arg = argv[10];
-    if (p1_arg == "p1")      p1_target = true;
-    else if (p1_arg == "p2") p1_target = false;
-    else                     Usage(argv[0]);
+    string p_arg = argv[10];
+    if (p_arg == "p0")      target_p = 0;
+    else if (p_arg == "p1") target_p = 1;
+    else                    Usage(argv[0]);
   }
 
   if (cfr_config->Algorithm() == "tcfr") {
     Buckets buckets(*card_abstraction, false);
     TCFR cfr(*card_abstraction, *betting_abstraction, *cfr_config,
-	     buckets, num_threads, p1_target);
+	     buckets, num_threads, target_p);
     cfr.Run(start_it, end_it, batch_size, save_interval);
   } else {
     fprintf(stderr, "Unknown algorithm: %s\n",

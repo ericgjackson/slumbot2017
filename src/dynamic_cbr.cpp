@@ -1,8 +1,11 @@
+// Use DynamicCBR2 now instead which does not needlessly replicate so much
+// code.
+// 
 // We copy the Vanilla CFR code from vcfr.cpp into DynamicCBR, albeit
-// with a lot of simplifications.  We only support a best response, for
-// example.  Maybe we could go back to using VCFR at least if we made a
-// few changes to the VCFR code.  We might need to pass in a sumprobs
-// object, for example.
+// with a lot of simplifications.  Maybe we could go back to using VCFR at
+// least if we made a few changes to the VCFR code.  We might need to pass in
+// a sumprobs object, buckets and a card abstraction, for example.  The
+// only thing we need the card abstraction for is bucket threshold.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -510,7 +513,7 @@ double *DynamicCBR::Compute(Node *node, unsigned int p,
   return vals;
 }
 
-// Pass in the player who you want CBR values for.
+// target_p is the player who you want CBR values for.
 // Things get confusing in endgame solving.  Suppose we are doing endgame
 // solving for P0.  We might say cfr_target_p is 0.  Then I want T-values for
 // P1.  So I pass in 1 to Compute(). We'll need the reach probs of P1's
@@ -523,7 +526,6 @@ double *DynamicCBR::Compute(Node *node, double **reach_probs,
 			    const CardAbstraction &card_abstraction,
 			    unsigned int target_p, bool cfrs, bool zero_sum) {
   cfrs_ = cfrs;
-  // For now assume that we always want to zero sum
   if (zero_sum) {
     double *p0_cvs = Compute(node, 0, reach_probs[1], gbd, hand_tree,
 			     sumprobs, root_bd_st, root_bd, buckets,

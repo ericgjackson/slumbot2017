@@ -38,6 +38,11 @@ public:
   float ReadFloatOrDie(void);
   bool ReadReal(float *f);
   bool ReadReal(double *d);
+  void ReadOrDie(unsigned char *c);
+  void ReadOrDie(unsigned short *s);
+  void ReadOrDie(unsigned int *u);
+  void ReadOrDie(int *i);
+  void ReadOrDie(double *d);
   bool GetLine(string *s);
   bool ReadCString(string *s);
   string ReadCStringOrDie(void);
@@ -91,6 +96,11 @@ class Writer {
   void WriteDouble(double d);
   void WriteReal(float f);
   void WriteReal(double d);
+  void Write(unsigned char c);
+  void Write(unsigned short s);
+  void Write(int i);
+  void Write(unsigned int u);
+  void Write(double d);
   void WriteCString(const char *s);
   void WriteNBytes(unsigned char *bytes, unsigned int num_bytes);
   void WriteBytes(unsigned char *bytes, int num_bytes);

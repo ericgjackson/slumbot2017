@@ -2,6 +2,7 @@
 #define _BUCKETS_H_
 
 class CardAbstraction;
+class Reader;
 
 class Buckets {
 public:
@@ -22,6 +23,18 @@ private:
   unsigned short **short_buckets_;
   unsigned int **int_buckets_;
   unsigned int *num_buckets_;
+};
+
+class BucketsFile {
+public:
+  BucketsFile(const CardAbstraction &ca);
+  ~BucketsFile(void);
+  unsigned int Bucket(unsigned int st, unsigned int h) const;
+private:
+  bool *none_;
+  unsigned int *num_buckets_;
+  bool *shorts_;
+  Reader **readers_;
 };
 
 #endif

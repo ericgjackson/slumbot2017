@@ -28,7 +28,6 @@
 #include "cfr_config.h"
 #include "cfr_params.h"
 #include "cfr_values.h"
-#include "cfr.h"
 #include "eg_cfr.h" // ResolvingMethod
 #include "files.h"
 #include "game.h"

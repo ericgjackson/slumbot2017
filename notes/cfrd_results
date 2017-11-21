@@ -1,0 +1,268 @@
+7/22/2017
+
+tcfr base
+Base 1b (24m):    Exploitability: 214.10 mbb/g
+Base 2b (23m):    Exploitability: 205.20 mbb/g
+Base 3b:          Exploitability: 202.28 mbb/g
+Base 12b:         Exploitability: 191.56 mbb/g
+Base 13b (+229m): Exploitability: 191.35 mbb/g
+
+ms3f1t1r1h5
+Base 200:  Exploitability: 32.21 mbb/g
+  Limp count: 174/190
+Base 1000: Exploitability: 2.76 mbb/g
+  Limp count: 190/190?!?
+Unsafe 1000/200: Exploitability: 92.05 mbb/g
+Unabstracted, cfrps_params
+  CBRs
+    It 200:
+      EV: -0.529810, 0.658667
+      CFR-D Exploitability: 26.60 mbb/g
+    It 1000:
+      EV: -0.587717, 0.598764
+      CFR-D Exploitability: 6.09 mbb/g
+        Limp count: 162/190
+	P1 best response: 0.603764 (301.88 mbb/g)
+        P2 best response: -0.579389 (-289.69 mbb/g)
+      Maxmargin Exploitability: 6.80 mbb/g
+  CFRs
+    It 200:
+      EV: +/-0.589602
+      CFR-D Exploitability: 97.74 mbb/g
+    It 1000:
+      EV: -0.591244, EV: 0.591244
+      CFR-D Exploitability: 84.41 mbb/g
+        Limp count 156/190
+        P1 best response: 0.664577 (332.29 mbb/g)
+        P2 best response: -0.326936 (-163.47 mbb/g)
+      Maxmargin Exploitability: 870.98 mbb/g
+Use doubles, exploration in base (cfrpsde01_params)
+  Unsafe Exploitability: 63.68 mbb/g
+  CBRs
+    It 1000:
+      EV: -0.543, 0.618
+      CFR-D Exploitability: 16.64 mbb/g
+      Maxmargin Exploitability: 17.97 mbb/g
+  CFRs
+    It 1000:
+      EV: +/- 0.597432
+      CFR-D Exploitability: 24.17 mbb/g
+      Maxmargin Exploitability: 160.07 mbb/g
+
+tcfr, nhs abstraction
+  Unsafe 13b/200: Exploitability: 137.79 mbb/g
+  CBRs
+    EV: -0.487, 0.692 (13b base)
+    EV: -0.455612, 0.733495 (3b base)
+    CFR-D 13b/200: Exploitability: 97.12 mbb/g
+    Limp count: 114/190
+    P1 best response: 0.765435 (382.72 mbb/g)
+    P2 best response: -0.376953 (-188.48 mbb/g)
+    Maxmargin Exploitability: 202.97 mbb/g
+      Now 202.25.  Why would it change?
+    Zero-sum CFR-D: Exploitability: 91.30 mbb/g (13b base)
+                    Exploitability: 98.48 mbb/g (3b base)
+           500 its: Exploitability: 89.42 mbb/g (13b base)
+  CFRs
+    EV: +/- 0.597432
+    CFR-D 13b/200: Exploitability: 120.25 mbb/g
+    Limp count: 76/190
+
+tcfr, maxmargin, cfrs: Exploitability: 944.70 mbb/g
+
+tcfr, card-level raw cbr values, maxmargin: Exploitability: 148.06 mbb/g
+  build_cbrs: EV: -0.144544, EV: 0.909924
+tcfr, card-level zero-sum cbr values, maxmargin: Exploitability: 146.52 mbb/g
+tcfr, card-level cbr values, cfr-d:          Exploitability: 150.50 mbb/g
+tcfr, card-level cbr values, zero sum cfr-d: Exploitability: 106.86 mbb/g
+
+
+tcfru: uniform probs when sum-pos-regrets 0, nhs3
+0: Exploitability: 216.03 mbb/g
+8: Exploitability: 204.86 mbb/g
+16: Exploitability: 202.58 mbb/g
+build_bcbrs EVs: -0.449254, 0.731147
+build_cbrs EVs: -0.124156, 0.934471
+CFR-D, bucket-level zero-sum CBRs: 97.83
+CFR-D, CFRs: Exploitability: 116.18 mbb/g
+  Note: there's no difference between card-level and bucket-level CFRs
+Combined, bucket-level zero-sum CBRs: Exploitability: 79.21 mbb/g (3b)
+  Compare tcfr/3b at 81.12
+
+tcfre001: explore=0.001
+16: Exploitability: 204.11 mbb/g
+build_bcbrs EVs: -0.443926, 0.737806
+build_cbrs EVs: -0.123387, 0.939837
+CFR-D, bucket-level zero-sum CBRs: Exploitability: 100.02 mbb/g
+CFR-D, card-level zero-sum CBRs:   Exploitability: 112.65 mbb/g
+
+Combined, tcfr, bucket-level zero-sum CBRs: Exploitability: 73.41 mbb/g (13b)
+                                            Exploitability: 81.12 mbb/g (3b)
+                                   500 its: Exploitability: 71.36 mbb/g (13b)
+Combined, tcfr, bucket-level raw CBRs:      Exploitability: 76.01 mbb/g
+Combined, tcfr, card-level zero-sum CBRs:   Exploitability: 88.17 mbb/g
+Combined, tcfr, card-level raw CBRs:        Exploitability: 98.91 mbb/g
+Combined w/ 50% cap, b/z/cbr, 13b:          Exploitability: 68.06 mbb/g
+Combined w/ 25% cap, b/z/cbr, 13b:          Exploitability: 63.57 mbb/g
+Combined w/ 20% cap, b/z/cbr, 13b:          Exploitability: 60.14 mbb/g
+Combined w/ 10% cap, b/z/cbr, 13b:          Exploitability: 65.58 mbb/g
+Combined w/ 20% cap, b/z/cbr, uniform 0.05 13b:   Exploitability: 56.86 mbb/g
+Combined w/ 20% cap, b/z/cbr, uniform 0.075 13b:  Exploitability: 56.00 mbb/g
+Combined w/ 20% cap, b/z/cbr, uniform 0.1 13b:    Exploitability: 55.74 mbb/g
+Combined w/ 20% cap, b/z/cbr, uniform 0.2 13b:    Exploitability: 58.10 mbb/g
+Combined w/ 15% cap, b/z/cbr, uniform 0.1 13b:    Exploitability: 56.21 mbb/g
+Combined, no cfrd, b/z/cbr, uniform 0.1 13b:      Exploitability: 77.58 mbb/g
+Combined, b/z/cbr, 20% cap, u 0.1, avg 4 cv, 13b: Exploitability: 65.39 mbb/g
+Combined, b/z/cbr, 20% cap, u 0.1, avg cbrs, 13b: Exploitability: 55.68 mbb/g
+Combined, b/z/cbr, 20% cap, u 0.1, 25/75 cbrs, 13b: Exploitability: 55.72 mbb/g
+Three weights
+Combined b/z/cbr, 13b, 0.85/0.15/0.05 rescaled:  Exploitability: 56.75 mbb/g
+Combined b/z/cbr, 13b, 0.75/0.2/0.05:            Exploitability: 56.82 mbb/g
+Unsafe plus weighted CFR-D/uniform
+Combined b/z/cbr, 13b, 0.2/0.1:                  Exploitability: 58.87 mbb/g
+Combined b/z/cbr, 13b, 0.3/0.1:                  Exploitability: 59.19 mbb/g
+Unsafe plus uniform; CFR-D applied to rem
+Combined b/z/cbr, 13b, 0.2/0.1:                  Exploitability: 59.05 mbb/g
+Combined b/z/cbr, 13b, 0.2/0:                    Exploitability: 64.09 mbb/g
+Combined b/z/cbr, 13b, 0.2/0.2:                  Exploitability: 58.79 mbb/g
+Combined b/z/cbr, 13b, 0.1/0.2:                  Exploitability: 65.74 mbb/g
+Combined b/z/cbr, 13b, 0.3/0.2:                  Exploitability: 57.64 mbb/g
+Combined b/z/cbr, 13b, 0.4/0.2:                  Exploitability: 58.63 mbb/g
+Flooring low CVs
+Combined w/ 20% cap, b/z/cbr, uniform 0.1 13b:   Exploitability: 55.59 mbb/g
+Alt vals for P0 (for target P1):                 Exploitability: 55.38 mbb/g
+Zero sum by scaling down 0.7:                    Exploitability: 55.88 mbb/g
+Zero sum by scaling down 0.8:                    Exploitability: 55.87 mbb/g
+Zero sum by scaling down 0.9:                    Exploitability: 55.84 mbb/g
+Higher CFR-D cap when sum reach probs low
+0.3 when srp < 10.0:                             Exploitability: 54.80 mbb/g
+0.4 when srp < 10.0:                             Exploitability: 54.61 mbb/g
+0.4 when srp < 10.0; 0.1 o.w.:                   Exploitability: 55.11 mbb/g
+0.5 when srp < 10.0:                             Exploitability: 54.68 mbb/g
+1.0 when srp < 10.0:                             Exploitability: 55.51 mbb/g
+0.4 when srp < 20.0:                             Exploitability: 55.29 mbb/g
+Fixed limit of 2.5 for CFR-D:                    Exploitability: 55.99 mbb/g
+Fixed limit of 3.0 for CFR-D:                    Exploitability: 55.49 mbb/g
+Fixed limit of 4.0 for CFR-D:                    Exploitability: 55.09 mbb/g
+Fixed limit of 5.0 for CFR-D:                    Exploitability: 55.28 mbb/g
+Fixed limit of 6.0 for CFR-D:                    Exploitability: 55.86 mbb/g
+Fixed limit of 10.0 for CFR-D:                   Exploitability: 58.77 mbb/g
+Adding random noise to T-values
+0.01 factor:                                     Exploitability: 55.55 mbb/g
+0.05 factor:                                     Exploitability: 55.58 mbb/g
+0.1 factor:                                      Exploitability: 56.33 mbb/g
+Only add CFR-D hands if unsafe prob low
+== 0:                                            Exploitability: 77.46 mbb/g
+< 0.1:                                           Exploitability: 66.66 mbb/g
+< 0.2:                                           Exploitability: 60.06 mbb/g
+< 0.3:                                           Exploitability: 59.29 mbb/g
+Add full CFR-D prob to unsafe prob               
+0.2 CFR-D cap:                                   Exploitability: 56.66 mbb/g
+0.15 CFR-D cap:                                  Exploitability: 56.67 mbb/g
+0.25 CFR-D cap:                                  Exploitability: 57.38 mbb/g
+Limit of 0.4 for CFR-D, uniform 2.0/1326:        Exploitability: 55.90 mbb/g
+Limit of 0.4 for CFR-D, uniform 2.5/1326:        Exploitability: 55.86 mbb/g
+Limit of 0.4 for CFR-D, uniform 3.0/1326:        Exploitability: 56.20 mbb/g
+Gap > 0.01; CFR-D cap 0.4:                       Exploitability: 55.33 mbb/g
+Gap > 0.01; CFR-D cap 0.5:                       Exploitability: 55.33 mbb/g
+Gap > 0.01; CFR-D cap 1.0:                       Exploitability: 55.59 mbb/g
+Gap > 0.02; CFR-D cap 1.0:                       Exploitability: 55.64 mbb/g
+
+Use bucket-level CFRs (not CBRs) in combined endgame solving
+EV: +/- 0.597432
+Baseline is 55.59 system
+96/200: Exploitability: 66.89 mbb/g
+
+Comparing to 55.59 system
+cfrps1, 40 iterations:  Exploitability: 82.16 mbb/g
+cfrps1, 50 iterations:  Exploitability: 72.96 mbb/g
+cfrps1, 60 iterations:  Exploitability: 67.67 mbb/g
+cfrps1, 70 iterations:  Exploitability: 64.22 mbb/g
+cfrps1, 80 iterations:  Exploitability: 62.04 mbb/g
+cfrps1, 90 iterations:  Exploitability: 60.65 mbb/g
+cfrps1, 100 iterations: Exploitability: 59.44 mbb/g
+
+  
+Combined, tcfre001, bucket-level zero-sum CBRs: Exploitability: 82.06 mbb/g
+
+Rank order of all systems with tcfr base.  All use nhs3_params.
+Combined, tcfr, b/z/cbrs, 20% CFR-D, u 0.1, floor:                 55.59
+Combined, tcfr, bucket-level zero-sum CBRs, 20% cap, uniform 0.1:  55.74
+Combined, tcfr, bucket-level raw CBRs, 20% cap, uniform 0.1:       55.78
+Combined, tcfr, card-level zero-sum CBRs, 20% CFR-D, uniform 0.1:  56.01
+Combined, tcfr, card-level zero-sum CBRs, 30% CFR-D, uniform 0.1:  57.27
+Combined, tcfr, card-level zero-sum CBRs, 20% CFR-D, uniform 0.05: 57.45
+Combined, tcfr, card-level zero-sum CBRs, 10% CFR-D, uniform 0.1:  58.75
+Combined, tcfr, card-level zero-sum CBRs, 20% CFR-D, uniform 0.2:  59.13
+Combined, tcfr, card-level raw CBRs, 20% cap, uniform 0.1:         59.61
+Combined, tcfr, bucket-level zero-sum CBRs, 20% cap: 60.14
+Combined, tcfr, bucket-level zero-sum CBRs, 25% cap: 63.57
+Combined, tcfr, bucket-level zero-sum CFRs, 10% CFR-D, u 0.05, floor: 64.26
+Combined, tcfr, bucket-level zero-sum CFRs, 10% CFR-D, u 0.1, floor:  65.04
+Combined, tcfr, bucket-level zero-sum CBRs, 10% cap: 65.58
+Combined, tcfr, bucket-level zero-sum CFRs, 20% CFR-D, u 0.1, floor:  66.89
+Combined, tcfr, bucket-level zero-sum CFRs, 5% CFR-D, u 0.1,  floor:  67.11
+Combined, tcfr, bucket-level zero-sum CBRs, 50% cap: 68.06
+Combined, tcfr, bucket-level zero-sum CFRs, 10% CFR-D, u 0.2, floor:  70.60
+Combined, tcfr, bucket-level zero-sum CBRs:     73.41
+Combined, tcfr, bucket-level raw CBRs:          76.01
+Combined, tcfre001, bucket-level zero-sum CBRs: 82.06
+Combined, tcfr, card-level zero-sum CBRs:       88.17
+CFR-D, tcfr, bucket-level zero-sum CBRs:        89.32
+CFR-D, tcfr, bucket-level raw CBRs:             97.12
+CFR-D, tcfru, bucket-level zero-sum CBRs:       97.83
+Combined, tcfr, card-level raw CBRs:            98.91
+CFR-D, tcfre001, bucket-level zero-sum CBRs:    100.02
+CFR-D, tcfr, card-level zero-sum CBRs:          106.86
+CFR-D, tcfre001, card-level zero-sum CBRs:      112.65
+CFR-D, tcfru, CFRs:                             116.18
+CFR-D, tcfr, bucket-level CFRs:                 120.25
+Unsafe, tcfr                                    137.79
+Maxmargin, tcfr, card-level zero-sum CBRs:      146.52
+Maxmargin, tcfr, card-level raw CBRs:           148.06
+CFR-D, tcfr, card-level raw CBRs:               150.50
+Maxmargin, tcfr, bucket-level raw CBRs:         202.25
+Maxmargin, tcfr, bucket-level CFRs:             944.70
+
+Choosing between CFR-D and unsafe based on avg_t_value_ / pot-size
+Unsafe: 137.79; CFR-D 89.32
+0.01:  Exploitability: 124.90 mbb/g
+0.005: Exploitability: 103.13 mbb/g
+0.001: Exploitability: 92.72 mbb/g
+
+----------------------------------------------
+
+Try a very simple abstracted game and see if CVs reported by build_bcbrs
+converge to zero-sum.
+
+ms1f1/nhs1/mb1b1/cfrps1
+50: Exploitability: 44.00 mbb/g
+60: Exploitability: 43.18 mbb/g
+70: Exploitability: 43.68 mbb/g
+100: Exploitability: 44.87 mbb/g
+200: Exploitability: 42.15 mbb/g
+300: Exploitability: 42.39 mbb/g
+1000: Exploitability: 44.51 mbb/g
+build_bcbrs:
+  60: EV: -0.119128, EV: 0.165664
+  200: EV: -0.136109, EV: 0.147840
+  300: EV: -0.138672, EV: 0.145518
+  1000: EV: -0.141080, EV: 0.142690
+Zero-sum CFR-D 60/200: Exploitability: 12.81 mbb/g
+Zero-sum CFR-D 200/200: Exploitability: 9.17 mbb/g
+Zero-sum CFR-D 300/200: Exploitability: 8.70 mbb/g
+Zero-sum CFR-D 1000/200: Exploitability: 8.37 mbb/g
+CFR-D 60/200:   Exploitability: 13.64 mbb/g
+CFR-D 200/200:  Exploitability: 9.47 mbb/g
+CFR-D 300/200:  Exploitability: 8.91 mbb/g
+CFR-D 1000/200: Exploitability: 8.40 mbb/g
+
+Helps to keep training base even after exploitability has plateaued.
+
+tcfr
+1b: Exploitability: 44.68 mbb/g
+  EV: -0.139913, EV: 0.144480
+2b: Exploitability: 43.87 mbb/g
+  EV: -0.140290, EV: 0.144115
+Zero-sum CFR-D 1b/200: Exploitability: 9.28 mbb/g
+Zero-sum CFR-D 1b/200: Exploitability: 8.87 mbb/g

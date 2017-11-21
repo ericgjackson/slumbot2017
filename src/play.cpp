@@ -43,9 +43,8 @@ class Player {
 public:
   Player(BettingTree *betting_tree, const BettingAbstraction &ba,
 	 const CardAbstraction &a_ca, const CardAbstraction &b_ca,
-	 const Buckets &a_buckets, const Buckets &b_buckets,
 	 const CFRConfig &a_cc, const CFRConfig &b_cc,
-	 unsigned int a_it, unsigned int b_it);
+	 unsigned int a_it, unsigned int b_it, bool mem_buckets);
   ~Player(void);
   void Go(unsigned long long int num_duplicate_hands, bool deterministic);
 private:
@@ -56,10 +55,13 @@ private:
   void PlayDuplicateHand(unsigned long long int h, const Card *cards,
 			 bool deterministic, double *a_sum, double *b_sum);
 
+  bool mem_buckets_;
   unsigned int num_players_;
   BettingTree *betting_tree_;
-  const Buckets &a_buckets_;
-  const Buckets &b_buckets_;
+  const Buckets *a_buckets_;
+  const Buckets *b_buckets_;
+  const BucketsFile *a_buckets_file_;
+  const BucketsFile *b_buckets_file_;
   CFRValues *a_probs_;
   CFRValues *b_probs_;
   unsigned int *boards_;
@@ -163,22 +165,32 @@ void Player::Play(Node *node, unsigned int b_pos, unsigned int *contributions,
     unsigned int a_offset, b_offset;
     // If card abstraction, hcp on river should be raw.  If no card
     // abstraction, hcp on river should be sorted.  Right?
-    if (a_buckets_.None(st)) {
+    if (a_buckets_->None(st)) {
       unsigned int hcp = st == Game::MaxStreet() ? sorted_hcps_[bd][raw_hcp] :
 	raw_hcp;
       a_offset = bd * num_hole_card_pairs * num_succs + hcp * num_succs;
     } else {
       unsigned int h = bd * num_hole_card_pairs + raw_hcp;
-      unsigned int b = a_buckets_.Bucket(st, h);
+      unsigned int b;
+      if (mem_buckets_) {
+	b = a_buckets_->Bucket(st, h);
+      } else {
+	b = a_buckets_file_->Bucket(st, h);
+      }
       a_offset = b * num_succs;
     }
-    if (b_buckets_.None(st)) {
+    if (b_buckets_->None(st)) {
       unsigned int hcp = st == Game::MaxStreet() ? sorted_hcps_[bd][raw_hcp] :
 	raw_hcp;
       b_offset = bd * num_hole_card_pairs * num_succs + hcp * num_succs;
     } else {
       unsigned int h = bd * num_hole_card_pairs + raw_hcp;
-      unsigned int b = b_buckets_.Bucket(st, h);
+      unsigned int b;
+      if (mem_buckets_) {
+	b = b_buckets_->Bucket(st, h);
+      } else {
+	b = b_buckets_file_->Bucket(st, h);
+      }
       b_offset = b * num_succs;
     }
     double r = RandZeroToOne();
@@ -422,10 +434,27 @@ void Player::Go(unsigned long long int num_duplicate_hands,
 
 Player::Player(BettingTree *betting_tree, const BettingAbstraction &ba,
 	       const CardAbstraction &a_ca, const CardAbstraction &b_ca,
-	       const Buckets &a_buckets, const Buckets &b_buckets,
 	       const CFRConfig &a_cc, const CFRConfig &b_cc,
-	       unsigned int a_it, unsigned int b_it) :
-  a_buckets_(a_buckets), b_buckets_(b_buckets) {
+	       unsigned int a_it, unsigned int b_it, bool mem_buckets) {
+  mem_buckets_ = mem_buckets;
+  if (mem_buckets_) {
+    a_buckets_ = new Buckets(a_ca, false);
+    fprintf(stderr, "Created a_buckets\n");
+    if (strcmp(a_ca.CardAbstractionName().c_str(),
+	       b_ca.CardAbstractionName().c_str())) {
+      b_buckets_ = new Buckets(b_ca, false);
+      fprintf(stderr, "Created b_buckets\n");
+    } else {
+      b_buckets_ = a_buckets_;
+    }
+    a_buckets_file_ = nullptr;
+    b_buckets_file_ = nullptr;
+  } else {
+    a_buckets_ = new Buckets(a_ca, true);
+    b_buckets_ = new Buckets(b_ca, true);
+    a_buckets_file_ = new BucketsFile(a_ca);
+    b_buckets_file_ = new BucketsFile(b_ca);
+  }
   num_players_ = Game::NumPlayers();
   hvs_.reset(new unsigned int[num_players_]);
   winners_.reset(new bool[num_players_]);
@@ -435,9 +464,9 @@ Player::Player(BettingTree *betting_tree, const BettingAbstraction &ba,
   BoardTree::CreateLookup();
   unsigned int max_street = Game::MaxStreet();
   a_probs_ = new CFRValues(nullptr, true, nullptr, betting_tree, 0, 0,
-			   a_ca, a_buckets, nullptr);
+			   a_ca, *a_buckets_, nullptr);
   b_probs_ = new CFRValues(nullptr, true, nullptr, betting_tree, 0, 0,
-			   b_ca, b_buckets, nullptr);
+			   b_ca, *b_buckets_, nullptr);
 
   char dir[500];
   sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
@@ -464,7 +493,7 @@ Player::Player(BettingTree *betting_tree, const BettingAbstraction &ba,
     raw_hcps_[p] = new unsigned int[max_street + 1];
   }
 
-  if (a_buckets_.None(max_street) || b_buckets_.None(max_street)) {
+  if (a_buckets_->None(max_street) || b_buckets_->None(max_street)) {
     unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(max_street);
     unsigned int num_boards = BoardTree::NumBoards(max_street);
     sorted_hcps_ = new unsigned short *[num_boards];
@@ -517,6 +546,10 @@ Player::~Player(void) {
     delete [] raw_hcps_[p];
   }
   delete [] raw_hcps_;
+  if (b_buckets_ != a_buckets_) delete b_buckets_;
+  delete a_buckets_;
+  delete a_buckets_file_;
+  delete b_buckets_file_;
   delete a_probs_;
   delete b_probs_;
 }
@@ -525,12 +558,12 @@ static void Usage(const char *prog_name) {
   fprintf(stderr, "USAGE: %s <game params> <A card params> <B card params> "
 	  "<betting abstraction params> <A CFR params> <B CFR params> "
 	  "<A it> <B it> <num duplicate hands> "
-	  "[determ|nondeterm]\n", prog_name);
+	  "[determ|nondeterm] [mem|disk]\n", prog_name);
   exit(-1);
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 11) Usage(argv[0]);
+  if (argc != 12) Usage(argv[0]);
   Files::Init();
   unique_ptr<Params> game_params = CreateGameParams();
   game_params->ReadFromFile(argv[1]);
@@ -566,6 +599,11 @@ int main(int argc, char *argv[]) {
   if (darg == "determ")         deterministic = true;
   else if (darg == "nondeterm") deterministic = false;
   else                          Usage(argv[0]);
+  string marg = argv[11];
+  bool mem_buckets;
+  if (marg == "mem")       mem_buckets = true;
+  else if (marg == "disk") mem_buckets = false;
+  else                     Usage(argv[0]);
 
   HandValueTree::Create();
   fprintf(stderr, "Created HandValueTree\n");
@@ -573,23 +611,12 @@ int main(int argc, char *argv[]) {
   // Leave this in if we don't want reproducibility
   InitRand();
   BettingTree *betting_tree = BettingTree::BuildTree(*betting_abstraction);
-  Buckets *a_buckets, *b_buckets;
-  a_buckets = new Buckets(*a_card_abstraction, false);
-  fprintf(stderr, "Created a_buckets\n");
-  if (strcmp(argv[2], argv[3])) {
-    b_buckets = new Buckets(*b_card_abstraction, false);
-    fprintf(stderr, "Created b_buckets\n");
-  } else {
-    b_buckets = a_buckets;
-  }
 
   Player *player = new Player(betting_tree, *betting_abstraction,
 			      *a_card_abstraction, *b_card_abstraction,
-			      *a_buckets, *b_buckets, *a_cfr_config,
-			      *b_cfr_config, a_it, b_it);
+			      *a_cfr_config, *b_cfr_config, a_it, b_it,
+			      mem_buckets);
   player->Go(num_duplicate_hands, deterministic);
   delete player;
-  delete a_buckets;
-  if (strcmp(argv[2], argv[3])) delete b_buckets;
   delete betting_tree;
 }

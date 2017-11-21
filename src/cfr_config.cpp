@@ -96,7 +96,24 @@ CFRConfig::CFRConfig(const Params &params) {
   ParseUnsignedInts(params.GetStringValue("CompressedStreets"),
 		    &compressed_streets_);
 
-  close_threshold_ = params.GetIntValue("CloseThreshold");
+  close_thresholds_.reset(new unsigned int[max_street + 1]);
+  if (params.IsSet("CloseThresholds")) {
+    vector<unsigned int> v;
+    ParseUnsignedInts(params.GetStringValue("CloseThresholds"), &v);
+    unsigned int num = v.size();
+    if (num != max_street + 1) {
+      fprintf(stderr, "Expected %u values in close thresholds\n",
+	      max_street + 1);
+      exit(-1);
+    }
+    for (unsigned int st = 0; st <= max_street; ++st) {
+      close_thresholds_[st] = v[st];
+    }
+  } else {
+    for (unsigned int st = 0; st <= max_street; ++st) {
+      close_thresholds_[st] = 0;
+    }
+  }
   active_mod_ = params.GetIntValue("ActiveMod");
   vector<string> conditions;
   Split(params.GetStringValue("ActiveConditions").c_str(), ';', false,

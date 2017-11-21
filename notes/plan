@@ -314,6 +314,7 @@ big6asym
 263,412 river actions in each
 77,200 turn actions in each
 9,362 flop actions in each
+439 preflop actions in each
 
 10m for river, 1m for turn, null for flop:
 10000000 * 263412 * 1 +
@@ -327,3 +328,90 @@ big6asym
 1286792 * 9362 * 8 =
 1,845,755,573,632
 Fits on 2 TB x1 instance
+
+1000000 * 263412 * 1 + 1500000 * 77200 * 8 + 1286792 * 9362 * 8 =
+1.3 TB.
+
+3000000 * 263412 * 1 + 1500000 * 77200 * 8 + 1286792 * 9362 * 8 =
+1.8 TB
+
+1.5m turn buckets in hs9 abstraction.
+2.65m in hs9bc4
+
+1000000 * 263412 * 1 + 2651151 * 77200 * 8 + 1286792 * 9362 * 8 =
+2.0 TB.
+
+500000 * 263412 * 1 + 2651151 * 77200 * 8 + 1286792 * 9362 * 8 =
+1.87 TB
+
+These action counts are for one of the P0 or P1 systems, not both.
+
+Assumptions:
+Need probs for preflop, flop and turn.  Without good reach probs, we cannot
+  do good endgame solving.
+Should be able to quantize probs to one byte per action however.
+On the river, seems like we can get by with a purified strategy.
+Only purifying river and there are no more than three actions on the river,
+  so we can use 2 bits which is 1/4 of a byte.
+If no more than 8 actions in information set, then need only 3 bits per
+  information set which 3/8 of a byte.
+Could do null flop, 1.1m turn buckets, 500k river buckets.
+(0.25 * 126404 * 500000 + 1 * 77200 * 1100000 + 1 * 9362 * 1286792) * 2
+226 GB
+Need about 10 GB for buckets.
+What will this need during CFR?
+8 bytes for flop, 8 bytes for turn (?), 1 byte for river.
+(8 * 9362 * 1286792 + 8 * 77200 * 1100000 + 1 * 263412 * 500000) * 2 =
+1,814,883,147,264 TB
+1.8 TB for both systems; need less than 1 TB per system.
+x1.16xlarge has 976 GB
+Right now x1.16xlarge much cheaper so that's nice too.
+hsfive has 983,359 buckets
+
+null/null/hsfive/k500k
+Have 976 GB available.
+Need about 15 GB for buckets and other overhead.
+ 8 * 439 * 169 +
+ 8 * 9362 * 1286792 +
+ 8 * 77200 * 983359 +
+ 1 * 263412 * 1105753 =
+ 994,967,294,796
+ Tiny bit too high.
+
+706,201 buckets in hsfour
+823,794,513,996
+Too low
+
+1,005,810 buckets in hsfourbc1
+Too much.
+
+Shrink big6asym a little bit.
+St 0 num nonterminals 220
+St 1 num nonterminals 4886
+St 2 num nonterminals 43198
+St 3 num nonterminals 126192
+262983 river actions
+77062 turn actions
+9334 flop actions
+439 preflop actions
+8 * 439 * 169 + 8 * 9334 * 1286792 + 8 * 77062 * 983359 + 1 * 262983 * 1105753
+993119057015
+Still tiny bit too high.
+If I can get river abstraction down to 1m, that would do the trick.
+Or turn down to 900,000.
+435,673 buckets in hsthree
+703,370 buckets in hsthreebc1
+930,932 buckets in hsthreebc2
+705,267 buckets in hsthreebc1s1
+1,843,230 buckets in hsone0.5hsthree
+8 * 439 * 169 + 8 * 9334 * 1286792 + 8 * 77062 * 930932 + 1 * 262983 * 1105753
+960798021223
+If buckets are only 10 GB, might fit?!?
+Seems too tight.
+Although a gigabyte is more than 1,000,000,000 bytes.
+
+Seems like features in combo one are:
+hsone0.5
+hsone0.5
+hstwo0.5
+hsone0.5

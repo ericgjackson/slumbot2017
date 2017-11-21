@@ -1,0 +1,78 @@
+Evaluate hshshshsbc3 on ms3f1t1r1h5 to see how good an abstraction it is.
+
+mb1b1
+tcfr
+Batch 0 (21m):  Exploitability: 221.71 mbb/g
+Batch 8 (20m):  Exploitability: 217.80 mbb/g
+Batch 16 (20m): Exploitability: 211.37 mbb/g
+Batch 24 (20m): Exploitability: 206.08 mbb/g
+Batch 32 (21m): Exploitability: 206.34 mbb/g
+
+Redid with multiplayer code:
+Batch 0 (32m): Exploitability: 221.93 mbb/g
+Redid returning to faster showdown code:
+Batch 0 (32m): Exploitability: 216.41 mbb/g
+Without solve_all_endgames_running:
+Batch 0 (27m14s): Exploitability: 221.78 mbb/g
+Redo old code:
+Batch 0 (20m31s): Exploitability: 226.11 mbb/g
+New code with hand_buckets_ one dimensional array; no other jobs running
+Batch 0 (28m16s): Exploitability: 224.27 mbb/g
+New code; got rid of unique pointers; allocate in constructor.
+Batch 0 (21m7s): Exploitability: 218.09 mbb/g
+Went back to general Showdown code:
+Batch 0 (21m49s): Exploitability: 227.90 mbb/g
+100m iterations instead
+Batch 0 (2m13s): Exploitability: 295.55 mbb/g
+New code in Prepare(); plus fixed bug accessing pot size in fold code
+Batch 0 (2m12s): Exploitability: 300.47 mbb/g
+New code in Prepare(); plus fixed bug accessing pot size in fold code
+Batch 0 (2m12s): Exploitability: 306.13 mbb/g
+Track contributions now, not pot size
+Batch 0 (2m18s): Exploitability: 305.40 mbb/g
+
+
+Resolve all river endgames
+24/200 (2m38s): Exploitability: 69.06 mbb/g
+
+This is a bit better than a 10m bucket river abstraction for holdem.
+
+mb2b2
+64:  Exploitability: 628.97 mbb/g
+104: Exploitability: 599.77 mbb/g
+112: Exploitability: 596.83 mbb/g
+
+Resolve all river endgames
+112/200: Exploitability: 239.36 mbb/g
+Much better, but the reduction isn't as good as for mb1b1 in percentage
+terms.  60% reduction as opposed to 67% reduction.  Well, not that different,
+I guess.  If I resolved for more iterations, probably would get better
+result.
+
+-------------
+
+Redo 11/19
+mb2b2
+Unsafe
+  112/200 (210m): Exploitability: 508.97 mbb/g (cfrpsm)
+Combined (cbrs/card/zerosum/avg/mixed/mem)
+  112/200 (453m): Exploitability: 239.36 mbb/g (cfrpsm2)
+  Matches exactly.
+Combined (cbrs/card/zerosum/current/pure3/mem) (cfrpsm3)
+  112/200: Exploitability: 319.44 mbb/g
+
+Base 112 vs. unsafe 112/200 (cfrpsm)
+  Avg B outcome: 0.069858 (34.9 mbb/g) over 100000000 dup hands
+Base 112 vs. combined/avg/mixed 112/200 (cfrpsm2)
+  Avg B outcome: 0.043428 (21.7 mbb/g) over 100000000 dup hands
+Base 112 vs. combined/current/pure 112/200 (cfrpsm3)
+  Avg B outcome: 0.032703 (16.4 mbb/g) over 100000000 dup hands
+
+
+mb3b3
+Process size 6.1g
+0:  Exploitability: 2595.30 mbb/g
+8:  Exploitability: 1905.91 mbb/g
+48: Exploitability: 1182.46 mbb/g
+56: Exploitability: 1131.84 mbb/g
+64: Exploitability: 1090.34 mbb/g

@@ -16,6 +16,7 @@
 #include "bcbr_thread.h"
 #include "bcfr_thread.h"
 #include "cfr_config.h"
+#include "cfr_values.h"
 #include "files.h"
 #include "game.h"
 #include "hand_tree.h"

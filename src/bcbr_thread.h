@@ -41,6 +41,7 @@ private:
   double *SecondPassOppChoice(Node *node);
   double *SecondPass(Node *node, unsigned int last_st);
 
+  unsigned int p_;
   HandTree *trunk_hand_tree_;
   unsigned int thread_index_;
   BCBRThread **threads_;

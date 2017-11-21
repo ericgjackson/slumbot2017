@@ -38,7 +38,7 @@ unique_ptr<Params> CreateCFRParams(void) {
   params->AddParam("DoubleRegrets", P_BOOLEAN);
   params->AddParam("DoubleSumprobs", P_BOOLEAN);
   params->AddParam("CompressedStreets", P_STRING);
-  params->AddParam("CloseThreshold", P_INT);
+  params->AddParam("CloseThresholds", P_STRING);
   params->AddParam("ActiveMod", P_INT);
   params->AddParam("ActiveConditions", P_STRING);
   params->AddParam("Uniform", P_BOOLEAN);

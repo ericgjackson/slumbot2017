@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 
-#include "cards.h"
 #include "vcfr.h"
 
 using namespace std;
@@ -27,7 +26,7 @@ public:
   virtual ~CFRP(void);
   void Run(unsigned int start_it, unsigned int end_it);
  protected:
-  void FloorRegrets(Node *node);
+  void FloorRegrets(Node *node, unsigned int p);
   void HalfIteration(unsigned int p);
   void Checkpoint(unsigned int it);
   void ReadFromCheckpoint(unsigned int it);

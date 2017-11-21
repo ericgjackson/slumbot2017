@@ -32,6 +32,8 @@
 
 using namespace std;
 
+// #define BC 1
+
 #define SUCCPTR(ptr) (ptr + 8)
 
 TCFRThread::TCFRThread(const BettingAbstraction &ba, const CFRConfig &cc,
@@ -132,7 +134,10 @@ TCFRThread::TCFRThread(const BettingAbstraction &ba, const CFRConfig &cc,
   }
 
   full_ = new bool[max_street_ + 1];
-  close_threshold_ = cfr_config_.CloseThreshold();
+  close_thresholds_.reset(new unsigned int[max_street_ + 1]);
+  for (unsigned int st = 0; st <= max_street_; ++st) {
+    close_thresholds_[st] = cfr_config_.CloseThreshold(st);
+  }
 
   active_mod_ = cfr_config_.ActiveMod();
   if (active_mod_ == 0) {
@@ -199,11 +204,14 @@ TCFRThread::~TCFRThread(void) {
 void TCFRThread::HVBDealHand(void) {
   double r;
   drand48_r(&rand_buf_, &r);
-  // unsigned int num_boards = BoardTree::NumBoards(max_street_);
-  // unsigned int msbd = r * num_boards;
+#ifdef BC
+  unsigned int num_boards = BoardTree::NumBoards(max_street_);
+  unsigned int msbd = r * num_boards;
+  board_count_ = BoardTree::BoardCount(max_street_, msbd);
+#else
   unsigned int msbd = board_table_[(int)(r * num_raw_boards_)];
+#endif
   canon_bds_[max_street_] = msbd;
-  // board_count_ = BoardTree::BoardCount(max_street_, msbd);
   for (unsigned int st = 1; st < max_street_; ++st) {
     canon_bds_[st] = BoardTree::PredBoard(msbd, st);
   }
@@ -270,11 +278,14 @@ void TCFRThread::HVBDealHand(void) {
 void TCFRThread::NoHVBDealHand(void) {
   double r;
   drand48_r(&rand_buf_, &r);
-  // unsigned int num_boards = BoardTree::NumBoards(max_street_);
-  // unsigned int msbd = r * num_boards;
+#ifdef BC
+  unsigned int num_boards = BoardTree::NumBoards(max_street_);
+  unsigned int msbd = r * num_boards;
+  board_count_ = BoardTree::BoardCount(max_street_, msbd);
+#else
   unsigned int msbd = board_table_[(int)(r * num_raw_boards_)];
+#endif
   canon_bds_[max_street_] = msbd;
-  // board_count_ = BoardTree::BoardCount(max_street_, msbd);
   for (unsigned int st = 1; st < max_street_; ++st) {
     canon_bds_[st] = BoardTree::PredBoard(msbd, st);
   }
@@ -407,12 +418,18 @@ void TCFRThread::Run(void) {
       }
       T_VALUE val = Process(data_, 1000, -1);
       sum_values[p_] += val;
-      // denoms[p_] += board_count_;
+#ifdef BC
+      denoms[p_] += board_count_;
+#else
       ++denoms[p_];
+#endif
       unsigned int b = hand_buckets_[p_ * (max_street_ + 1)];
       g_preflop_vals[b] += val;
-      // g_preflop_nums[b] += board_count_;
+#ifdef BC
+      g_preflop_nums[b] += board_count_;
+#else
       ++g_preflop_nums[b];
+#endif
     }
 
     ++it_;
@@ -422,10 +439,14 @@ void TCFRThread::Run(void) {
 		sum_values[p] / (double)denoms[p]);
       }
     }
-    if (it_ % 1000 == 0) {
-      // To reduce the chance of multiple threads trying to update total_its_
-      // at the same time, only update every 1000 iterations.
-      *total_its_ += 1000;
+    if (num_threads_ == 1) {
+      ++*total_its_;
+    } else {
+      if (it_ % 1000 == 0) {
+	// To reduce the chance of multiple threads trying to update total_its_
+	// at the same time, only update every 1000 iterations.
+	*total_its_ += 1000;
+      }
     }
   }
   fprintf(stderr, "Thread %i done; performed %llu iterations\n",
@@ -505,7 +526,11 @@ T_VALUE TCFRThread::Process(unsigned char *ptr,
       // one remaining player is the target player (p_) because when the
       // target player folds we return earlier and don't get here.
       // We want the pot size minus our contribution.  This is what we win.
-      return pot_size - contributions_[p_]; // * board_count_;
+#ifdef BC
+      return (pot_size - contributions_[p_]) * board_count_;
+#else
+      return pot_size - contributions_[p_];
+#endif
     } else {
       // Showdown
       
@@ -530,12 +555,20 @@ T_VALUE TCFRThread::Process(unsigned char *ptr,
 	// c) Divided by the number of winners
 	double winnings =
 	  ((double)(pot_size - winner_contributions)) /
-	  ((double)num_winners); // * board_count_;
+	  ((double)num_winners);
 	// Normally the winnings are a whole number, but not always.
+#ifdef BC
+	ret = Round(winnings * board_count_);
+#else
 	ret = Round(winnings);
+#endif
       } else {
 	// If we lose at showdown, we lose the amount we contributed to the pot.
-	ret = -contributions_[p_]; // * board_count_;
+#ifdef BC
+	ret = -contributions_[p_] * board_count_;
+#else
+	ret = -contributions_[p_];
+#endif
       }
       return ret;
     }
@@ -642,7 +675,7 @@ T_VALUE TCFRThread::Process(unsigned char *ptr,
 	recurse_on_all = true;
       } else {
 	// Could consider only recursing on close children.
-	bool close = ((min_r2 - min_r) < close_threshold_);
+	bool close = ((min_r2 - min_r) < close_thresholds_[st]);
 	recurse_on_all = full_[st] || close;
       }
 
@@ -660,7 +693,11 @@ T_VALUE TCFRThread::Process(unsigned char *ptr,
 	  }
 	}
 	if (s == fold_succ_index) {
-	  val = -contributions_[p_]; // * board_count_;
+#ifdef BC
+	  val = -contributions_[p_] * board_count_;
+#else
+	  val = -contributions_[p_];
+#endif
 	} else {
 	  unsigned long long int succ_offset =
 	    *((unsigned long long int *)(SUCCPTR(ptr) + s * 8));
@@ -687,7 +724,11 @@ T_VALUE TCFRThread::Process(unsigned char *ptr,
 	  }
 	  if (s == fold_succ_index || ! prune) {
 	    if (s == fold_succ_index) {
-	      succ_values[s] = -contributions_[p_]; // * board_count_;
+#ifdef BC
+	      succ_values[s] = -contributions_[p_] * board_count_;
+#else
+	      succ_values[s] = -contributions_[p_];
+#endif
 	    } else {
 	      unsigned long long int succ_offset =
 		*((unsigned long long int *)(SUCCPTR(ptr) + s * 8));
@@ -732,7 +773,7 @@ T_VALUE TCFRThread::Process(unsigned char *ptr,
 	  int i_regret;
 	  if (scaled_streets_[st]) {
 	    int incr = succ_values[s] - val;
-	    double scaled = incr * 0.05;
+	    double scaled = incr * 0.005;
 	    int trunc = scaled;
 	    double rnd = rngs_[rng_index_++];
 	    if (rng_index_ == kNumPregenRNGs) rng_index_ = 0;
@@ -1741,15 +1782,24 @@ TCFR::TCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
 	   unsigned int num_threads, unsigned int target_player) :
   card_abstraction_(ca), betting_abstraction_(ba), cfr_config_(cc),
   buckets_(buckets) {
-  fprintf(stderr, "Full evaluation if regrets close; threshold %u\n",
-	  cfr_config_.CloseThreshold());
+  max_street_ = Game::MaxStreet();
+#ifdef BC
+  fprintf(stderr,
+	  "Sampling canonical boards; scaling updates by board count\n");
+#else
+  fprintf(stderr, "Sampling raw boards with right frequency\n");
+#endif
+  fprintf(stderr, "Full evaluation if regrets close; thresholds:");
+  for (unsigned int st = 0; st <= max_street_; ++st) {
+    fprintf(stderr, " %u", cfr_config_.CloseThreshold(st));
+  }
+  fprintf(stderr, "\n");
   time_t start_t = time(NULL);
   asymmetric_ = betting_abstraction_.Asymmetric();
   num_players_ = Game::NumPlayers();
   target_player_ = target_player;
   num_cfr_threads_ = num_threads;
   fprintf(stderr, "Num threads: %i\n", num_cfr_threads_);
-  max_street_ = Game::MaxStreet();
   for (unsigned int st = 0; st <= max_street_; ++st) {
     if (buckets_.None(st)) {
       fprintf(stderr, "TCFR expects buckets on all streets\n");
@@ -1798,6 +1848,39 @@ TCFR::TCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
   } else {
     betting_tree_.reset(BettingTree::BuildTree(betting_abstraction_));
   }
+
+  BoardTree::BuildBoardCounts();
+#ifdef BC
+  num_raw_boards_ = 0;
+  board_table_.reset(nullptr);
+#else
+  num_raw_boards_ = 1;
+  unsigned int num_remaining = Game::NumCardsInDeck();
+  for (unsigned int st = 1; st <= max_street_; ++st) {
+    unsigned int num_street_cards = Game::NumCardsForStreet(st);
+    unsigned int multiplier = 1;
+    for (unsigned int n = (num_remaining - num_street_cards) + 1;
+	 n <= num_remaining; ++n) {
+      multiplier *= n;
+    }
+    num_raw_boards_ *= multiplier / Factorial(num_street_cards);
+    num_remaining -= num_street_cards;
+  }
+  board_table_.reset(new unsigned int[num_raw_boards_]);
+  unsigned int num_boards = BoardTree::NumBoards(max_street_);
+  unsigned int i = 0;
+  for (unsigned int bd = 0; bd < num_boards; ++bd) {
+    unsigned int ct = BoardTree::BoardCount(max_street_, bd);
+    for (unsigned int j = 0; j < ct; ++j) {
+      board_table_[i++] = bd;
+    }
+  }
+  if (i != num_raw_boards_) {
+    fprintf(stderr, "Num raw board mismatch: %u, %u\n", i, num_raw_boards_);
+    exit(-1);
+  }
+  BoardTree::DeleteBoardCounts();
+#endif
 
   Prepare();
 
@@ -1869,34 +1952,6 @@ TCFR::TCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
   } else {
     cards_to_indices_ = NULL;
   }
-
-  num_raw_boards_ = 1;
-  unsigned int num_remaining = Game::NumCardsInDeck();
-  for (unsigned int st = 1; st <= max_street_; ++st) {
-    unsigned int num_street_cards = Game::NumCardsForStreet(st);
-    unsigned int multiplier = 1;
-    for (unsigned int n = (num_remaining - num_street_cards) + 1;
-	 n <= num_remaining; ++n) {
-      multiplier *= n;
-    }
-    num_raw_boards_ *= multiplier / Factorial(num_street_cards);
-    num_remaining -= num_street_cards;
-  }
-  board_table_.reset(new unsigned int[num_raw_boards_]);
-  BoardTree::BuildBoardCounts();
-  unsigned int num_boards = BoardTree::NumBoards(max_street_);
-  unsigned int i = 0;
-  for (unsigned int bd = 0; bd < num_boards; ++bd) {
-    unsigned int ct = BoardTree::BoardCount(max_street_, bd);
-    for (unsigned int j = 0; j < ct; ++j) {
-      board_table_[i++] = bd;
-    }
-  }
-  if (i != num_raw_boards_) {
-    fprintf(stderr, "Num raw board mismatch: %u, %u\n", i, num_raw_boards_);
-    exit(-1);
-  }
-  BoardTree::DeleteBoardCounts();
 
   time_t end_t = time(NULL);
   double diff_sec = difftime(end_t, start_t);

@@ -18,9 +18,8 @@ public:
   CBRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
 	    const CFRConfig &cc, const Buckets &buckets,
 	    const BettingTree *betting_tree, bool cfrs, unsigned int p,
-	    HandTree *trunk_hand_tree, unsigned int thread_index,
-	    unsigned int num_threads, unsigned int it, CBRThread **threads,
-	    bool trunk);
+	    HandTree *trunk_hand_tree, unsigned int num_threads,
+	    unsigned int it);
   ~CBRThread(void);
   double Go(void);
 private:
@@ -29,23 +28,10 @@ private:
 		   double *vals);
   double *OurChoice(Node *node, unsigned int lbd, const VCFRState &state);
   double *OppChoice(Node *node, unsigned int lbd, const VCFRState &state);
-#if 0
-  double *Split(Node *node, unsigned int bd, double *opp_probs);
-  double *Process(Node *node, unsigned int lbd, const VCFRState &state,
-		  unsigned int last_st);
-#endif
 
   bool cfrs_;
+  unsigned int p_;
   HandTree *trunk_hand_tree_;
-  unsigned int thread_index_;
-  CBRThread **threads_;
-#if 0
-  double *final_hand_vals_;
-  Node *split_node_;
-  unsigned int split_bd_;
-  double *opp_reach_probs_;
-  pthread_t pthread_id_;
-#endif
 };
 
 #endif

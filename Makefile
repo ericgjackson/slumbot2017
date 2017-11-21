@@ -8,17 +8,19 @@ HEADS =	src/constants.h src/rand.h src/split.h src/files.h \
 	src/betting_abstraction_params.h src/betting_abstraction.h \
 	src/cfr_params.h src/cfr_config.h src/betting_tree.h \
 	src/betting_tree_builder.h src/nonterminal_ids.h \
-	src/cfr_values.h src/cfr_utils.h src/vcfr.h src/cfrp.h src/rgbr.h \
-	src/eg_cfr.h src/endgames.h src/cbr_thread.h src/cbr_builder.h \
-	src/path.h src/sorting.h src/rollout.h src/univariate_kmeans.h \
-	src/buckets.h src/fast_hash.h src/sparse_and_dense.h \
-	src/bcbr_thread.h src/bcfr_thread.h src/bcbr_builder.h \
-	src/vcfr_subgame.h src/kmeans.h src/pkmeans.h src/dynamic_cbr.h \
-	src/endgame_utils.h src/compression_utils.h src/regret_compression.h \
-	src/tcfr.h src/ols.h src/ej_compress.h src/pcs_cfr.h src/canonical.h \
-	src/mp_vcfr.h src/mp_rgbr.h src/sampled_bcfr_builder.h \
-	src/runtime_params.h src/runtime_config.h \
-	src/acpc_protocol.h src/agent.h src/nearest_neighbors.h src/nl_agent.h
+	src/cfr_value_type.h src/cfr_values.h src/prob_method.h \
+	src/cfr_utils.h src/vcfr_state.h src/vcfr.h src/cfrp.h src/rgbr.h \
+	src/resolving_method.h src/eg_cfr.h src/endgames.h src/cbr_thread.h \
+	src/cbr_builder.h src/path.h src/sorting.h src/rollout.h \
+	src/univariate_kmeans.h src/buckets.h src/fast_hash.h \
+	src/sparse_and_dense.h src/bcbr_thread.h src/bcfr_thread.h \
+	src/bcbr_builder.h src/vcfr_subgame.h src/kmeans.h src/pkmeans.h \
+	src/endgame_utils.h src/compression_utils.h \
+	src/regret_compression.h src/tcfr.h src/ols.h src/ej_compress.h \
+	src/pcs_cfr.h src/canonical.h src/mp_vcfr.h src/mp_rgbr.h \
+	src/sampled_bcfr_builder.h src/runtime_params.h src/runtime_config.h \
+	src/acpc_protocol.h src/agent.h src/nearest_neighbors.h \
+	src/nl_agent.h src/dynamic_cbr2.h
 
 # -Wl,--no-as-needed fixes my problem of undefined reference to
 # pthread_create (and pthread_join).  Comments I found on the web indicate
@@ -43,18 +45,19 @@ OBJS =	obj/rand.o obj/split.o obj/files.o obj/cards.o obj/io.o \
 	obj/cfr_params.o obj/cfr_config.o obj/betting_tree.o \
 	obj/betting_tree_builder.o obj/limit_tree.o obj/no_limit_tree.o \
 	obj/reentrant_tree.o obj/mp_betting_tree.o obj/nonterminal_ids.o \
-	obj/cfr_values.o obj/cfr_utils.o obj/cfr.o obj/vcfr.o obj/cfrp.o \
-	obj/rgbr.o obj/eg_cfr.o obj/endgames.o obj/cbr_thread.o \
-	obj/cbr_builder.o obj/path.o obj/sorting.o obj/rollout.o \
-	obj/univariate_kmeans.o obj/buckets.o obj/fast_hash.o \
-	obj/sparse_and_dense.o obj/bcbr_thread.o \
+	obj/cfr_values.o obj/cfr_utils.o obj/vcfr_state.o \
+	obj/vcfr.o obj/cfrp.o obj/rgbr.o obj/resolving_method.o obj/eg_cfr.o \
+	obj/endgames.o obj/cbr_thread.o obj/cbr_builder.o obj/path.o \
+	obj/sorting.o obj/rollout.o obj/univariate_kmeans.o obj/buckets.o \
+	obj/fast_hash.o obj/sparse_and_dense.o obj/bcbr_thread.o \
 	obj/bcfr_thread.o obj/bcbr_builder.o obj/vcfr_subgame.o obj/kmeans.o \
-	obj/pkmeans.o obj/dynamic_cbr.o obj/endgame_utils.o \
+	obj/pkmeans.o obj/endgame_utils.o \
 	obj/compression_utils.o obj/regret_compression.o obj/tcfr.o \
 	obj/ols.o obj/ej_compress.o obj/pcs_cfr.o obj/canonical.o \
 	obj/mp_vcfr.o obj/mp_rgbr.o obj/sampled_bcfr_builder.o \
 	obj/runtime_params.o obj/runtime_config.o \
-	obj/acpc_protocol.o obj/nearest_neighbors.o obj/nl_agent.o
+	obj/acpc_protocol.o obj/nearest_neighbors.o obj/nl_agent.o \
+	obj/dynamic_cbr2.o
 
 bin/test:	obj/test.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/test obj/test.o $(OBJS) \
@@ -104,6 +107,10 @@ bin/run_rgbr:	obj/run_rgbr.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/run_rgbr obj/run_rgbr.o $(OBJS) \
 	$(LIBRARIES)
 
+bin/run_rgbr2:	obj/run_rgbr2.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/run_rgbr2 obj/run_rgbr2.o $(OBJS) \
+	$(LIBRARIES)
+
 bin/run_mp_rgbr:	obj/run_mp_rgbr.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/run_mp_rgbr obj/run_mp_rgbr.o $(OBJS) \
 	$(LIBRARIES)
@@ -120,6 +127,10 @@ bin/solve_all_endgames3:	obj/solve_all_endgames3.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/solve_all_endgames3 \
 	obj/solve_all_endgames3.o $(OBJS) $(LIBRARIES)
 
+bin/solve_all_endgames4:	obj/solve_all_endgames4.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/solve_all_endgames4 \
+	obj/solve_all_endgames4.o $(OBJS) $(LIBRARIES)
+
 bin/assemble_endgames:	obj/assemble_endgames.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/assemble_endgames \
 	obj/assemble_endgames.o $(OBJS) $(LIBRARIES)
@@ -131,6 +142,10 @@ bin/assemble_endgames2:	obj/assemble_endgames2.o $(OBJS) $(HEADS)
 bin/assemble_endgames3:	obj/assemble_endgames3.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/assemble_endgames3 \
 	obj/assemble_endgames3.o $(OBJS) $(LIBRARIES)
+
+bin/assemble_endgames4:	obj/assemble_endgames4.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/assemble_endgames4 \
+	obj/assemble_endgames4.o $(OBJS) $(LIBRARIES)
 
 bin/build_cbrs:	obj/build_cbrs.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/build_cbrs obj/build_cbrs.o \
@@ -294,6 +309,10 @@ bin/test_shared_ptrs:	obj/test_shared_ptrs.o $(OBJS) $(HEADS)
 
 bin/compare_boards:	obj/compare_boards.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/compare_boards obj/compare_boards.o \
+	$(OBJS) $(LIBRARIES)
+
+bin/show_features:	obj/show_features.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/show_features obj/show_features.o \
 	$(OBJS) $(LIBRARIES)
 
 bin/x:	obj/x.o $(OBJS) $(HEADS)

@@ -17,7 +17,8 @@ class VCFRSubgame : public VCFR {
 public:
   VCFRSubgame(const CardAbstraction &ca, const BettingAbstraction &ba,
 	      const CFRConfig &cc, const Buckets &buckets, Node *root,
-	      unsigned int root_bd, const string &action_sequence, VCFR *cfr);
+	      unsigned int root_bd, unsigned int p,
+	      const string &action_sequence, VCFR *cfr);
   ~VCFRSubgame(void);
   void Go(void);
   void SetIt(unsigned int it) {it_ = it;}
@@ -35,6 +36,7 @@ private:
   BettingTree *subtree_;
   VCFR *cfr_;
   bool *subtree_streets_;
+  unsigned int p_;
   const string &action_sequence_;
   double *opp_probs_;
   const HandTree *hand_tree_;

@@ -35,6 +35,7 @@
 #include "hand_value_tree.h"
 #include "io.h"
 #include "split.h"
+#include "vcfr_state.h"
 #include "vcfr.h"
 
 using namespace std;
@@ -118,25 +119,25 @@ CFRP::~CFRP(void) {
   delete hand_tree_;
 }
 
-void CFRP::FloorRegrets(Node *node) {
+void CFRP::FloorRegrets(Node *node, unsigned int p) {
   if (node->Terminal()) return;
   unsigned int st = node->Street();
   unsigned int num_succs = node->NumSuccs();
-  if (node->PlayerActing() == p_ && ! buckets_.None(st) && num_succs > 1) {
+  if (node->PlayerActing() == p && ! buckets_.None(st) && num_succs > 1) {
     unsigned int nt = node->NonterminalID();
     unsigned int num_buckets = buckets_.NumBuckets(st);
     unsigned int num_values = num_buckets * num_succs;
     if (nn_regrets_ && regret_floors_[st] >= 0) {
-      if (regrets_->Ints(p_, st)) {
+      if (regrets_->Ints(p, st)) {
 	int *i_all_regrets;
-	regrets_->Values(p_, st, nt, &i_all_regrets);
+	regrets_->Values(p, st, nt, &i_all_regrets);
 	int floor = regret_floors_[st];
 	for (unsigned int i = 0; i < num_values; ++i) {
 	  if (i_all_regrets[i] < floor) i_all_regrets[i] = floor;
 	}
       } else {
 	double *d_all_regrets;
-	regrets_->Values(p_, st, nt, &d_all_regrets);
+	regrets_->Values(p, st, nt, &d_all_regrets);
 	double floor = regret_floors_[st];
 	for (unsigned int i = 0; i < num_values; ++i) {
 	  if (d_all_regrets[i] < floor) d_all_regrets[i] = floor;
@@ -145,14 +146,13 @@ void CFRP::FloorRegrets(Node *node) {
     }
   }
   for (unsigned int s = 0; s < num_succs; ++s) {
-    FloorRegrets(node->IthSucc(s));
+    FloorRegrets(node->IthSucc(s), p);
   }
 }
 
 // Do trunk in main thread
 void CFRP::HalfIteration(unsigned int p) {
-  p_ = p;
-  fprintf(stderr, "%s half iteration\n", p_ ? "P1" : "P2");
+  fprintf(stderr, "%s half iteration\n", p ? "P1" : "P2");
   if (current_strategy_.get() != nullptr) {
     SetCurrentStrategy(betting_tree_->Root());
   }
@@ -172,7 +172,7 @@ void CFRP::HalfIteration(unsigned int p) {
   if (subgame_street_ <= Game::MaxStreet()) pre_phase_ = true;
   double *opp_probs = AllocateOppProbs(true);
   unsigned int **street_buckets = AllocateStreetBuckets();
-  VCFRState state(opp_probs, street_buckets, hand_tree_);
+  VCFRState state(opp_probs, street_buckets, hand_tree_, p);
   SetStreetBuckets(0, 0, state);
   double *vals = Process(betting_tree_->Root(), 0, state, 0);
   if (subgame_street_ <= Game::MaxStreet()) {
@@ -204,7 +204,7 @@ void CFRP::HalfIteration(unsigned int p) {
   delete [] vals;
 
   if (nn_regrets_ && bucketed_) {
-    FloorRegrets(betting_tree_->Root());
+    FloorRegrets(betting_tree_->Root(), p);
   }
 }
 

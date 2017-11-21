@@ -70,7 +70,6 @@ CFRValues::CFRValues(const bool *players, bool sumprobs, bool *streets,
   root_bd_ = root_bd;
   root_bd_st_ = root_bd_st;
 
-
   bucket_thresholds_.reset(new unsigned int[max_street + 1]);
   for (unsigned int st = 0; st <= max_street; ++st) {
     bucket_thresholds_[st] = card_abstraction.BucketThreshold(st);
@@ -82,7 +81,11 @@ CFRValues::CFRValues(const bool *players, bool sumprobs, bool *streets,
     num_card_holdings_[p] = new unsigned int[max_street + 1];
     num_bucket_holdings_[p] = new unsigned int[max_street + 1];
     for (unsigned int st = 0; st <= max_street; ++st) {
-      if (! streets_[st]) continue;
+      if (! streets_[st]) {
+	num_card_holdings_[p][st] = 0;
+	num_bucket_holdings_[p][st] = 0;
+	continue;
+      }
       unsigned int num_local_boards =
 	BoardTree::NumLocalBoards(root_bd_st_, root_bd_, st);
       unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
@@ -1565,7 +1568,7 @@ void CFRValues::ReadSubtreeFromFull(Node *full_node, Node *full_subtree_root,
 void CFRValues::ReadSubtreeFromFull(const char *dir, unsigned int it,
 				    Node *full_root, Node *full_subtree_root,
 				    Node *subtree_root,
-				    const string &action_sequence,
+				    const string &root_action_sequence,
 				    unsigned int *num_full_holdings,
 				    unsigned int only_p) {
   unsigned int num_players = Game::NumPlayers();
@@ -1595,7 +1598,7 @@ void CFRValues::ReadSubtreeFromFull(const char *dir, unsigned int it,
 	decompressors[p][st] = nullptr;
 	continue;
       }
-      readers[p][st] = InitializeReader(dir, p, st, it, action_sequence,
+      readers[p][st] = InitializeReader(dir, p, st, it, root_action_sequence,
 					full_root->Street(), 0,
 					&value_types[p][st]);
       if (compressed_streets_[st]) {

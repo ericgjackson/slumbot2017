@@ -250,10 +250,11 @@ void ProcessOppProbsBucketed(Node *node, unsigned int **street_buckets,
 // Unabstracted, int cs_vals, int sumprobs
 void ProcessOppProbs(Node *node, const CanonicalCards *hands, bool bucketed,
 		     unsigned int **street_buckets, bool nonneg, bool uniform,
-		     double explore, unsigned int it, unsigned int soft_warmup,
-		     unsigned int hard_warmup, bool update_sumprobs,
-		     double *sumprob_scaling, double *opp_probs,
-		     double **succ_opp_probs, int *cs_vals, int *sumprobs) {
+		     double explore, ProbMethod prob_method, unsigned int it,
+		     unsigned int soft_warmup, unsigned int hard_warmup,
+		     bool update_sumprobs, double *sumprob_scaling,
+		     double *opp_probs, double **succ_opp_probs, int *cs_vals,
+		     int *sumprobs) {
   unsigned int st = node->Street();
   unsigned int num_succs = node->NumSuccs();
   unsigned int num_hole_cards = Game::NumCardsForStreet(0);
@@ -295,17 +296,28 @@ void ProcessOppProbs(Node *node, const CanonicalCards *hands, bool bucketed,
 	my_cs_vals = cs_vals + i * num_succs;
       }
       int *my_sumprobs = nullptr;
+      unsigned int b;
       if (update_sumprobs) {
 	if (bucketed) {
-	  unsigned int b = street_buckets[st][i];
+	  b = street_buckets[st][i];
 	  my_sumprobs = sumprobs + b * num_succs;
 	} else {
 	  my_sumprobs = sumprobs + i * num_succs;
 	}
       }
-      RegretsToProbs(my_cs_vals, num_succs, nonneg, uniform,
-		     default_succ_index, explore, num_nonterminal_succs,
-		     nonterminal_succs, current_probs);
+      if (prob_method == ProbMethod::REGRET_MATCHING) {
+	RegretsToProbs(my_cs_vals, num_succs, nonneg, uniform,
+		       default_succ_index, explore, num_nonterminal_succs,
+		       nonterminal_succs, current_probs);
+      } else if (prob_method == ProbMethod::PURE) {
+	PureProbs(my_cs_vals, num_succs, current_probs);
+      } else if (prob_method == ProbMethod::FTL) {
+	FTLPureProbs(my_cs_vals, num_succs, current_probs);
+      } else {
+	fprintf(stderr, "Unknown prob method: %i\n",
+		(int)prob_method);
+	exit(-1);
+      }
       bool downscale = false;
       for (unsigned int s = 0; s < num_succs; ++s) {
 	double succ_opp_prob = opp_prob * current_probs[s];
@@ -513,9 +525,10 @@ void ProcessOppProbs(Node *node, const CanonicalCards *hands, bool bucketed,
 void DeleteOldFiles(const CardAbstraction &ca, const BettingAbstraction &ba,
 		    const CFRConfig &cc, unsigned int it) {
   char dir[500];
-  sprintf(dir, "%s/%s.%s.%i.%i.%i.%s.%s", Files::NewCFRBase(),
-	  Game::GameName().c_str(), ca.CardAbstractionName().c_str(),
-	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
+  sprintf(dir, "%s/%s.%u.%s.%i.%i.%i.%s.%s", Files::NewCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
+	  ca.CardAbstractionName().c_str(), Game::NumRanks(),
+	  Game::NumSuits(), Game::MaxStreet(),
 	  ba.BettingAbstractionName().c_str(), cc.CFRConfigName().c_str());
 
   if (! FileExists(dir)) return;

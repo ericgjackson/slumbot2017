@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "resolving_method.h"
 #include "vcfr.h"
 
 using namespace std;
@@ -17,8 +18,6 @@ class HandTree;
 class Node;
 class Reader;
 class Writer;
-
-enum class ResolvingMethod { UNSAFE, CFRD, MAXMARGIN, COMBINED };
 
 class EGCFR : public VCFR {
  public:
@@ -50,15 +49,14 @@ class EGCFR : public VCFR {
   const CFRValues *Sumprobs(void) const {return sumprobs_.get();}
  private:
   double *HalfIteration(BettingTree *subtree, unsigned int solve_bd,
-			unsigned int p, const VCFRState &state);
+			const VCFRState &state);
   void CFRDHalfIteration(BettingTree *subtree, unsigned int solve_bd,
-			 unsigned int p, double *opp_cvs, VCFRState *state);
+			 double *opp_cvs, VCFRState *state);
   void CombinedHalfIteration(BettingTree *subtree, unsigned int solve_bd,
-			     unsigned int p, double *opp_reach_probs,
-			     double *opp_cvs, VCFRState *state);
+			     double **reach_probs, double *opp_cvs,
+			     VCFRState *state);
   void MaxMarginHalfIteration(BettingTree *subtree, unsigned int solve_bd,
-			      unsigned int p, double *opp_cvs,
-			      VCFRState *state);
+			      double *opp_cvs, VCFRState *state);
   double *LoadCVs(Node *subtree_root, const string &action_sequence,
 		  unsigned int gbd, unsigned int base_it, unsigned int p,
 		  double **reach_probs, const CanonicalCards *hands,
@@ -88,12 +86,5 @@ class EGCFR : public VCFR {
   double *sum_target_probs_;
 #endif
 };
-
-const char *ResolvingMethodName(ResolvingMethod method);
-void FloorCVs(Node *subtree_root, double *opp_reach_probs,
-	      const CanonicalCards *hands, double *cvs);
-void ZeroSumCVs(double *p0_cvs, double *p1_cvs,
-		unsigned int num_hole_card_pairs, double **reach_probs,
-		const CanonicalCards *hands);
 
 #endif

@@ -1,0 +1,577 @@
+holdem5_params
+mb1b1
+CFR+
+
+200 iterations in 25m6s
+200: Exploitability: 27.063654 mbb/g
+
+mb1b1aa
+AlwaysAllIn true, stack size 400
+
+200 iterations in 27m
+200: Exploitability: 267.405754 mbb/g
+
+Expand to mb1b2aa
+200: Exploitability: 997.674524 mbb/g
+
+-----------------------------------------------
+
+ms3f1t1r1h5
+20 card deck (5 ranks)
+mb1b1
+200:  Exploitability: 32.214475 mbb/g
+1000: Exploitability: 2.761737 mbb/g
+Turn unsafe 200/200:   Exploitability: 29.700548 mbb/g
+Turn unsafe 200/1000:  Exploitability: 23.206759 mbb/g
+Turn unsafe 1000/200:  Exploitability: 26.087378 mbb/g
+Turn unsafe 1000/1000: Exploitability: 9.550237 mbb/g
+Turn CFR-D 200/200:    Exploitability: 33.809340 mbb/g
+Turn CFR-D 200/1000:   Exploitability: 25.681268 mbb/g
+Turn CFR-D 1000/200:   Exploitability: 14.592072 mbb/g
+Turn CFR-D 1000/1000:  Exploitability: 2.764489 mbb/g
+
+
+
+-----------------------------------------------
+
+ms3f1t1r1h5
+20 card deck (5 ranks)
+mb3b3t
+  30,974 betting sequences
+Preflop and flop: one pot size bet
+Turn and river: three bets, three bet sizes (0.5, 1.0, 2.0)
+Solve directly
+200 iterations in 103m
+200: Exploitability: 281.788754 mbb/g
+200-300: 53m
+300: Exploitability: 155.688378 mbb/g
+300-400: 51m
+400: Exploitability: 103.217116 mbb/g
+400-500: 50m
+500: Exploitability: 75.291028 mbb/g
+500-1000: 234m
+1000: Exploitability: 26.085553 mbb/g
+1000-2000: 453m
+2000: Exploitability: 10.104711 mbb/g
+
+
+Base mb2b1t
+  742 betting sequences
+200 iterations in 2m23s
+200: Exploitability: 63.363584 mbb/g
+200-300 in 1m14s
+300: Exploitability: 29.514541 mbb/g
+300-500 in 2m23s
+500: Exploitability: 12.668699 mbb/g
+
+Solved all turn subgames (unsafe, 200 its) in 94m
+  14s per subgame?  It was more like 40s on the initial subgames.  I guess
+  it depends on the depth of the remaining stacks.
+Turn unsafe 500/200: Exploitability: 420.615691 mbb/g
+  Almost no P1 hands reach CC/CC.  (Prob sum 0.003.)
+Solved all turn subgames (1000 its) in 431m
+Turn unsafe 500/1000: Exploitability: 319.397905 mbb/g
+  A bit better, but still terrible.
+
+Solved all turn subgames (CFR-D, 200 its) in 180m
+Turn CFR-D 500/200: Exploitability: 293.707366 mbb/g
+  Better than unsafe, but still bad.
+Solved all turn subgames (CFR-D, 1000 its) in 859m
+Turn CFR-D 500/1000: Exploitability: 135.043661 mbb/g
+
+
+Try using PCS for mb2b1t base:
+10k its in 13s
+10k: Exploitability: 2373.244334 mbb/g
+100k its in 2m13s
+100k: Exploitability: 567.936536 mbb/g
+1m its in 18m33s
+1m: Exploitability: 311.923466 mbb/g
+1m-2m its in 17m59s
+2m: Exploitability: 293.036237 mbb/g
+Is there a bug?  PCS should improve over time.
+Solved all turn subgames (unsafe, 200 iterations) in 95m
+2m/200: Exploitability: 329.859449 mbb/g
+  Better than CFR+ base@500
+Solved all turn subgames (unsafe, 1000 iterations) in 487m
+2m/1000: Exploitability: 246.349940 mbb/g
+
+Use PCS with nhs3 abstraction for mb3b3t base:
+1m its in 571m
+1m: Exploitability: 767.085516 mbb/g
+Resolve all turn subgames (200 its, unsafe) in ???
+Turn unsafe 1m/200: Exploitability: 172.421168 mbb/g
+  This is the best yet for 200 iterations.  Nearly as good as using
+  mb3b3t/cfr+ as the base.
+Resolve all turn subgames (1000 its, unsafe) in 440m
+Turn unsafe 1m/1000: Exploitability: 89.875190 mbb/g
+
+  
+Resolve all turn subgames (200 its, CFR-D) in 188m
+Turn CFR-D 1m/200: Exploitability: 500.138686 mbb/g
+  Terrible!
+
+Use PCS with hs3 abstraction for mb3b3t base:
+100k its in 46m; next 100k in 37m
+100k: Exploitability: 3853.341794 mbb/g
+200k: Exploitability: 3826.701909 mbb/g
+Resolve all turn subgames (200 its, unsafe) in 97m
+Turn unsafe 200k/200: Exploitability: 287.952428 mbb/g
+
+
+
+Base mb3b3t
+Solve all turn subgames (unsafe, 200 its) in 96m
+Turn unsafe 1000/200: Exploitability: 164.540964 mbb/g
+This is very bad.  But I guess it's better than solving directly for 200.
+Solve all turn subgames (unsafe, 200 its) in 496m
+Turn unsafe 1000/1000: Exploitability: 41.950016 mbb/g
+Is this good enough?  16 worse than direct solve.
+Solve all turn subgames (CFR-D, 200 its) in 179m
+Turn CFR-D 1000/200: Exploitability: 235.319949 mbb/g
+  Worse than unsafe!
+Solve all turn subgames (CFR-D, 1000 its) in 807m
+Turn CFR-D 1000/1000: Exploitability: 45.525264 mbb/g
+Turn CFR-D 2000/200:  Exploitability: 223.462457 mbb/g
+
+                            200   1000
+		            ---   ----
+Directly                    282   26
+mb2b1t/cfr+, unsafe         421   319
+mb2b1t/cfr+, cfr-d          294   135
+mb2b1t/pcs/null, unsafe     330   246
+mb3b3t/pcs/nhs3, unsafe     172   90
+mb3b3t/pcs/nhs3, cfr-d      500
+mb3b3t/pcs/hs3, unsafe      288
+mb3b3t/cfr+, unsafe         165   42
+mb3b3t/cfr+, cfr-d (b1000)  235   46
+mb3b3t/cfr+, cfr-d (b2000)  223
+
+-------------------------------------------
+
+Base mb2b1t
+Full mb2b2t
+
+Solved all turn endgames (200 its) in 14m
+Turn unsafe 500/200:   Exploitability: 103.911760 mbb/g
+Turn unsafe 500/1000:  Exploitability: 62.938089 mbb/g
+Turn unsafe 1000/200:  Exploitability: 88.833091 mbb/g
+Turn unsafe 1000/1000: Exploitability: 19.997965 mbb/g
+Turn unsafe 1500/1000: Exploitability: 24.111088 mbb/g
+Turn unsafe 2000/1000: Exploitability: 48.981120 mbb/g
+  Wait, it got worse?!?
+Turn unsafe 2000/2000: Exploitability: 44.997978 mbb/g
+
+
+Turn CFR-D 1000/200:  Exploitability: 91.834799 mbb/g
+Turn CFR-D 1000/1000: Exploitability: 13.195787 mbb/g
+Turn CFR-D 2000/1000: Exploitability: 8.912774 mbb/g
+Turn CFR-D 2000/2000: Exploitability: 4.324761 mbb/g
+
+-------------------------------------------
+
+Base mb2b2t
+Full mb2b2t
+
+mb2b2t directly
+200:  Exploitability: 98.499367 mbb/g
+500:  Exploitability: 22.320214 mbb/g
+1000: Exploitability: 7.816575 mbb/g
+2000: Exploitability: 2.782415 mbb/g
+Explore=0.01
+200: Exploitability: 119.14 mbb/g
+500: Exploitability: 70.92 mbb/g
+Explore=0.001
+200: Exploitability: 98.33 mbb/g
+
+River resolve of mb2b2t using mb2b2t as base
+Base soft warmup, river resolve soft warmup
+Unsafe river 200/200: Exploitability: 1753.00 mbb/g
+  Needs exploration?
+Base explore=0.01, river resolve soft warmup
+Unsafe river 200/200: Exploitability: 185.53 mbb/g
+Base explore=0.001, river resolve soft warmup
+Unsafe river 200/200: Exploitability: 170.16 mbb/g
+
+Combined turn 2000/200 cfrps (47m): Exploitability: 66.12 mbb/g
+  EVs: -0.949246, 0.960375
+  CFR-D cap 0.2 uniform cap 0.1 floor
+
+-------------------------------------------
+
+Base mb2b2to
+Two bets and two bet sizes on turn only
+Otherwise single pot size bet
+
+Solve directly
+200:  Exploitability: 60.843777 mbb/g
+400:  Exploitability: 16.814319 mbb/g
+1000: Exploitability: 3.615090 mbb/g
+
+Doubles, explore=0.01
+Solve directly
+200: Exploitability: 126.50 mbb/g
+
+Doubles, explore=0.001
+Solve directly
+200:  Exploitability: 52.97 mbb/g
+1000: Exploitability: 12.95 mbb/g
+
+Double sumprobs, int regrets, explore=0.01, soft warmup
+Solve directly
+200: Exploitability: 127.90 mbb/g
+
+
+Turn resolve of mb2b2to with mb2b2to as base
+I don't know what the point of doing this was.
+Unsafe turn 200/200:   Exploitability: 95.799743 mbb/g
+Unsafe turn 400/400:   Exploitability: 34.423414 mbb/g
+Unsafe turn 1000/1000: Exploitability: 32.108232 mbb/g
+Base explore=0.01, resolve explore=0.01
+Unsafe turn 200/200:   Exploitability: 68.68 mbb/g
+
+Nested river resolve of mb2b2t with turn merged mb2b2to as base
+Unsafe river 200/200:   Exploitability: 547.819738 mbb/g
+Unsafe river 400/400:   Exploitability: 532.156009 mbb/g
+Unsafe river 1000/1000: Exploitability: 557.420180 mbb/g
+
+River resolve of mb2b2t with mb2b2to (*not* merged) as base
+Unsafe river 200/200:  Exploitability: 3058.485722 mbb/g
+  Worse?!?  Why is this so bad?  Bug?  Does it get better if we run CFR
+  for longer?
+Use doubles, explore=0.01 as base
+Unsafe river 200/200:  Exploitability: 497.85 mbb/g
+  Better, but much worse than CFR-D.
+CFR-D river 200/200:   Exploitability: 217.355534 mbb/g
+  Much much much better!  (Although still not that great.)
+Use double sumprobs, int regrets, explore=0.01, soft warmup as base
+Unsafe river 200/200:  Exploitability: 495.01 mbb/g
+
+Turn resolve of mb2b2t with mb2b2to as base
+Base soft warmup, resolve soft warmup
+Unsafe turn 200/200: Exploitability: 197.40 mbb/g
+Use doubles, explore=0.01 for base and resolve
+Unsafe turn 200/200: Exploitability: 219.92 mbb/g
+Use doubles, explore=0.001 for base and resolve
+Unsafe turn 200/200:   Exploitability: 184.75 mbb/g
+Unsafe turn 1000/1000: Exploitability: 117.63 mbb/g
+Explore=0.001 for base; explore=0.01 for resolve
+Unsafe turn 200/200:  Exploitability: 216.87 mbb/g
+
+River resolve of mb2b2t using turn merged mb2b2t as base
+Base explore=0.01, turn resolve explore=0.01, river resolve soft warmup
+Unsafe river 200/200: Exploitability: 262.20 mbb/g
+  Compare 185.53 for resolving river from mb2b2t base.
+Base explore=0.001, turn resolve explore=0.001, river resolve soft warmup
+Unsafe river 200/200/200:    Exploitability: 257.07 mbb/g
+Unsafe river 1000/1000/1000: Exploitability: 207.26 mbb/g
+CFR-D river 1000/1000/1000:  Exploitability: 115.21 mbb/g
+Base soft warmup, turn soft warmup, river resolve soft warmup
+Unsafe river 200/200: Exploitability: 274.60 mbb/g
+
+---------------------------------------------------
+
+Try three street game
+ms1f1t1h5/mb2b2fo
+200: Exploitability: 15.866020 mbb/g
+400: Exploitability: 4.374677 mbb/g
+Doubles, explore=0.01
+200: Exploitability: 38.85 mbb/g
+
+Resolve mb2b2f with base of mb2b2fo
+Unsafe turn 200/200: Exploitability: 223.335955 mbb/g
+  This is pretty bad too.  Is its badness comparable to the badness of
+  the four street game (3058 mbb/g)?
+Unsafe turn 400/400: Exploitability: 198.822951 mbb/g
+CFR-D turn 200/200:  Exploitability: 74.675194 mbb/g
+  Much better.
+Doubles, explore=0.01
+Unsafe turn 200/200: Exploitability: 132.81 mbb/g
+  Much better than no explore, but much worse than CFR-D
+
+Unsafe is much worse than, for example, using mb1b1 as a base and resolving
+the turn for mb2b2t.  Why is that?  Maybe it's because we get bigger pots
+if we have multiple bets in the trunk in the base.
+
+---------------------------------------------
+
+mb2b2
+
+Solve directly
+200:        Exploitability: 200.998663 mbb/g
+200 e 0.01: Exploitability: 326.42 mbb/g (old code with rounding problems)
+1000:       Exploitability: 18.05 mbb/g
+River unsafe 200/200: Exploitability: 5967.637933 mbb/g
+  P1 best response: 7.381225
+  P2 best response: 16.489327
+River CFR-D 200/200: Exploitability: 186.30 mbb/g
+  P1 best response: 0.973969
+  P2 best response: -0.228774
+River unsafe explore 0.01 200/200: Exploitability: 8145.26 mbb/g
+  P1 best response: 9.820470 (4910.24 mbb/g)
+  P2 best response: 22.760569 (11380.28 mbb/g)
+  This was due to integer quantization issues
+
+---------------------------------------------
+
+mb2b2s100
+Stack size of 100
+
+Soft warmup
+Directly 200: Exploitability: 65.61 mbb/g
+Directly 500: Exploitability: 13.72 mbb/g
+Soft warmup, doubles, explore 0.01
+Directly 200: Exploitability: 118.48 mbb/g
+Soft warmup, doubles, explore 0.01 (no term)
+Directly 200: Exploitability: 108.00 mbb/g
+Directly 300 (+49m): Exploitability: 98.26 mbb/g
+Directly 500 (+89m): Exploitability: 95.72 mbb/g
+  Buggy?  Now seeing 30.91.
+PCS, nhs3_params
+Directly 1k (48s):     Exploitability: 3564.17 mbb/g
+Directly 10k (+8m6s):  Exploitability: 981.44 mbb/g
+Directly 20k (+8m47s): Exploitability: 675.24 mbb/g
+Directly 100k (+63m):  Exploitability: 369.28 mbb/g
+Directly 200k (+73m):  Exploitability: 322.51 mbb/g
+Directly 300k (+69m):  Exploitability: 306.90 mbb/g
+PCS, nhs3_params, explore=0.01
+Directly 100k (117m):  Exploitability: 368.17 mbb/g
+Directly 500k (+475m): Exploitability: 297.88 mbb/g
+PCS, nhs3_params, new explore=0.01
+Directly 10k (12m):    Exploitability: 924.73 mbb/g
+Directly 100k (+106m): Exploitability: 433.69 mbb/g
+Directly 200k (+120m): Exploitability: 399.19 mbb/g
+Directly 300k (+120m): Exploitability: 389.72 mbb/g
+Directly 1m (+827m):   Exploitability: 383.44 mbb/g
+TCFR, nhs3, no explore
+Directly 4b:           Exploitability: 434.08 mbb/g
+Directly 45b:          Exploitability: 199.23 mbb/g
+TCFR, hshshshsbc3, no explore
+Directly 10b:          Exploitability: 310.61 mbb/g
+Directly 30b:          Exploitability: 253.79 mbb/g
+PCS, null_params
+Directly 100k (78m):   Exploitability: 393.26 mbb/g
+Directly 200k (+78m):  Exploitability: 303.27 mbb/g
+Directly 500k (+204m): Exploitability: 249.32 mbb/g
+PCS, null_params, explore=0.01
+Directly 500k (574m):  Exploitability: 273.49 mbb/g
+
+
+Base soft warmup, doubles, explore 0.01; resolve soft warmup
+River unsafe 200/200: Exploitability: 76.92 mbb/g
+River unsafe 500/200: Exploitability: 82.17 mbb/g
+  Got worse?!?
+
+Base soft warmup; resolve soft warmup
+River unsafe 200/200: Exploitability: 1370.60 mbb/g
+River CFR-D 200/200:  Exploitability: 61.58 mbb/g
+
+Base PCS, nhs3; resolve soft warmup
+River unsafe 100k/200: Exploitability: 297.43 mbb/g
+
+Base PCS, nhs3, explore=0.01; resolve soft warmup
+River unsafe 100k/200: Exploitability: 273.08 mbb/g
+River unsafe 500k/200: Exploitability: 217.96 mbb/g
+
+Base PCS, null; resolve soft warmup
+River unsafe 100k/200: Exploitability: 293.61 mbb/g
+River unsafe 500k/200: Exploitability: 204.11 mbb/g
+
+Base PCS, null, explore=0.01; resolve soft warmup
+River unsafe 500k/200: Exploitability: 187.96 mbb/g
+
+Base PCS, nhs3, new explore=0.01; resolve soft warmup
+River unsafe 300k/200: Exploitability: 231.78 mbb/g
+River unsafe 1m/500: Exploitability: 221.95 mbb/g
+
+Base TCFR, nhs3, no explore; resolve soft warmup
+River unsafe 44/200:        Exploitability: 155.69 mbb/g
+Turn unsafe 44/200 in 68m:  Exploitability: 74.03 mbb/g
+Turn unsafe 44/500 in 161m: Exploitability: 65.28 mbb/g
+CFR-D (CVs 0.508027, -0.126072)
+River CFR-D 44/200: Exploitability: 111.53 mbb/g
+River zero-sum CFR-D 44/200: Exploitability: 102.59 mbb/g
+  Limp count: 178/190; Fold count: 0/190
+  P1 best response: 0.519334 (259.67 mbb/g)
+  P2 best response: -0.108984 (-54.49 mbb/g)
+Base TCFR/nhs3/44: Exploitability: 199.23 mbb/g
+  Limp count: 178/190; Fold count: 0/190
+  P1 best response: 0.689718 (344.86 mbb/g)
+  P2 best response: 0.107188 (53.59 mbb/g)
+Redo river unsafe 44/200 (132m): Exploitability: 155.69 mbb/g
+  Limp count: 190/190; Fold count: 0/190
+  P1 best response: 0.601406 (300.70 mbb/g)
+  P2 best response: 0.021358 (10.68 mbb/g)
+
+Base TCFR, hshshshsbc3, no explore; resolve soft warmup
+River unsafe 29/200: Exploitability: 180.13 mbb/g
+
+Exploration helps a *ton* in CFR+ base.
+Exploration helps a little in PCS base
+Null abstraction vs. nhs3 helps a little in PCS base
+CFR+ base much better than PCS base
+TCFR base better than PCS base.
+
+-------------------------------------------------------
+
+Redo experiments, July 2017.
+
+ms3f1t1r1h5_params
+
+mb2b1t -> mb3b3t
+
+No card abstraction
+cfrps_params
+Base 200: Exploitability: 63.36 mbb/g
+Base 300: Exploitability: 29.51 mbb/g
+Base 500: Exploitability: 12.67 mbb/g
+Turn unsafe 500/200 (104m): Exploitability: 418.56 mbb/g
+  (Almost nothing reaches CC/CC.  Prob sum ~0.003.)
+cfrpsde01_params
+Base 200: Exploitability: 110.86 mbb/g
+Base 300: Exploitability: 90.20 mbb/g
+Base 500: Exploitability: 80.49 mbb/g
+Turn unsafe 500/200 (105m): Exploitability: 352.29 mbb/g
+  (Reach CC/CC with prob sum ~0.025.)
+  Better than no exploration, but not by much.
+Turn unsafe 500/500 (278m): Exploitability: 267.49 mbb/g
+cfrpsde001_params
+Base 200: Exploitability: 62.78 mbb/g
+Base 300: Exploitability: 33.67 mbb/g
+Base 500: Exploitability: 18.96 mbb/g
+Turn unsafe 500/200 (105m): Exploitability: 368.04 mbb/g
+  (Reach CC/CC with prob sum ~0.004.  Not much different than no explore.)
+  A bit worse than explore=0.01
+
+TCFR
+nhs3_params
+Base 1b: Exploitability: 404.05 mbb/g
+Base 2b: Exploitability: 393.05 mbb/g
+Turn unsafe 2b/200 (106m): Exploitability: 309.38 mbb/g
+  P1 reaches CC/CC with prob sum ~3.6
+Turn unsafe 2b/500 (283m): Exploitability: 238.46 mbb/g
+  Better than CFR+ base.  Nice!  Still pretty bad though.
+
+
+mb1b1 -> mb3b3t
+No card abstraction
+cfrp_params
+Base 1000: Exploitability: 2.76 mbb/g
+Turn unsafe 1000/200 (136m): Exploitability: 949.76 mbb/g
+  P1 reaches CC/CC with prob sum ~0.016
+cfrps_params
+Base 1000: Exploitability: 2.76 mbb/g
+Won't bother to solve endgames.  Seems to be identical to old system above.
+cfrpsde01_params
+Base 200:  Exploitability: 31.43 mbb/g
+Base 500:  Exploitability: 20.25 mbb/g
+Base 1000: Exploitability: 18.74 mbb/g
+Turn unsafe 1000/200 (135m): Exploitability: 734.78 mbb/g
+  P1 reaches CC/CC with prob sum ~0.6
+
+Seems like we definitely need a richer base betting abstraction than
+mb1b1.
+
+-------------------------------------------------
+
+mb3b3t -> mb3b3t
+
+tcfr, nhs3
+Base 1b (70m):    Exploitability: 1190.77 mbb/g
+Base 2b (+57m):   Exploitability: 876.76 mbb/g
+Base 16b (+799m): Exploitability: 527.25 mbb/g
+Base 17b (+73m):  Exploitability: 524.00 mbb/g
+Base 25b (+530m): Exploitability: 507.84 mbb/g
+  Limp count: 130/190
+Turn unsafe 16b/200 (105m): Exploitability: 129.53 mbb/g
+Turn unsafe 57b/200 (107m): Exploitability: 130.82 mbb/g
+CFR-D EVs: -0.575, 1.174
+Turn CFR-D 16b/200 (261m): Exploitability: 338.73 mbb/g
+  P1 best response: 1.472555 (736.28 mbb/g)
+  P2 best response: -0.117632 (-58.82 mbb/g)
+Turn CFR-D 16b/500 (755m): Exploitability: 195.32 mbb/g
+Turn zero-sum CFR-D 16b/200 (315m): Exploitability: 199.76 mbb/g
+  P1 best response: 1.095779 (547.89 mbb/g)
+  P2 best response: -0.296758 (-148.38 mbb/g)
+  Limp count: 0/190
+Turn zero-sum CFR-D 25b/200 (341m): Exploitability: 195.64 mbb/g
+  EVs: -0.603971, 1.089683
+  Limp count: 0/190
+  P1 best response: 1.090764 (545.38 mbb/g)
+  P2 best response: -0.308185 (-154.09 mbb/g)
+45b EVs: -0.629666, 1.015830
+Turn zero-sum CFR-D 57b/200 (280m): Exploitability: 192.38 mbb/g
+  57b EVs: -0.638055, 0.996959
+Turn zero-sum bucket combined 57b/200 (254m): Exploitability: 128.06 mbb/g
+Turn zero-sum bucket combined 20% cap 57b/200 (220m): Expl: 107.76 mbb/g
+Turn zero-sum bucket CBR combined 20% cap uniform 0.1 57b/200 (222m): 94.06
+  500 its (820m): Exploitability: 46.45 mbb/g
+Turn zero-sum card CBR combined (218m): Exploitability: 104.06 mbb/g
+  EVs: 0.424381, 1.547846
+
+-------------------------------------------------
+
+mb2b2s100
+mb2b2s100rcc -> mb2b2s100
+Although betting tree is only 2/3 smaller, CFR runs much much faster
+because there are so many fewer river nodes.
+No card abstraction
+cfrps_params
+Base 200: Exploitability: 18.86 mbb/g
+Base 300: Exploitability: 9.42 mbb/g
+Base 400: Exploitability: 6.07 mbb/g
+Turn unsafe 400/200 (67m): Exploitability: 662.08 mbb/g
+  P1 reaches CC/CC with prob sum ~20.
+cfrpsde01_params
+Base 400: Exploitability: 42.52 mbb/g
+Turn unsafe 400/200 (73m): Exploitability: 547.37 mbb/g
+  Substantially better, but still very bad
+
+mb2b2s100 -> mb2b2s100
+No card abstraction
+Base 200 (72m): Exploitability: 65.61 mbb/g
+cfrpsde01
+Turn unsafe 500/200 (74m):  Exploitability: 56.60 mbb/g
+River unsafe 500/200 (98m): Exploitability: 82.17 mbb/g
+
+tcfr
+nhs3_params (13,217 river buckets)
+CFR-D (build_prbrs: 0.508027, -0.126072)
+Base 44: Exploitability: 199.23 mbb/g
+Resolving river subgames
+CFR-D 44/200: Exploitability: 111.53 mbb/g
+  Compare unsafe at 155.69
+Zero-sum CFR-D 44/200: Exploitability: 102.59 mbb/g
+Zero-sum bucket CBR combined 44/200 (300m): Exploitability: 94.40 mbb/g
+Zero-sum bucket CBR combined 20% cap 44/200 (217m): Exploitability: 77.86 mbb/g
+Zero-sum bucket CBR combined 20% cap uniform 0.1 44/200 (224m): 77.95 mbb/g
+  500 its (836m): Exploitability: 75.03 mbb/g
+Resolving flop subgames 44/200 (208m): Exploitability: 49.79 mbb/g
+
+Using card-level zero-sum CBRs
+EVs: 0.107188, 0.689718
+River 44/200 (226m): Exploitability: 78.98 mbb/g
+
+
+hshshshsbc3_params (1457 river buckets)
+Base 1b: Exploitability: 324.20 mbb/g
+Base 2b: Exploitability: 278.52 mbb/g
+Base 3b: Exploitability: 260.95 mbb/g
+Base 12b: Exploitability: 229.32 mbb/g
+Base 13b: Exploitability: 228.97 mbb/g
+build_bcbrs: -0.102769, 0.504518
+Combined z/b/cbrs 20% CFR-D u 0.1 floor 96/200: Exploitability: 85.60 mbb/g
+  Compare nhs3 at 77.86.
+  
+h5b100_params (about 100 buckets on each postflop street)
+Base 1b: Exploitability: 1411.34 mbb/g
+Base 2b: Exploitability: 1408.56 mbb/g
+Combined z/b/cbrs 20% CFR-D u 0.1 floor 2/200: Exploitability: 684.60 mbb/g
+Yikes, terrible.  But is the problem the resolving or the abstraction
+on the flop or turn?
+hss0.6bc1_params: 100 buckets on river; null pre-river
+8b: Exploitability: 1162.58 mbb/g
+9b: Exploitability: 1164.96 mbb/g
+build_bcbrs: 0.198627, 0.716531
+Combined z/b/cbrs 20% CFR-D u 0.1 floor 2/200 (382m): Exploitability: 375.18
+The river abstraction is just too bad.

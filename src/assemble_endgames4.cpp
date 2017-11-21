@@ -1,23 +1,14 @@
-// Can get mysterious crash if we pass the wrong streets on the command
-// line.  Should catch that.  Well, it was a weird scenario in which I first
-// called solve_all_endgames with the wrong streets as well.
+// Meant for use with solve_all_endgames4.  solve_all_endgames4 is limited
+// in terms of what types of endgame solving it does.  There is no nested
+// endgame solving, and endgames are always solved at street-initial nodes.
 //
-// I could merge the base sumprobs into the merged sumprobs.  Is there any
-// advantage to doing that?
+// We also write out endgames in a different directory format.
 //
-// Can we reduce the memory footprint in any way?  Getting close to our
-// machine's limit.  Currently we merge all the sumprobs into the merged
-// sumprobs object.  Maybe that's not necessary, especially for unabstracted
-// endgames.  Can write out as we go.  Can definitely write out after the
-// loop over boards at a subtree root, no?  Actually, I don't think so.
-//
-// Want to have one file per street.
+// We use routines from endgame_utils.cpp here.
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include <string>
 
 #include "betting_abstraction.h"
 #include "betting_abstraction_params.h"
@@ -29,8 +20,10 @@
 #include "card_abstraction_params.h"
 #include "cfr_config.h"
 #include "cfr_params.h"
+#include "cfr_utils.h"
 #include "cfr_values.h"
 #include "eg_cfr.h" // ResolvingMethod
+#include "endgame_utils.h" // ReadEndgame()
 #include "files.h"
 #include "game.h"
 #include "game_params.h"
@@ -38,14 +31,12 @@
 #include "params.h"
 #include "split.h"
 
-using namespace std;
-
 class Assembler {
 public:
   Assembler(BettingTree *base_betting_tree, BettingTree *endgame_betting_tree,
-	    unsigned int solve_street, unsigned int target_street,
-	    unsigned int base_it, unsigned int endgame_it,
-	    const CardAbstraction &base_ca, const CardAbstraction &endgame_ca,
+	    unsigned int solve_street, unsigned int base_it,
+	    unsigned int endgame_it, const CardAbstraction &base_ca,
+	    const CardAbstraction &endgame_ca,
 	    const CardAbstraction &merged_ca,
 	    const BettingAbstraction &base_ba,
 	    const BettingAbstraction &endgame_ba, const CFRConfig &base_cc,
@@ -56,13 +47,12 @@ public:
   void Go(void);
 private:
   void WalkTrunk(Node *base_node, Node *endgame_node,
-		 const string &action_sequence);
+		 const string &action_sequence, unsigned int last_st);
 
   bool asymmetric_;
   BettingTree *base_betting_tree_;
   BettingTree *endgame_betting_tree_;
   unsigned int solve_street_;
-  unsigned int target_street_;
   unsigned int base_it_;
   unsigned int endgame_it_;
   const CardAbstraction &base_ca_;
@@ -74,16 +64,15 @@ private:
   const CFRConfig &endgame_cc_;
   const CFRConfig &merged_cc_;
   ResolvingMethod method_;
+  unique_ptr<CFRValues> base_sumprobs_;
   unique_ptr<CFRValues> merged_sumprobs_;
   unique_ptr<Buckets> endgame_buckets_;
-  Writer ***writers_;
-  void ***compressors_;
 };
 
 Assembler::Assembler(BettingTree *base_betting_tree,
 		     BettingTree *endgame_betting_tree,
-		     unsigned int solve_street, unsigned int target_street,
-		     unsigned int base_it, unsigned int endgame_it,
+		     unsigned int solve_street, unsigned int base_it,
+		     unsigned int endgame_it,
 		     const CardAbstraction &base_ca,
 		     const CardAbstraction &endgame_ca,
 		     const CardAbstraction &merged_ca,
@@ -100,7 +89,6 @@ Assembler::Assembler(BettingTree *base_betting_tree,
   base_betting_tree_ = base_betting_tree;
   endgame_betting_tree_ = endgame_betting_tree;
   solve_street_ = solve_street;
-  target_street_ = target_street;
   base_it_ = base_it;
   endgame_it_ = endgame_it;
   method_ = method;
@@ -110,13 +98,13 @@ Assembler::Assembler(BettingTree *base_betting_tree,
   endgame_buckets_.reset(new Buckets(endgame_ca_, true));
   
   unsigned int max_street = Game::MaxStreet();
-  bool *base_streets = new bool[max_street + 1];
+  unique_ptr<bool []> base_streets(new bool[max_street + 1]);
   for (unsigned int st = 0; st <= max_street; ++st) {
-    base_streets[st] = st < target_street;
+    base_streets[st] = st < solve_street_;
   }
   Buckets base_buckets(base_ca_, true);
 
-  bool *base_compressed_streets = new bool[max_street + 1];
+  unique_ptr<bool []> base_compressed_streets(new bool[max_street + 1]);
   for (unsigned int st = 0; st <= max_street; ++st) {
     base_compressed_streets[st] = false;
   }
@@ -127,37 +115,35 @@ Assembler::Assembler(BettingTree *base_betting_tree,
     base_compressed_streets[st] = true;
   }
 
-  CFRValues base_sumprobs(nullptr, true, base_streets, base_betting_tree_,
-			  0, 0, base_ca_, base_buckets,
-			  base_compressed_streets);
-  delete [] base_compressed_streets;
-  delete [] base_streets;
+  CFRValues base_sumprobs(nullptr, true, base_streets.get(),
+			  base_betting_tree_, 0, 0, base_ca_, base_buckets,
+			  base_compressed_streets.get());
   
   char read_dir[500], write_dir[500];
   sprintf(read_dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
 	  Game::GameName().c_str(), Game::NumPlayers(),
-	  base_ca.CardAbstractionName().c_str(),
-	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
+	  base_ca.CardAbstractionName().c_str(), Game::NumRanks(),
+	  Game::NumSuits(), Game::MaxStreet(),
 	  base_ba_.BettingAbstractionName().c_str(),
 	  base_cc_.CFRConfigName().c_str());
   base_sumprobs.Read(read_dir, base_it, base_betting_tree_->Root(), "x",
 		     kMaxUInt);
   sprintf(write_dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::NewCFRBase(),
 	  Game::GameName().c_str(), Game::NumPlayers(),
-	  merged_ca_.CardAbstractionName().c_str(),
-	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
+	  merged_ca_.CardAbstractionName().c_str(), Game::NumRanks(),
+	  Game::NumSuits(), Game::MaxStreet(),
 	  endgame_ba_.BettingAbstractionName().c_str(),
 	  merged_cc_.CFRConfigName().c_str());
   base_sumprobs.Write(write_dir, endgame_it_, base_betting_tree_->Root(), "x",
 		      kMaxUInt);
 
-  bool *endgame_streets = new bool[max_street + 1];
+  unique_ptr<bool []> endgame_streets(new bool[max_street + 1]);
   for (unsigned int st = 0; st <= max_street; ++st) {
-    endgame_streets[st] = st >= target_street_;
+    endgame_streets[st] = st >= solve_street_;
   }
   Buckets merged_buckets(merged_ca_, true);
 
-  bool *merged_compressed_streets = new bool[max_street + 1];
+  unique_ptr<bool []> merged_compressed_streets(new bool[max_street + 1]);
   for (unsigned int st = 0; st <= max_street; ++st) {
     merged_compressed_streets[st] = false;
   }
@@ -168,34 +154,31 @@ Assembler::Assembler(BettingTree *base_betting_tree,
     merged_compressed_streets[st] = true;
   }
 
-  merged_sumprobs_.reset(new CFRValues(nullptr, true, endgame_streets,
-				       endgame_betting_tree, 0, 0,
+  merged_sumprobs_.reset(new CFRValues(nullptr, true, endgame_streets.get(),
+				       endgame_betting_tree_, 0, 0,
 				       merged_ca_, merged_buckets,
-				       merged_compressed_streets));
-  delete [] merged_compressed_streets;
-  delete [] endgame_streets;
-
-  // Choosing not to merge preflop into merged_sumprobs_, but we could
-  writers_ = merged_sumprobs_->InitializeWriters(write_dir, endgame_it_, "x",
-						 kMaxUInt, &compressors_);
+				       merged_compressed_streets.get()));
 }
 
 Assembler::~Assembler(void) {
-  merged_sumprobs_->DeleteWriters(writers_, compressors_);
 }
 
+// When we get to the target street, read the entire base strategy for
+// this subtree into merged sumprobs.  Then go through and override parts
+// with the endgame strategy.
 void Assembler::WalkTrunk(Node *base_node, Node *endgame_node,
-			  const string &action_sequence) {
+			  const string &action_sequence,
+			  unsigned int last_st) {
   if (base_node->Terminal()) return;
   unsigned int st = base_node->Street();
-  if (st == target_street_) {
+  if (st == solve_street_) {
     unsigned int num_boards = BoardTree::NumBoards(st);
     fprintf(stderr, "%s\n", action_sequence.c_str());
     BettingTree *subtree = BettingTree::BuildSubtree(endgame_node);
     unsigned int max_street = Game::MaxStreet();
     bool *endgame_streets = new bool[max_street + 1];
     for (unsigned int st = 0; st <= max_street; ++st) {
-      endgame_streets[st] = st >= target_street_;
+      endgame_streets[st] = st >= solve_street_;
     }
     bool *endgame_compressed_streets = new bool[max_street + 1];
     for (unsigned int st = 0; st <= max_street; ++st) {
@@ -207,35 +190,21 @@ void Assembler::WalkTrunk(Node *base_node, Node *endgame_node,
       unsigned int st = ecsv[i];
       endgame_compressed_streets[st] = true;
     }
-    char read_dir[500];
-    sprintf(read_dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s/endgames.%s.%s.%s.%s.%u.%u",
-	    Files::OldCFRBase(), Game::GameName().c_str(), Game::NumPlayers(),
-	    base_ca_.CardAbstractionName().c_str(),
-	    Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
-	    base_ba_.BettingAbstractionName().c_str(),
-	    base_cc_.CFRConfigName().c_str(),
-	    endgame_ca_.CardAbstractionName().c_str(),
-	    endgame_ba_.BettingAbstractionName().c_str(),
-	    endgame_cc_.CFRConfigName().c_str(),
-	    ResolvingMethodName(method_), solve_street_, target_street_);
     for (unsigned int gbd = 0; gbd < num_boards; ++gbd) {
-      CFRValues endgame_sumprobs(nullptr, true, endgame_streets,
-				 subtree, gbd, target_street_,
-				 endgame_ca_, *endgame_buckets_,
-				 endgame_compressed_streets);
-      endgame_sumprobs.Read(read_dir, endgame_it_, subtree->Root(),
-			    action_sequence, kMaxUInt);
-      merged_sumprobs_->MergeInto(endgame_sumprobs, gbd, endgame_node,
+      unique_ptr<CFRValues> endgame_sumprobs;
+      endgame_sumprobs.reset(ReadEndgame(action_sequence, subtree, gbd,
+					 base_ca_, endgame_ca_, base_ba_,
+					 endgame_ba_, base_cc_, endgame_cc_,
+					 *endgame_buckets_.get(), method_, st,
+					 gbd, kMaxUInt));
+      merged_sumprobs_->MergeInto(*endgame_sumprobs.get(), gbd, endgame_node,
 				  subtree->Root(), *endgame_buckets_,
-				  max_street);
+				  Game::MaxStreet());
     }
-
+    
     delete subtree;
     delete [] endgame_streets;
     delete [] endgame_compressed_streets;
-
-    merged_sumprobs_->Write(endgame_node, writers_, compressors_, nullptr);
-    merged_sumprobs_->DeleteBelow(endgame_node);
     
     return;
   }
@@ -243,28 +212,35 @@ void Assembler::WalkTrunk(Node *base_node, Node *endgame_node,
   for (unsigned int s = 0; s < num_succs; ++s) {
     string action = base_node->ActionName(s);
     WalkTrunk(base_node->IthSucc(s), endgame_node->IthSucc(s),
-	      action_sequence + action);
+	      action_sequence + action, st);
   }
 }
 
 void Assembler::Go(void) {
-  WalkTrunk(base_betting_tree_->Root(), endgame_betting_tree_->Root(), "x");
-  // Now we write as we go
-  // merged_sumprobs_->Write(endgame_betting_tree_->Root(), writers_);
+  WalkTrunk(base_betting_tree_->Root(), endgame_betting_tree_->Root(), "x",
+	    base_betting_tree_->Root()->Street());
+  char dir[500];
+  sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::NewCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
+	  merged_ca_.CardAbstractionName().c_str(), Game::NumRanks(),
+	  Game::NumSuits(), Game::MaxStreet(),
+	  endgame_ba_.BettingAbstractionName().c_str(),
+	  merged_cc_.CFRConfigName().c_str());
+  merged_sumprobs_->Write(dir, endgame_it_, endgame_betting_tree_->Root(),
+			  "x", kMaxUInt);
 }
 
 static void Usage(const char *prog_name) {
   fprintf(stderr, "USAGE: %s <game params> <base card params> "
 	  "<endgame card params> <merged card params> <base betting params> "
 	  "<endgame betting params> <base CFR params> <endgame CFR params> "
-	  "<merged CFR params> <solve street> <target street> <base it> "
-	  "<endgame it> <method>\n",
-	  prog_name);
+	  "<merged CFR params> <solve street> <base it> <endgame it> "
+	  "<method>\n", prog_name);
   exit(-1);
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 15) Usage(argv[0]);
+  if (argc != 14) Usage(argv[0]);
   Files::Init();
   unique_ptr<Params> game_params = CreateGameParams();
   game_params->ReadFromFile(argv[1]);
@@ -303,12 +279,11 @@ int main(int argc, char *argv[]) {
   unique_ptr<CFRConfig>
     merged_cfr_config(new CFRConfig(*merged_cfr_params));
 
-  unsigned int solve_street, target_street, base_it, endgame_it;
+  unsigned int solve_street, base_it, endgame_it;
   if (sscanf(argv[10], "%u", &solve_street) != 1)  Usage(argv[0]);
-  if (sscanf(argv[11], "%u", &target_street) != 1) Usage(argv[0]);
-  if (sscanf(argv[12], "%u", &base_it) != 1)       Usage(argv[0]);
-  if (sscanf(argv[13], "%u", &endgame_it) != 1)    Usage(argv[0]);
-  string m = argv[14];
+  if (sscanf(argv[11], "%u", &base_it) != 1)       Usage(argv[0]);
+  if (sscanf(argv[12], "%u", &endgame_it) != 1)    Usage(argv[0]);
+  string m = argv[13];
   ResolvingMethod method;
   if (m == "unsafe")         method = ResolvingMethod::UNSAFE;
   else if (m == "cfrd")      method = ResolvingMethod::CFRD;
@@ -323,10 +298,10 @@ int main(int argc, char *argv[]) {
   BoardTree::Create();
 
   Assembler assembler(base_betting_tree, endgame_betting_tree, solve_street,
-		      target_street, base_it, endgame_it,
-		      *base_card_abstraction, *endgame_card_abstraction,
-		      *merged_card_abstraction, *base_betting_abstraction,
-		      *endgame_betting_abstraction, *base_cfr_config,
-		      *endgame_cfr_config, *merged_cfr_config, method);
+		      base_it, endgame_it, *base_card_abstraction,
+		      *endgame_card_abstraction, *merged_card_abstraction,
+		      *base_betting_abstraction, *endgame_betting_abstraction,
+		      *base_cfr_config, *endgame_cfr_config,
+		      *merged_cfr_config, method);
   assembler.Go();
 }

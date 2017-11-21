@@ -76,3 +76,16 @@ Current strategy also does better than the cumulative strategy when using
 an abstracted strategy against a near-equilibrium unabstracted strategy.
 
 Quantizing river regrets to one byte seems to work fine.
+Need to scale regret updates.  Scaling factor of 0.05 seems to work well.
+But not when we are scaling CVs by board count.
+
+Quantizing turn regrets hurts by about 5.5 mbb/g. Doesn't help to scale
+turn regret updates.
+
+Conclusions from mb3b3 experiments on Amazon:
+a) River quantization doesn't hurt
+b) Turn quantization hurts a bit; probably not worth it
+c) Quantization scaling of 0.001 seems best
+d) Sample raw boards with right frequency best
+e) Close threshold helps
+

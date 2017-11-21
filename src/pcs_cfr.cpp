@@ -20,7 +20,6 @@
 #include "buckets.h"
 #include "canonical_cards.h"
 #include "card_abstraction.h"
-#include "cfr.h"
 #include "cfr_config.h"
 #include "cfr_utils.h"
 #include "cfr_values.h"

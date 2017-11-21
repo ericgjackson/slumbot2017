@@ -444,14 +444,9 @@ of opponent probs.
     be any better?
 * Does CFR+ work on reentrant trees?  If so, use it to compare reentrant
   trees (possibly with better card abstractions) to non-reentrant trees.
-* Test endgame solving after VCFRState changes.
-  * Getting slightly bad results with zero-sum CVs in combined endgame
-    solving on ms1f3.  But results on four-street games look good.
-  * I think I lost my old ms3h5/nhs3/tcfr base system.  Rebuild.
 * Verify that multiplayer strategies look reasonable.  It's a little
   suspicious that the gaps in head-to-head between any two systems is so
   small.
-* Maintain last_aggressor.  Use as key for reentrancy.
 * Why is it so much faster to build a reentrant betting tree than to read
   one from disk?  Don't they both do the same sorts of hashtable lookups?
 * PokerStars issues
@@ -471,24 +466,52 @@ of opponent probs.
   * Is StatelessNLAgent::Recurse() doing the right thing with pot sizes?
   * We used CanonicalCards::ToCanon2() to canonicalize cards.  I thought I
     decided that could not be used for that purpose.
+  * Create a bot that is a clone of Slumbot but checkraises the flop
+    100% at BC/CB.  Can it crush Slumbot?
 * Evaluate current strategy for head-to-head.
   * Evaluate exploitability of current strategy.
   * Does current strategy fold much more or less than cumulative strategy?
   * Should compare current strategy of one abstraction to cumulative
     strategy of a different abstraction.
-* Build a big abstraction.  kmeans as much as possible, and then
-  prify or crossproduct.
-* Can I try harder to use templates everywhere?
-* Quantization
-  * Test quantizing turn regrets.
-  * Try scaling by 0.01
-  * Test chars and shorts in CFRValues class.  Need to handle chars and
-    sorts in vcfr.cpp.
-* Can I do endgame solving well if all I have is the current strategy?
-  The current strategy may not be very balanced.
-  * Also, even if I have mixed ranges (from sumprobs) up to the river,
-    what if my opp CVs are calculated based on the current strategy?
-* Experiments to run
-  * If we make abstract game 10x bigger, how much longer until the big
-    system surpasses the small system?
-  * Best 1m river bucket abstraction.
+* Do I need to structure base sumprobs on disk differently to enable fast
+  endgame solving?  Don't want to have to read the whole file.  If I have
+  big files, need to be able to seek to the right location quickly.
+  Table of offsets?  Or search through the tree to compute the offset
+  dynamically.
+* Four choices for endgame solving of final system:
+  * Use unsafe endgame solving.  Then I don't need to save anything for the
+    river.  Allows me to use a richer card abstraction for the rest of the
+    game and fit into 250 GB.
+  * Use combined endgame solving with current strategy and one-byte
+    quantized river regrets.  Requires one byte per river bucket.
+  * Use combined endgame solving with current strategy and unquantized river
+    regrets.  Requires four bytes per river bucket.
+  * Use combined endgame solving with average strategy.  Requires four bytes
+    per river bucket in competition and eight bytes during CFR.
+  * Should evaluate on mb3b3.
+  * Should compare coarse river abstraction with sumprobs to not coarse
+    with one-byte regrets.
+* Evaluate post-hoc pruning where we eliminate paths that very few hands
+  take.  Will this help endgame solving?  Maybe not.  We still need to learn
+  strategies in case the opponent takes a path we think unlikely.  And nodes
+  that we rarely reach shouldn't affect our strategy that much.
+* Copy bug fixes over to slumbot2018 directory.
+* Unsafe beats combined head-to-head although combined has better
+  exploitability.  Cause for concern?  Try on mb2b2.  Can't load two resolved
+  games into memory.  Access probs and or buckets from disk?  Quantize
+  probs in memory?  Convert ints to chars.
+* Any time to build, test and use HVB table?
+* Start training.  Submit code to github.  Are we satisfied with big6asym?
+  Are we satisfied with hsfive/rk100kbc1s1?  Are we satisfied with endgame
+  solving based on a one-byte quantized river strategy?
+* How often do I want to checkpoint?  About once a day?  I think I can
+  save up to two checkpoints at most.
+  * How many iterations should I do before checkpointing?
+  * About 20m to Prepare().
+  * About 30m to write the regrets.
+  * Not sure how long to read.  Same as writing?
+  * So maybe four hours for all of the data?!?
+  * 10m its in 5m.  Implies 120m in 1h.  Implies 2.88B in 1 day.
+    But I expect it to pick up.
+  * First job started around 6:25 PM.  At 8:25 have done 300m iterations.
+    3b may take 20 hours therefore.

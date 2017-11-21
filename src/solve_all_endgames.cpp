@@ -34,9 +34,9 @@ static void WalkTrunk2(Node *base_node, Node *endgame_node,
   if (base_node->Terminal()) return;
   unsigned int st = base_node->Street();
   if (st == target_st) {
-    unsigned int p = base_node->PlayerActing();
-    unsigned int base_solve_nt = base_solve_root->NonterminalID();
-    unsigned int base_target_nt = base_node->NonterminalID();
+    // unsigned int p = base_node->PlayerActing();
+    // unsigned int base_solve_nt = base_solve_root->NonterminalID();
+    // unsigned int base_target_nt = base_node->NonterminalID();
     unsigned int sbb, sbe;
     if (target_st > solve_st) {
       sbb = BoardTree::SuccBoardBegin(solve_st, solve_bd, target_st);
@@ -46,11 +46,13 @@ static void WalkTrunk2(Node *base_node, Node *endgame_node,
       sbe = solve_bd + 1;
     }
     for (unsigned int target_bd = sbb; target_bd < sbe; ++target_bd) {
+#if 0
       fprintf(stderr, "P%u base solve nt %u base target nt %u endgame nt %u "
 	      "solve_bd %u target_bd %u\n", p, base_solve_nt,
 	      base_target_nt, endgame_node->NonterminalID(), solve_bd,
 	      target_bd);
-      solver->Solve(endgame_solve_root, endgame_node, base_solve_root, 
+#endif
+      solver->Solve(endgame_solve_root, endgame_node, base_solve_root,
 		    action_sequence, solve_bd, target_bd,
 		    base_node->NonterminalID(), num_its, endgame_betting_tree);
     }

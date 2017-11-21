@@ -3,6 +3,8 @@
 
 #include <memory>
 
+#include "cfr_value_type.h"
+
 using namespace std;
 
 class BettingTree;
@@ -13,13 +15,6 @@ class Reader;
 class Writer;
 
 #define EJC 1
-
-enum CFRValueType {
-  CFR_CHAR,
-  CFR_SHORT,
-  CFR_INT,
-  CFR_DOUBLE
-};
 
 class CFRValues {
 public:
@@ -174,7 +169,8 @@ public:
 		 unsigned int final_st);
   void ReadSubtreeFromFull(const char *dir, unsigned int it,
 			   Node *full_root, Node *full_subtree_root,
-			   Node *subtree_root, const string &action_sequence,
+			   Node *subtree_root,
+			   const string &root_action_sequence,
 			   unsigned int *num_full_holdings,
 			   unsigned int only_p);
   bool Players(unsigned int p) const {return players_[p];}

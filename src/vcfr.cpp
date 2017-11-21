@@ -39,138 +39,10 @@
 #include "rand.h"
 #include "split.h"
 #include "vcfr.h"
+#include "vcfr_state.h"
 #include "vcfr_subgame.h"
 
 using namespace std;
-
-// Currently allocate for all streets.  Could be smarter and allocate just
-// for streets that we have buckets for.  But we don't call this code often
-// and is cheap both in terms of time and memory.
-unsigned int **AllocateStreetBuckets(void) {
-  unsigned int max_street = Game::MaxStreet();
-  unsigned int **street_buckets = new unsigned int *[max_street + 1];
-  for (unsigned int st = 0; st <= max_street; ++st) {
-    unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
-    street_buckets[st] = new unsigned int[num_hole_card_pairs];
-  }
-
-  return street_buckets;
-}
-
-void DeleteStreetBuckets(unsigned int **street_buckets) {
-  unsigned int max_street = Game::MaxStreet();
-  for (unsigned int st = 0; st <= max_street; ++st) {
-    delete [] street_buckets[st];
-  }
-  delete [] street_buckets;
-}
-
-double *AllocateOppProbs(bool initialize) {
-  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
-  unsigned int max_card1 = Game::MaxCard() + 1;
-  unsigned int num_enc;
-  if (num_hole_cards == 1) num_enc = max_card1;
-  else                     num_enc = max_card1 * max_card1;
-  double *opp_probs = new double[num_enc];
-  if (initialize) {
-    for (unsigned int i = 0; i < num_enc; ++i) opp_probs[i] = 1.0;
-  }
-  return opp_probs;
-}
-
-// Called at the root of the tree.  We need to initialize total_card_probs_
-// and sum_opp_probs_ because an open fold is allowed.
-VCFRState::VCFRState(double *opp_probs, unsigned int **street_buckets,
-		     const HandTree *hand_tree) {
-  opp_probs_ = opp_probs;
-  street_buckets_ = street_buckets;
-  action_sequence_ = "x";
-  hand_tree_ = hand_tree;
-  root_bd_ = 0;
-  root_bd_st_ = 0;
-  unsigned int max_card1 = Game::MaxCard() + 1;
-  total_card_probs_ = new double[max_card1];
-  const CanonicalCards *hands = hand_tree_->Hands(0, 0);
-  CommonBetResponseCalcs(0, hands, opp_probs_, &sum_opp_probs_,
-			 total_card_probs_);
-}
-  
-// Called at an internal street-initial node.  We initialize total_card_probs_
-// to nullptr and sum_opp_probs_ to zero because we know we will come
-// across an opp-choice node before we need those members.
-VCFRState::VCFRState(double *opp_probs, const HandTree *hand_tree,
-		     unsigned int st, unsigned int lbd,
-		     const string &action_sequence, unsigned int root_bd,
-		     unsigned int root_bd_st, unsigned int **street_buckets) {
-  opp_probs_ = opp_probs;
-  total_card_probs_ = nullptr;
-  sum_opp_probs_ = 0;
-  hand_tree_ = hand_tree;
-  action_sequence_ = action_sequence;
-  root_bd_ = root_bd;
-  root_bd_st_ = root_bd_st;
-  street_buckets_ = street_buckets;
-}
-
-// Called at an internal street-initial node.  Unlike the above constructor,
-// we take a total_card_probs parameter and initialize it.
-VCFRState::VCFRState(double *opp_probs, double *total_card_probs,
-		     const HandTree *hand_tree, unsigned int st,
-		     unsigned int lbd, const string &action_sequence,
-		     unsigned int root_bd, unsigned int root_bd_st,
-		     unsigned int **street_buckets) {
-  opp_probs_ = opp_probs;
-  total_card_probs_ = total_card_probs;
-  hand_tree_ = hand_tree;
-  action_sequence_ = action_sequence;
-  root_bd_ = root_bd;
-  root_bd_st_ = root_bd_st;
-  street_buckets_ = street_buckets;
-  const CanonicalCards *hands = hand_tree_->Hands(st, lbd);
-  CommonBetResponseCalcs(root_bd_st_, hands, opp_probs_, &sum_opp_probs_,
-			 total_card_probs_);
-}
-
-// Create a new VCFRState corresponding to taking an action of ours.
-VCFRState::VCFRState(const VCFRState &pred, Node *node, unsigned int s) {
-  opp_probs_ = pred.OppProbs();
-  hand_tree_ = pred.GetHandTree();
-  action_sequence_ = pred.ActionSequence() + node->ActionName(s);
-  root_bd_ = pred.RootBd();
-  root_bd_st_ = pred.RootBdSt();
-  street_buckets_ = pred.StreetBuckets();
-  total_card_probs_ = pred.TotalCardProbs();
-  sum_opp_probs_ = pred.SumOppProbs();
-}
-
-// Create a new VCFRState corresponding to taking an opponent action.
-VCFRState::VCFRState(const VCFRState &pred, Node *node, unsigned int s,
-		     double *opp_probs, double sum_opp_probs,
-		     double *total_card_probs) {
-  opp_probs_ = opp_probs;
-  hand_tree_ = pred.GetHandTree();
-  action_sequence_ = pred.ActionSequence() + node->ActionName(s);
-  root_bd_ = pred.RootBd();
-  root_bd_st_ = pred.RootBdSt();
-  street_buckets_ = pred.StreetBuckets();
-  sum_opp_probs_ = sum_opp_probs;
-  total_card_probs_ = total_card_probs;
-}
-
-#if 0
-// If I want to update total_card_probs_ and sum_opp_probs_, do this.
-void VCFRState::SetOppProbs(double *opp_probs, unsigned int st,
-			    unsigned int lbd) {
-  opp_probs_ = opp_probs;
-  const CanonicalCards *hands = hand_tree_->Hands(st, lbd);
-  CommonBetResponseCalcs(root_bd_st_, hands, opp_probs_, &sum_opp_probs_,
-			 total_card_probs_);
-}
-#endif
-
-// We don't own any of the arrays.  Caller must delete.
-VCFRState::~VCFRState(void) {
-}
 
 // Unabstracted, integer regrets
 void VCFR::UpdateRegrets(Node *node, double *vals, double **succ_vals,
@@ -336,6 +208,7 @@ void VCFR::UpdateRegretsBucketed(Node *node, unsigned int **street_buckets,
 
 double *VCFR::OurChoice(Node *node, unsigned int lbd, const VCFRState &state) {
   unsigned int st = node->Street();
+  unsigned int pa = node->PlayerActing();
   unsigned int num_succs = node->NumSuccs();
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
   unsigned int nt = node->NonterminalID();
@@ -381,7 +254,7 @@ double *VCFR::OurChoice(Node *node, unsigned int lbd, const VCFRState &state) {
 	// current strategy, even as we update the regrets.  So we store
 	// the current strategy in current_strategy_.
 	double *d_all_current_probs;
-	current_strategy_->Values(p_, st, nt, &d_all_current_probs);
+	current_strategy_->Values(pa, st, nt, &d_all_current_probs);
 	for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
 	  unsigned int b = street_buckets[st][i];
 	  double *my_current_probs = d_all_current_probs + b * num_succs;
@@ -390,14 +263,14 @@ double *VCFR::OurChoice(Node *node, unsigned int lbd, const VCFRState &state) {
 	  }
 	}
 	if (! value_calculation_ && ! pre_phase_) {
-	  if (regrets_->Ints(p_, st)) {
+	  if (regrets_->Ints(pa, st)) {
 	    int *i_all_regrets;
-	    regrets_->Values(p_, st, nt, &i_all_regrets);
+	    regrets_->Values(pa, st, nt, &i_all_regrets);
 	    UpdateRegretsBucketed(node, street_buckets, vals, succ_vals,
 				  i_all_regrets);
 	  } else {
 	    double *d_all_regrets;
-	    regrets_->Values(p_, st, nt, &d_all_regrets);
+	    regrets_->Values(pa, st, nt, &d_all_regrets);
 	    UpdateRegretsBucketed(node, street_buckets, vals, succ_vals,
 				  d_all_regrets);
 	  }
@@ -414,19 +287,19 @@ double *VCFR::OurChoice(Node *node, unsigned int lbd, const VCFRState &state) {
 	double explore;
 	if (value_calculation_) {
 	  // For example, when called from build_cbrs.
-	  if (sumprobs_->Ints(p_, st)) {
-	    sumprobs_->Values(p_, st, nt, &i_all_cs_vals);
+	  if (sumprobs_->Ints(pa, st)) {
+	    sumprobs_->Values(pa, st, nt, &i_all_cs_vals);
 	  } else {
-	    sumprobs_->Values(p_, st, nt, &d_all_cs_vals);
+	    sumprobs_->Values(pa, st, nt, &d_all_cs_vals);
 	  }
 	  nonneg = true;
 	  // Don't want to impose exploration when working off of sumprobs.
 	  explore = 0;
 	} else {
-	  if (regrets_->Ints(p_, st)) {
-	    regrets_->Values(p_, st, nt, &i_all_cs_vals);
+	  if (regrets_->Ints(pa, st)) {
+	    regrets_->Values(pa, st, nt, &i_all_cs_vals);
 	  } else {
-	    regrets_->Values(p_, st, nt, &d_all_cs_vals);
+	    regrets_->Values(pa, st, nt, &d_all_cs_vals);
 	  }
 	  nonneg = nn_regrets_ && regret_floors_[st] >= 0;
 	  explore = explore_;
@@ -517,6 +390,7 @@ double *VCFR::OurChoice(Node *node, unsigned int lbd, const VCFRState &state) {
 
 double *VCFR::OppChoice(Node *node, unsigned int lbd, const VCFRState &state) {
   unsigned int st = node->Street();
+  unsigned int pa = node->PlayerActing();
   unsigned int num_succs = node->NumSuccs();
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
   const HandTree *hand_tree = state.GetHandTree();
@@ -537,7 +411,6 @@ double *VCFR::OppChoice(Node *node, unsigned int lbd, const VCFRState &state) {
   } else {
     unsigned int **street_buckets = state.StreetBuckets();
     unsigned int nt = node->NonterminalID();
-    unsigned int opp = p_^1;
     for (unsigned int s = 0; s < num_succs; ++s) {
       succ_opp_probs[s] = new double[num_enc];
       for (unsigned int i = 0; i < num_enc; ++i) succ_opp_probs[s][i] = 0;
@@ -556,7 +429,7 @@ double *VCFR::OppChoice(Node *node, unsigned int lbd, const VCFRState &state) {
       node->LastBetTo() < card_abstraction_.BucketThreshold(st);
 
     if (bucketed && ! value_calculation_) {
-      current_strategy_->Values(opp, st, nt, &d_all_current_probs);
+      current_strategy_->Values(pa, st, nt, &d_all_current_probs);
     } else {
       // cs_vals are the current strategy values; i.e., the values we pass into
       // RegretsToProbs() in order to get the current strategy.  In VCFR, these
@@ -564,16 +437,44 @@ double *VCFR::OppChoice(Node *node, unsigned int lbd, const VCFRState &state) {
       // sumprobs.
 
       if (value_calculation_ && ! br_current_) {
-	if (sumprobs_->Ints(opp, st)) {
-	  sumprobs_->Values(opp, st, nt, &i_all_cs_vals);
+	if (sumprobs_ == nullptr) {
+	  fprintf(stderr, "VCFR::OppChoice() no sumprobs?!?\n");
+	  exit(-1);
+	}
+	if (sumprobs_->Ints(pa, st)) {
+	  sumprobs_->Values(pa, st, nt, &i_all_cs_vals);
+	  if (i_all_cs_vals == nullptr) {
+	    fprintf(stderr, "No int sumprob cs vals???  pa %u st %u nt %u\n",
+		    pa, st, nt);
+	    exit(-1);
+	  }
 	} else {
-	  sumprobs_->Values(opp, st, nt, &d_all_cs_vals);
+	  sumprobs_->Values(pa, st, nt, &d_all_cs_vals);
+	  if (d_all_cs_vals == nullptr) {
+	    fprintf(stderr, "No double sumprob cs vals???  pa %u st %u "
+		    "nt %u\n", pa, st, nt);
+	    exit(-1);
+	  }
 	}
       } else {
-	if (regrets_->Ints(opp, st)) {
-	  regrets_->Values(opp, st, nt, &i_all_cs_vals);
+	if (regrets_ == nullptr) {
+	  fprintf(stderr, "VCFR::OppChoice() no regrets?!?\n");
+	  exit(-1);
+	}
+	if (regrets_->Ints(pa, st)) {
+	  regrets_->Values(pa, st, nt, &i_all_cs_vals);
+	  if (i_all_cs_vals == nullptr) {
+	    fprintf(stderr, "No int regret cs vals???  pa %u st %u nt %u\n",
+		    pa, st, nt);
+	    exit(-1);
+	  }
 	} else {
-	  regrets_->Values(opp, st, nt, &d_all_cs_vals);
+	  regrets_->Values(pa, st, nt, &d_all_cs_vals);
+	  if (d_all_cs_vals == nullptr) {
+	    fprintf(stderr, "No double regret cs vals???  pa %u st %u "
+		    "nt %u\n", pa, st, nt);
+	    exit(-1);
+	  }
 	}
       }
     }
@@ -581,16 +482,16 @@ double *VCFR::OppChoice(Node *node, unsigned int lbd, const VCFRState &state) {
     // The "all" values point to the values for all hands.
     double *d_all_sumprobs = nullptr;
     int *i_all_sumprobs = nullptr;
-    // sumprobs_->Players(opp) check is there because in asymmetric systems
+    // sumprobs_->Players(pa) check is there because in asymmetric systems
     // (e.g., endgame solving with CFR-D method) we are only saving probs for
     // one player.
     // Don't update sumprobs during pre phase
     if (! pre_phase_ && ! value_calculation_ && sumprob_streets_[st] &&
-	sumprobs_->Players(opp)) {
-      if (sumprobs_->Ints(opp, st)) {
-	sumprobs_->Values(opp, st, nt, &i_all_sumprobs);
+	sumprobs_->Players(pa)) {
+      if (sumprobs_->Ints(pa, st)) {
+	sumprobs_->Values(pa, st, nt, &i_all_sumprobs);
       } else {
-	sumprobs_->Values(opp, st, nt, &d_all_sumprobs);
+	sumprobs_->Values(pa, st, nt, &d_all_sumprobs);
       }
     }
 
@@ -663,9 +564,9 @@ double *VCFR::OppChoice(Node *node, unsigned int lbd, const VCFRState &state) {
 	    ! (value_calculation_ || i_sumprobs == nullptr ||
 	       (hard_warmup_ > 0 && it_ <= hard_warmup_));
 	  ProcessOppProbs(node, hands, bucketed, street_buckets, nonneg,
-			  uniform_, explore, it_, soft_warmup_, hard_warmup_,
-			  update_sumprobs, sumprob_scaling_, opp_probs,
-			  succ_opp_probs, i_cs_vals, i_sumprobs);
+			  uniform_, explore, prob_method_, it_, soft_warmup_,
+			  hard_warmup_, update_sumprobs, sumprob_scaling_,
+			  opp_probs, succ_opp_probs, i_cs_vals, i_sumprobs);
 	}
       } else {
 	// Double regrets and sumprobs
@@ -722,7 +623,8 @@ class VCFRThread {
 public:
   VCFRThread(VCFR *vcfr, unsigned int thread_index, unsigned int num_threads,
 	     Node *node, const string &action_sequence, double *opp_probs,
-	     const HandTree *hand_tree, unsigned int *prev_canons);
+	     const HandTree *hand_tree, unsigned int p,
+	     unsigned int *prev_canons);
   ~VCFRThread(void);
   void Run(void);
   void Join(void);
@@ -736,6 +638,7 @@ private:
   const string &action_sequence_;
   double *opp_probs_;
   const HandTree *hand_tree_;
+  unsigned int p_;
   unsigned int *prev_canons_;
   double *ret_vals_;
   pthread_t pthread_id_;
@@ -744,7 +647,8 @@ private:
 VCFRThread::VCFRThread(VCFR *vcfr, unsigned int thread_index,
 		       unsigned int num_threads, Node *node,
 		       const string &action_sequence, double *opp_probs,
-		       const HandTree *hand_tree, unsigned int *prev_canons) :
+		       const HandTree *hand_tree, unsigned int p,
+		       unsigned int *prev_canons) :
   action_sequence_(action_sequence) {
   vcfr_ = vcfr;
   thread_index_ = thread_index;
@@ -752,6 +656,7 @@ VCFRThread::VCFRThread(VCFR *vcfr, unsigned int thread_index,
   node_ = node;
   opp_probs_ = opp_probs;
   hand_tree_ = hand_tree;
+  p_ = p;
   prev_canons_ = prev_canons;
 }
 
@@ -783,8 +688,8 @@ void VCFRThread::Go(void) {
   for (unsigned int i = 0; i < num_prev_hole_card_pairs; ++i) ret_vals_[i] = 0;
   for (unsigned int bd = thread_index_; bd < num_boards; bd += num_threads_) {
     unsigned int **street_buckets = AllocateStreetBuckets();
-    VCFRState state(opp_probs_, hand_tree_, st, bd, action_sequence_, 0, 0,
-		    street_buckets);
+    VCFRState state(opp_probs_, hand_tree_, bd, action_sequence_, 0, 0,
+		    street_buckets, p_);
     // Initialize buckets for this street
     vcfr_->SetStreetBuckets(st, bd, state);
     double *bd_vals = vcfr_->Process(node_, bd, state, st);
@@ -809,8 +714,8 @@ void VCFRThread::Go(void) {
 // Only support splitting on the flop for now.
 // Ugly that we pass prev_canons in.
 void VCFR::Split(Node *node, double *opp_probs, const HandTree *hand_tree,
-		 const string &action_sequence, unsigned int *prev_canons,
-		 double *vals) {
+		 unsigned int p, const string &action_sequence,
+		 unsigned int *prev_canons, double *vals) {
   unsigned int nst = node->Street();
   unsigned int pst = nst - 1;
   unsigned int prev_num_hole_card_pairs = Game::NumHoleCardPairs(pst);
@@ -818,7 +723,7 @@ void VCFR::Split(Node *node, double *opp_probs, const HandTree *hand_tree,
   unique_ptr<VCFRThread * []> threads(new VCFRThread *[num_threads_]);
   for (unsigned int t = 0; t < num_threads_; ++t) {
     threads[t] = new VCFRThread(this, t, num_threads_, node, action_sequence,
-				opp_probs, hand_tree, prev_canons);
+				opp_probs, hand_tree, p, prev_canons);
   }
   for (unsigned int t = 1; t < num_threads_; ++t) {
     threads[t]->Run();
@@ -878,7 +783,8 @@ double *VCFR::StreetInitial(Node *node, unsigned int plbd,
   unsigned int prev_num_hole_card_pairs = Game::NumHoleCardPairs(pst);
   if (nst == subgame_street_ && ! subgame_) {
     if (pre_phase_) {
-      SpawnSubgame(node, plbd, state.ActionSequence(), state.OppProbs());
+      SpawnSubgame(node, plbd, state.P(), state.ActionSequence(),
+		   state.OppProbs());
       // Code expects values to be returned so we return all zeroes
       double *vals = new double[prev_num_hole_card_pairs];
       for (unsigned int i = 0; i < prev_num_hole_card_pairs; ++i) vals[i] = 0;
@@ -922,8 +828,8 @@ double *VCFR::StreetInitial(Node *node, unsigned int plbd,
 
   if (nst == 1 && subgame_street_ == kMaxUInt && num_threads_ > 1) {
     // Currently only flop supported
-    Split(node, state.OppProbs(), state.GetHandTree(), state.ActionSequence(),
-	  prev_canons, vals);
+    Split(node, state.OppProbs(), state.GetHandTree(), state.P(),
+	  state.ActionSequence(), prev_canons, vals);
   } else {
     unsigned int pgbd = BoardTree::GlobalIndex(state.RootBdSt(),
 					       state.RootBd(), pst, plbd);
@@ -1044,11 +950,11 @@ static void *thread_run(void *v_sg) {
   return NULL;
 }
 
-void VCFR::SpawnSubgame(Node *node, unsigned int bd,
+void VCFR::SpawnSubgame(Node *node, unsigned int bd, unsigned int p,
 			const string &action_sequence, double *opp_probs) {
   VCFRSubgame *subgame =
     new VCFRSubgame(card_abstraction_, betting_abstraction_, cfr_config_,
-		    buckets_, node, bd, action_sequence, this);
+		    buckets_, node, bd, p, action_sequence, this);
   subgame->SetBestResponseStreets(best_response_streets_);
   subgame->SetBRCurrent(br_current_);
   subgame->SetValueCalculation(value_calculation_);
@@ -1085,7 +991,6 @@ void VCFR::SpawnSubgame(Node *node, unsigned int bd,
   subgame_running_[t] = true;
   active_subgames_[t] = subgame;
   // I could pass these into the constructor, no?
-  subgame->SetP(p_);
   subgame->SetTargetP(target_p_);
   subgame->SetIt(it_);
   subgame->SetOppProbs(opp_probs);
@@ -1104,7 +1009,7 @@ double *VCFR::Process(Node *node, unsigned int lbd, const VCFRState &state,
   unsigned int st = node->Street();
   if (node->Terminal()) {
     if (node->NumRemaining() == 1) {
-      return Fold(node, p_, state.GetHandTree()->Hands(st, lbd),
+      return Fold(node, state.P(), state.GetHandTree()->Hands(st, lbd),
 		  state.OppProbs(), state.SumOppProbs(),
 		  state.TotalCardProbs());
     } else {
@@ -1116,7 +1021,7 @@ double *VCFR::Process(Node *node, unsigned int lbd, const VCFRState &state,
   if (st > last_st) {
     return StreetInitial(node, lbd, state);
   }
-  if (node->PlayerActing() == p_) {
+  if (node->PlayerActing() == state.P()) {
     return OurChoice(node, lbd, state);
   } else {
     return OppChoice(node, lbd, state);
@@ -1357,6 +1262,7 @@ VCFR::VCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
     best_response_streets_[st] = false;
   }
   br_current_ = false;
+  prob_method_ = ProbMethod::REGRET_MATCHING;
   value_calculation_ = false;
   // Whether we prune branches if no opponent hand reaches.  Normally true,
   // but false when calculating CBRs.

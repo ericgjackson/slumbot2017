@@ -9,7 +9,6 @@ using namespace std;
 
 class BettingAbstraction;
 class Node;
-// class Pool;
 class Writer;
 
 class BettingTreeBuilder {
@@ -37,7 +36,13 @@ public:
 		   unsigned int new_bet_size, unsigned int num_street_bets,
 		   unsigned int target_player,
 		   unsigned int *num_terminals);
-  
+  // Public so we can call in endgame solving; e.g., from solve_all_endgames4
+  shared_ptr<Node>
+    CreateNoLimitSubtree(unsigned int st, unsigned int last_bet_size,
+			 unsigned int bet_to, unsigned int num_street_bets,
+			 unsigned int player_acting,
+			 unsigned int target_player,
+			 unsigned int *terminal_id);
 private:
   unsigned int NearestAllowableBetTo(unsigned int old_pot_size,
 				     unsigned int new_bet_to,
@@ -68,12 +73,6 @@ private:
 			  shared_ptr<Node> *call_succ,
 			  shared_ptr<Node> *fold_succ,
 			  vector< shared_ptr<Node> > *bet_succs);
-  shared_ptr<Node>
-    CreateNoLimitSubtree(unsigned int st, unsigned int last_bet_size,
-			 unsigned int bet_to, unsigned int num_street_bets,
-			 unsigned int player_acting,
-			 unsigned int target_player,
-			 unsigned int *terminal_id);
   void CreateLimitSuccs(unsigned int street, unsigned int pot_size,
 			unsigned int last_bet_size, unsigned int num_bets,
 			unsigned int last_bettor, unsigned int player_acting,

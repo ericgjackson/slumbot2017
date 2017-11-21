@@ -33,3 +33,14 @@ exploitability.  But maybe I am moving away from focusing on
 exploitability?
 
 Use AllowableBetTos.  Shrinks large trees by up to 10x (?), I think.
+
+mb6b6r0abtaaiamb_params
+St 0 num nonterminals 23158
+St 1 num nonterminals 44266
+St 2 num nonterminals 44940
+St 3 num nonterminals 44940
+mb6b6r0abt2aaiamb_params
+St 0 num nonterminals 31153
+St 1 num nonterminals 64743
+St 2 num nonterminals 65791
+St 3 num nonterminals 65791

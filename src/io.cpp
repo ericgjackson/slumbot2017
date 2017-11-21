@@ -423,6 +423,26 @@ unsigned char Reader::ReadUnsignedCharOrDie(void) {
   return u;
 }
 
+void Reader::ReadOrDie(unsigned char *c) {
+  *c = ReadUnsignedCharOrDie();
+}
+
+void Reader::ReadOrDie(unsigned short *s) {
+  *s = ReadUnsignedShortOrDie();
+}
+
+void Reader::ReadOrDie(unsigned int *u) {
+  *u = ReadUnsignedIntOrDie();
+}
+
+void Reader::ReadOrDie(int *i) {
+  *i = ReadIntOrDie();
+}
+
+void Reader::ReadOrDie(double *d) {
+  *d = ReadDoubleOrDie();
+}
+
 void Reader::ReadNBytesOrDie(unsigned int num_bytes, unsigned char *buf) {
   for (unsigned int i = 0; i < num_bytes; ++i) {
     if (buf_ptr_ + 1 > end_read_) {
@@ -752,6 +772,26 @@ void Writer::WriteReal(double d) {
   }
   *(double *)buf_ptr_ = d;
   buf_ptr_ += sizeof(double);
+}
+
+void Writer::Write(unsigned char c) {
+  WriteUnsignedChar(c);
+}
+
+void Writer::Write(unsigned short s) {
+  WriteUnsignedShort(s);
+}
+
+void Writer::Write(int i) {
+  WriteInt(i);
+}
+
+void Writer::Write(unsigned int u) {
+  WriteUnsignedInt(u);
+}
+
+void Writer::Write(double d) {
+  WriteDouble(d);
 }
 
 void Writer::WriteCString(const char *s) {

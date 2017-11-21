@@ -34,6 +34,7 @@ private:
   double *OurChoice(Node *node, unsigned int lbd, const VCFRState &state);
   double *OppChoice(Node *node, unsigned int lbd, const VCFRState &state);
 
+  unsigned int p_;
   HandTree *trunk_hand_tree_;
   unsigned int thread_index_;
   BCFRThread **threads_;

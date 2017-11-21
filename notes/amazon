@@ -1,0 +1,17 @@
+When launching spot instance, select "attach instance store at launch".
+
+Do lsblk on instance to find device.
+
+build_hand_value_tree
+build_betting_tree
+build_null_buckets (preflop and flop)
+build_rollout_features (all streets)
+  hs, hs, hstwo, hs, hsfive for turn
+build_unique_buckets (turn)
+build_kmeans_buckets (river)
+build_board_features (river)
+build_unique_buckets (river)
+build_suit_features (river)
+build_unique_buckets (river)
+crossproduct (river)
+Compile code

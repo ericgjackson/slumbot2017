@@ -1,0 +1,279 @@
+Evaluate "combined" method of subgame solving.
+
+ms1f1
+mb1b1
+none
+Unsafe 200/200:   Exploitability: 3.84 mbb/g
+CFR-D raw 200/200:    Exploitability: 3.05 mbb/g
+  Limp count: 560/1326
+  Fold count: 144/1326
+  P1 best response: 0.147084 (73.54 mbb/g)
+  P2 best response: -0.134904 (-67.45 mbb/g)
+CFR-D zero-sum 200/200: Exploitability: 2.95 mbb/g
+Combined raw 200/200: Exploitability: 2.71 mbb/g
+  Limp count: 544/1326
+  Fold count: 208/1326
+  P1 best response: 0.146459 (73.23 mbb/g)
+  P2 best response: -0.135611 (-67.81 mbb/g)
+Combined zero-sum 200/200: Exploitability: 2.69 mbb/g
+
+Redid 10/29
+combined/raw: 2.86
+combined/zerosum: 2.88
+  Replicated 11/15
+
+Redid 10/29 with old_slumbot2017 code
+combined/raw: Exploitability: 2.88 mbb/g
+
+11/15 using current strategy (and solve_all_endgames4, DynamicCBR2)
+Exploitability: 3.49 mbb/g
+Purifying opponent current strategy
+Exploitability: 11.29 mbb/g
+
+
+ms1f3
+mb1b1
+none
+build_cbrs CVs: -0.309140, 0.314868
+Unsafe 200/200: Exploitability: 1.17 mbb/g
+  Limp count: 48/1326
+  Fold count: 188/1326
+  P1 best response: 0.314829 (157.41 mbb/g)
+  P2 best response: -0.310138 (-155.07 mbb/g)
+CFR-D raw 200/200: Exploitability: 1.66 mbb/g
+  Limp count: 0/1326
+  Fold count: 212/1326
+  P1 best response: 0.315489 (157.74 mbb/g)
+  P2 best response: -0.308841 (-154.42 mbb/g)
+Combined raw 200/200: Exploitability: 1.12 mbb/g
+  Limp count: 0/1326
+  Fold count: 240/1326
+  P1 best response: 0.314415 (157.21 mbb/g)
+  P2 best response: -0.309917 (-154.96 mbb/g)
+
+Redid 10/29
+cfrps base
+  build_cbrs CVs: -0.309140, 0.314868 (MATCHES)
+Unsafe
+  cfrps/cfrps: Exploitability: 1.17 mbb/g (MATCHES)
+CFR-D raw
+  cfrps/cfrps: Exploitability: 1.66 mbb/g (MATCHES)
+Combined, raw
+  cfrps/cfrps: Exploitability: 1.64 mbb/g  (BAD)
+Combined, zero-sum
+  cfrps/cfrps:  Exploitability: 1.63 mbb/g  (BAD)
+  cfrps1/cfrps: Exploitability: 2.13 mbb/g  (BAD)
+
+Redid 10/29 with old_slumbot2017 code
+cfrps base: Exploitability: 1.43 mbb/g (MATCHES)
+  build_cbrs CVs: -0.309140, 0.314868 (MATCHES)
+Combined, raw
+  cfrps/cfrps: Exploitability: 1.63 mbb/g
+  Doesn't match either old results or new results, although very close to
+  new results.
+
+Redid 11/15
+Using solve_all_endgames4.  CBRs calculated dynamically.
+With current/pure/base_mem, competition: 9m
+
+Combined/cbr/card/zero-sum/avg:     Exploitability: 1.63 mbb/g
+  P0 best response: -0.308139 (-154.07 mbb/g)
+  P1 best response: 0.314667 (157.33 mbb/g)
+Combined/cbr/card/zero-sum/current: Exploitability: 1.65 mbb/g
+Combined/cbr/card/zero-sum/current/pure:          Exploitability: 2.95 mbb/g
+Combined/cbr/card/zero-sum/current/pure/base_mem: Exploitability: 2.95 mbb/g
+
+solve_all_endgames (combined/cbr/card/zero-sum) is 9m.
+
+
+8/18
+ms2f1t1
+Turn (5m7s): Exploitability: 7.93 mbb/g
+Flop (3m11s): Exploitability: 10.23 mbb/g
+
+--------------------------------------------------------------------
+
+10/29
+ms3f1t1r1h5
+mb1b1
+tcfr
+null
+Base 21b: Exploitability: 142.52 mbb/g
+build_cbrs: -0.224336, 0.794415
+
+combined cfrps/cbrs/card/zerosum 160/200:
+  Exploitability: 26.12 mbb/g
+unsafe 160/200:
+  Exploitability: 50.93 mbb/g
+cfr-d zerosum 160/200:
+  Exploitability: 59.92 mbb/g
+cfr-d raw 160/200:
+  Exploitability: 101.72 mbb/g
+
+--------------------------------------------------------------------
+
+10/29
+ms3f1t1r1h5
+mb1b1
+tcfr
+hshshshsbc3
+
+Base 24 (4b): Exploitability: 206.08 mbb/g
+
+combined zerosum 24/200 (old cbrs):
+  CBRs (-0.133975, 0.958296)
+  Exploitability: 68.99 mbb/g
+    Was 69.06?  Why different?
+unsafe 24/200
+  Exploitability: 146.08 mbb/g
+cfr-d zerosum 24/200
+  Exploitability: 107.30 mbb/g
+cfr-d raw 24/200
+  Exploitability: 153.01 mbb/g
+
+-------------------------------------------------
+
+11/15
+ms3f1t1r1h5
+nhs3
+mb1b1
+tcfr
+13217 river buckets
+Close threshold 2000
+Sampling canonical boards
+
+Want to redo experiments reported on in cfrd_results.
+Some contention for batch 0
+Batch 0 (27m): Exploitability: 216.23 mbb/g
+Batch 8 (23m): Exploitability: 202.80 mbb/g
+Batch 16:      Exploitability: 199.75 mbb/g
+Batch 24:      Exploitability: 197.55 mbb/g
+Batch 32:      Exploitability: 197.52 mbb/g
+Batch 96:      Exploitability: 189.49 mbb/g
+
+Solving all endgames
+Unsafe
+96/200: Exploitability: 135.99 mbb/g
+  Previously was: 137.79
+
+CFR-D
+CBRs: -0.148802, 0.906747
+cbr/card/zero-sum 96/200: Exploitability: 106.90 mbb/g
+  Previously was: 106.86
+
+Combined
+cbr/card/zero-sum 96/200:   Exploitability: 54.76 mbb/g
+cbr/card/zero-sum 96/200:   Exploitability: 54.86 mbb/g (buggy)
+cbr/bucket/zero-sum 96/200: Exploitability: 54.78 mbb/g
+  Was 55.74 for corresponding *bucket* level system before.
+
+solve_all_endgames4
+cbr/card/zero-sum/avg/mixed/mem
+  Exploitability: 54.76 mbb/g
+cbr/card/zero-sum/avg/pure/mem
+  Exploitability: 71.31 mbb/g
+cbr/card/zero-sum/current/pure/mem (FTL in endgame) (cfrpsm5)
+  Exploitability: 78.88 mbb/g
+cbr/card/zero-sum/current/pure 2,3/mem (FTL in endgame)
+  Exploitability: 4429.48 mbb/g
+
+play
+nhs3 96/200 (avg, mixed) vs. hshshshsbc3 16/200 (avg, mixed):
+  Avg B outcome: -0.008574 (-4.3 mbb/g) over 100m dup hands
+nhs3 96/200 (avg, mixed) vs. hs3 16/200 (avg, mixed):
+  Avg B outcome: -0.097576 (-48.8 mbb/g) over 100m dup hands
+nhs3 96/200 (avg, mixed) vs. hshs3 8/200 (avg, mixed):
+  Avg B outcome: -0.050386 (-25.2 mbb/g) over 100m dup hands
+nhs3 96/200 (current, pure) vs. hshshshsbc3 16/200 (avg, mixed):
+  Avg B outcome: -0.004136 (-2.1 mbb/g) over 100m dup hands
+nhs3 96/200 (current, pure) vs. hs3 16/200 (avg, mixed):
+  Avg B outcome: -0.091397 (-45.7 mbb/g) over 100m dup hands
+nhs3 96/200 (current, pure) vs. hshs3 8/200 (avg, mixed):
+  Avg B outcome: -0.045404 (-22.7 mbb/g) over 100m dup hands
+nhs3 96/200 (current, pure) vs. base 96:
+  Avg B outcome: -0.015148 (-7.6 mbb/g) over 100m dup hands
+nhs3 96/200 (avg, mixed) vs. base 96:
+  Avg B outcome: -0.018634 (-9.3 mbb/g) over 100m dup hands
+nhs3 96/200 (current, pure) vs. nhs3 96/200 (unsafe)
+  Avg B outcome: 0.016757 (8.4 mbb/g) over 100000000 dup hands
+nhs3 96/200 (avg, mixed) vs. nhs3 96/200 (unsafe)
+  Avg B outcome: 0.012884 (6.4 mbb/g) over 100000000 dup hands
+
+
+cfrpsm: nhs3/avg/mixed
+cfrpsm2: hshshshsbc3/avg/mixed
+cfrpsm3: hs3/avg/mixed
+cfrpsm4: hshs3/avg/mixed
+cfrpsm5: nhs3/current/pure
+cfrpsm6: nhs3/unsafe
+cfrpsm7: nhs3/current/pure 2,3
+
+-----------------------------------------------------
+
+11/18
+ms3f1t1r1h5
+hshshshsbc3
+mb1b1
+tcfr
+1457 river buckets
+Base 16: Exploitability: 195.41 mbb/g
+Hardly any worse?!?
+
+solve_all_endgames4 16/200
+cbr/card/zero-sum/avg/mixed/mem
+  Exploitability: 64.37 mbb/g
+cbr/card/zero-sum/avg/pure/mem
+  Exploitability: 95.80 mbb/g
+cbr/card/zero-sum/current/pure/mem (FTL)
+  Exploitability: 105.97 mbb/g
+
+-----------------------------------------------------
+
+11/18
+ms3f1t1r1h5
+hs3
+mb1b1
+tcfr
+66 river buckets
+Base 16: Exploitability: 1142.63 mbb/g
+
+solve_all_endgames4 16/200
+cbr/card/zero-sum/avg/mixed/mem
+  Exploitability: 313.08 mbb/g
+cbr/card/zero-sum/avg/pure/mem
+  Exploitability: 351.50 mbb/g
+cbr/card/zero-sum/current/pure/mem (FTL)
+  Exploitability: 370.34 mbb/g
+
+-----------------------------------------------------
+
+11/18
+ms3f1t1r1h5
+hshs3
+mb1b1
+tcfr
+Base 0: Exploitability: 704.58 mbb/g
+Base 8: Exploitability: 701.27 mbb/g
+
+solve_all_endgames4 8/200
+cbr/card/zero-sum/avg/mixed/mem
+  Exploitability: 192.96 mbb/g
+
+
+-----------------------------------------------------
+
+11/20
+ms3f1t1r1h5
+hshshshsbc3
+mb2b2
+tcfr/112
+See results in hshshshsbc3_results
+
+-----------------------------------------------------
+
+11/18
+ms3f1t1r1h5
+hshshshsbc3
+mb3b3
+tcfr2/120
+build_cbrs: 1.632682, 

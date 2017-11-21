@@ -35,7 +35,9 @@ public:
   }
   const vector<double> &FullProbs(void) const {return full_probs_;}
   bool HVBTable(void) const {return hvb_table_;}
-  unsigned int CloseThreshold(void) const {return close_threshold_;}
+  unsigned int CloseThreshold(unsigned int st) const {
+    return close_thresholds_[st];
+  }
   bool FTL(void) const {return ftl_;}
   bool SampleOppHands(void) const {return sample_opp_hands_;}
   double Explore(void) const {return explore_;}
@@ -89,7 +91,7 @@ public:
   vector<unsigned int> pruning_thresholds_;
   vector<double> full_probs_;
   bool hvb_table_;
-  unsigned int close_threshold_;
+  unique_ptr<unsigned int []> close_thresholds_;
   bool ftl_;
   bool sample_opp_hands_;
   double explore_;
