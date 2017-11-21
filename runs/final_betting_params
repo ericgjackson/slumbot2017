@@ -1,0 +1,44 @@
+# One idea for what our base system could look like:
+# Maximum of five bets on preflop, flop and turn
+# Maximum of three bets on river
+# Assume rivers will be resolved
+# Target player
+#   Preflop
+#     Two opening bets (1/2, 3/4)
+#     Three raises (1/2, 1x, 2x)
+#     Three more pot-size reraises
+#   Flop
+#     Three opening bets (1/4, 1/2, 1.5)
+#     Two raises (1/2, 1x)
+#     Three more pot-size reraises
+#   Turn
+#     1/2 and 1x for open and raise; three pot-size reraises
+#   River
+#     Up to three pot size bets.
+# Opponent
+#   Preflop
+#     Three opening bets (1/2, 3/4, 1x)
+#     Five raises (1/2, 3/4, 1x, 2x, 3x)
+#     Three raise sizes afterwards (1/2, 1x, 2x)
+#   Flop and turn
+#     Six opening bets (1/4, 1/2, 3/4, 1x, 1.5x, 2x)
+#     Five raises (1/2, 3/4, 1x, 1.5x, 2x)
+#     Three raise sizes for 3-bet and 4-bet
+#     Pot size only for 5-bet
+#   River
+#     Up to three pot size bets
+# Always all-in (both players)
+# CloseToAllInFrac 0.5
+BettingAbstractionName final
+Limit false
+StackSize 400
+Asymmetric true
+NoLimitTreeType 1
+MinBet 2
+OurMaxBets 5,5,5,3
+OppMaxBets 5,5,5,3
+OurAlwaysAllIn true
+OppAlwaysAllIn true
+OurBetSizes 0.5,0.75;0.5,1.0,2.0;1.0;1.0;1.0|0.25,0.5,1.5;0.5,1.0;1.0;1.0;1.0|0.5,1.0;0.5,1.0;1.0;1.0;1.0|1.0;1.0;1.0
+OppBetSizes 0.5,0.75,1.0;0.5,0.75,1.0,2.0,3.0;0.5,1.0,2.0;0.5,1.0,2.0;0.5,1.0,2.0|0.25,0.5,0.75,1.0,1.5,2.0;0.5,0.75,1.0,1.5,2.0;0.5,1.0,2.0;0.5,1.0,2.0;1.0|0.25,0.5,0.75,1.0,1.5,2.0;0.5,0.75,1.0,1.5,2.0;0.5,1.0,2.0;0.5,1.0,2.0;1.0|1.0;1.0;1.0
+CloseToAllInFrac 0.5
