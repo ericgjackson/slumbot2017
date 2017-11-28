@@ -315,6 +315,14 @@ bin/show_features:	obj/show_features.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/show_features obj/show_features.o \
 	$(OBJS) $(LIBRARIES)
 
+bin/show_nuts:	obj/show_nuts.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/show_nuts obj/show_nuts.o \
+	$(OBJS) $(LIBRARIES)
+
+bin/check_the_nuts:	obj/check_the_nuts.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/check_the_nuts obj/check_the_nuts.o \
+	$(OBJS) $(LIBRARIES)
+
 bin/x:	obj/x.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/x obj/x.o \
 	$(OBJS) $(LIBRARIES)

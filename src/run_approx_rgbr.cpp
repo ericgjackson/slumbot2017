@@ -166,8 +166,7 @@ ApproxRGBR::ApproxRGBR(const CardAbstraction &ca, const BettingAbstraction &ba,
   }
 
   dynamic_cbr2_.reset(new DynamicCBR2(card_abstraction_, betting_abstraction_,
-				      cfr_config_, buckets_,
-				      betting_tree_.get(), 1));
+				      cfr_config_, buckets_, 1));
 
 #if 0
   // This is an inefficient way of computing the total number of raw
