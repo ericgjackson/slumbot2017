@@ -9,8 +9,8 @@
 
 using namespace std;
 
-Params *CreateRuntimeParams(void) {
-  Params *params = new Params();
+unique_ptr<Params> CreateRuntimeParams(void) {
+  unique_ptr<Params> params(new Params());
   params->AddParam("RuntimeConfigName", P_STRING);
   params->AddParam("Iteration", P_INT);
   params->AddParam("QuantizedStreets", P_STRING);

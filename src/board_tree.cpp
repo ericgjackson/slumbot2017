@@ -124,6 +124,7 @@ void BoardTree::Build(unsigned int st, const unique_ptr<Card []> &prev_board,
   }
 }
 
+// Should make thread-safe
 void BoardTree::Create(void) {
   // Prevent multiple initialization
   if (boards_ != nullptr) return;

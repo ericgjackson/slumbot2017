@@ -1,0 +1,209 @@
+960/1536
+200 endgame its
+
+mb1b1 vs. mb2b2: 30k hands in 1 hr
+SCORE:-307750|307750:smb1b1|smb2b2
+
+mb2b2 vs. mb3b3: 30k hands in 141m
+SCORE:25050|-25050:smb2b2|smb3b3
+
+mb2b2 vs. mb3b3: 150k hands in 676m
+SCORE:67500|-67500:smb2b2|smb3b3
+
+nes vs. mb2b2: 30k hands in 35m
+fwd seed 0: SCORE:250000|-250000:snes|smb2b2
+rev seed 0: SCORE:-35250|35250:smb2b2|snes
+
+nes vs. mb2b2aai: 30k hands in 44m
+fwd seed 0: SCORE:120250|-120250:snes|smb2b2aai
+rev seed 0: SCORE:-149750|149750:smb2b2aai|snes
+fwd seed 1: SCORE:-272350|272350:snes|smb2b2aai
+rev seed 1: SCORE:121800|-121800:smb2b2aai|snes
+
+Fixed bug when sum-opp-probs is zero in endgame solving.
+fwd seed 2: SCORE:288450|-288450:snes|smb2b2aai
+rev seed 2: SCORE:348350|-348350:smb2b2aai|snes
+
+fwd seed 3: SCORE:407700|-407700:snes|smb2b2aai
+rev seed 3: SCORE:342400|-342400:smb2b2aai|snes
+
+fwd seed 4: SCORE:-52900|52900:snes|smb2b2aai
+rev seed 4: SCORE:88750|-88750:smb2b2aai|snes
+
+mb2b2aai vs. mb3b3aai: 100k hands in 550m
+fwd seed 5: SCORE:-228700|228700:smb2b2aai|smb3b3aai
+rev seed 5: SCORE:603600|-603600:smb3b3aai|smb2b2aai
+
+nes vs. nesmp1
+30,000 hands seed 0
+fwd: SCORE:175700|-175700:nes|nesmp1
+rev: SCORE:77200|-77200:nesmp1|nes
+300,000 hands seed 0 6m each
+fwd: SCORE:-796900|796900:nes|nesmp1
+rev: SCORE:130850|-130850:nesmp1|nes
+3m hands seed 1 (63m)
+fwd: SCORE:-1604500|1604500:nes|nesmp1
+rev: SCORE:7969500|-7969500:nesmp1|nes
+
+nesmp1 vs. nesmp2
+3m hands seed 1
+fwd: SCORE:567050|-567050:nesmp1|nesmp2
+rev: SCORE:7355550|-7355550:nesmp2|nesmp1
+
+mb3b3aai vs. mb3b3baai:
+mb3b3aai: 0.5,1.0,2.0 pot bets
+mb3b3baai: 0.25,0.5,1.0 pot bets
+75,000 hands seed 6
+fwd: SCORE:130200|-130200:smb3b3aai|smb3b3baai
+rev: SCORE:175950|-175950:smb3b3baai|smb3b3aai
+
+2016 vs. nes
+100k hands seed 0
+fwd: SCORE:649150|-649150:2016|nes
+rev: SCORE:-939650|939650:nes|2016
+
+2016 vs. nesmp2
+100k hands seed 0
+fwd: SCORE:335450|-335450:2016|nesmp2
+rev: SCORE:-1219900|1219900:nesmp2|2016
+1m hands seed 0
+SCORE:5490800|-5490800:2016|nesmp2
+SCORE:-11105950|11105950:nesmp2|2016
+Net: -16.6m
+
+2016 vs mb3b3baai
+75,000 hands, seed 1 in 408m
+fwd: SCORE:934550|-934550:2016|smb3b3baai
+rev: SCORE:304250|-304250:smb3b3baai|2016
+Scale this up to 1m hands this would be -8.4m
+Better than without endgame solving, but still bad.
+
+2016ui vs. nesmp2
+100k hands seed 0 (2.5m)
+fwd: SCORE:448550|-448550:2016ui|nesmp2
+rev: SCORE:-911800|911800:nesmp2|2016ui
+1m hands seed 0 (22m)
+fwd: SCORE:4955750|-4955750:2016ui|nesmp2
+rev: SCORE:-9606700|9606700:nesmp2|2016ui
+
+2016 vs. 2016ui
+1m hands seed 0
+fwd: SCORE:-4837250|4837250:2016|2016ui
+rev: SCORE:916350|-916350:2016ui|2016
+1m hands seed 1
+fwd: SCORE:-2928200|2928200:2016|2016ui
+rev: SCORE:2350000|-2350000:2016ui|2016
+1m hands seed 2
+fwd: SCORE:-2988700|2988700:2016|2016ui
+rev: SCORE:2412500|-2412500:2016ui|2016
+1m hands seed 3
+fwd: SCORE:-3456050|3456050:2016|2016ui
+rev: SCORE:2741350|-2741350:2016ui|2016
+
+2016 vs. 2016noftar
+Turned off fold-to-alternative completely
+1m hands seed 0
+fwd: SCORE:-5023750|5023750:2016|2016noftar
+rev: SCORE:933050|-933050:2016noftar|2016
+
+2016 vs. 2016mfaf1
+Min frac alternative folded 0.1
+1m hands seed 0
+fwd: SCORE:-2759950|2759950:2016|2016mfaf01
+rev: SCORE:-1193950|1193950:2016mfaf01|2016
+
+2016ui vs 2016uinhc
+seed 0
+SCORE:-1803650|1803650:2016ui|2016uinhc
+SCORE:-1043250|1043250:2016uinhc|2016ui
+seed 1
+SCORE:-2033650|2033650:2016ui|2016uinhc
+SCORE:-302500|302500:2016uinhc|2016ui
+seed 2
+SCORE:-1109850|1109850:2016ui|2016uinhc
+SCORE:-311200|311200:2016uinhc|2016ui
+seed 3
+SCORE:-488850|488850:2016ui|2016uinhc
+SCORE:164550|-164550:2016uinhc|2016ui
+seed 4
+SCORE:-2367150|2367150:2016ui|2016uinhc
+SCORE:-443800|443800:2016uinhc|2016ui
+
+nesmp2 vs. 2016uinhc
+10m hands seed 0 (290m)
+SCORE:-55569150|55569150:nesmp2|2016uinhc
+SCORE:48701850|-48701850:2016uinhc|nesmp2
+
+2016ui vs. 2016uihc1
+Uses hard-coded strategy for root only
+1m hands seed 0
+SCORE:-1203050|1203050:2016uinhc|2016uihc1  +300k
+SCORE:-898450|898450:2016uihc1|2016uinhc
+SCORE:-1321200|1321200:2016uinhc|2016uihc1  -350k
+SCORE:-1677650|1677650:2016uihc1|2016uinhc
+SCORE:-588100|588100:2016uinhc|2016uihc1    +50k
+SCORE:-536650|536650:2016uihc1|2016uinhc
+SCORE:-25750|25750:2016uinhc|2016uihc1      -75k
+SCORE:-101350|101350:2016uihc1|2016uinhc
+
+2016ui vs. 2016uihc2
+Uses hard-coded strategy at r200 only
+1m hands
+SCORE:-628150|628150:2016uinhc|2016uihc2    -800k
+SCORE:-1438750|1438750:2016uihc2|2016uinhc
+SCORE:-856150|856150:2016uinhc|2016uihc2    -900k
+SCORE:-1748550|1748550:2016uihc2|2016uinhc
+
+
+-----------------------------------------
+
+New 2017 heads-up bot
+
+2016 vs. nesmp2
+1m hands, seed 0
+SCORE:3899550|-3899550:2016|nesmp2
+SCORE:-10360500|10360500:nesmp2|2016
+We lose about 14.2m.
+
+2016 vs. nesmp2pur
+1m hands, seed 0
+SCORE:5870300|-5870300:2016|nespur
+SCORE:-10135900|10135900:nespur|2016
+
+2016uinhc vs. nesmp2
+1m hands, seed 0
+SCORE:2130700|-2130700:2016uinhc|nesmps
+SCORE:-6581950|6581950:nesmps|2016uinhc
+We lose about 8.6m
+
+2016uinhc vs. mb3b3aaimp2
+10,000 hands seed 0
+SCORE:49400|-49400:2016uinhc|mb3b3aaimp2
+SCORE:-67600|67600:mb3b3aaimp2|2016uinhc
+SCORE:479500|-479500:2016uinhc|mb3b3aaimp2
+SCORE:260300|-260300:mb3b3aaimp2|2016uinhc
+
+2016 vs. hcr200mp2
+Hard coded strategy at r200
+
+
+-----------------------------------------
+
+Six player
+
+Min prob 0.2:
+10m hands seed 0
+SCORE:-4364258.333333|-1091641.666667|-2594575|-9710816.666667|393316.666667|17367975:s1|s2|s3|s4|s5|smp2
++17m
+
+Min prob 0.1 vs. min prob 0.2:
+1m hands seed 0
+SCORE:2088850|445175|35825|-2057550|-1187275|674975:smp21|smp22|smp23|smp24|smp25|smp1
+SCORE:935125|459275|-441225|1084125|-1166400|-870900:smp21|smp22|smp23|smp24|smp25|smp1
+Pretty much a wash.
+
+Min prob 0.1 and fold-round-up 0.5
+SCORE:239908.333333|2789500|245891.666667|-2168441.666667|-935833.333333|-171025:smp11|smp12|smp13|smp14|smp15|smp1fru5
+-171k
+SCORE:725650|1669425|-580350|110050|174125|-2098900:smp11|smp12|smp13|smp14|smp15|smp1fru5
+-2.1m

@@ -70,12 +70,12 @@ PCSCFR::PCSCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
   board_buckets_ = new unsigned int[(max_street + 1) * num_ms_hole_card_pairs];
 
   regrets_.reset(new CFRValues(nullptr, false, nullptr, betting_tree_, 0,
-			       0, card_abstraction_, buckets_,
+			       0, card_abstraction_, buckets_.NumBuckets(),
 			       compressed_streets_));
   // Should check for asymmetric systems
   // Should honor sumprobs_streets_
   sumprobs_.reset(new CFRValues(nullptr, true, nullptr, betting_tree_, 0,
-				0, card_abstraction_, buckets_,
+				0, card_abstraction_, buckets_.NumBuckets(),
 				compressed_streets_));
   // This will get changed if we do subgame solving
   initial_max_street_board_ = 0;
@@ -478,7 +478,7 @@ void EGPCSCFR::SolveSubgame(unsigned int root_bd, BettingTree *subtree,
   }
   regrets_.reset(new CFRValues(nullptr, false, subtree_streets, subtree,
 			       root_bd, root_st, card_abstraction_,
-			       buckets_, compressed_streets_));
+			       buckets_.NumBuckets(), compressed_streets_));
   regrets_->AllocateAndClearDoubles(subtree->Root(), kMaxUInt);
 #if 0
   // Should honor sumprobs_streets_
@@ -486,13 +486,13 @@ void EGPCSCFR::SolveSubgame(unsigned int root_bd, BettingTree *subtree,
   if (asymmetric_) {
     sumprobs_.reset(new CFRValues(target_p_, target_p_^1, true,
 				  subtree_streets, subtree, root_bd, root_st,
-				  card_abstraction_, buckets_,
+				  card_abstraction_, buckets_.NumBuckets(),
 				  compressed_streets_));
   }
 #endif
   sumprobs_.reset(new CFRValues(nullptr, true, subtree_streets,
 				subtree, root_bd, root_st,
-				card_abstraction_, buckets_,
+				card_abstraction_, buckets_.NumBuckets(),
 				compressed_streets_));
   sumprobs_->AllocateAndClearDoubles(subtree->Root(), kMaxUInt);
   delete [] subtree_streets;

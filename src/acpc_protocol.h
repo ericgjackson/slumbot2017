@@ -33,8 +33,8 @@ bool ParseNoLimitLine(const string &line, unsigned int *street,
 		      vector< vector<Action> * > *actions,
 		      Card *p2_hi, Card *p2_lo, Card *p1_hi, Card *p1_lo,
 		      Card *board, double *p1_outcome, string *p2, string *p1);
-bool ParseMatchState(const string &match_state, bool *p1, int *hand_no,
-		     string *action, Card *our_hi, Card *our_lo, Card *opp_hi,
-		     Card *opp_lo, Card *board, unsigned int *street);
+bool ParseMatchState(const string &match_state, unsigned int num_players,
+		     unsigned int *p, unsigned int *hand_no, string *action,
+		     Card *hi, Card *lo, Card *board, unsigned int *street);
 
 #endif

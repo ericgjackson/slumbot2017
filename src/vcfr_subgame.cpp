@@ -183,19 +183,19 @@ void VCFRSubgame::Go(void) {
     // Only need the opponent's sumprobs
     sumprobs_.reset(new CFRValues(sp_players.get(), true, subtree_streets_,
 				  subtree_, root_bd_, root_bd_st_,
-				  card_abstraction_, buckets_,
+				  card_abstraction_, buckets_.NumBuckets(),
 				  compressed_streets_));
     sumprobs_->Read(dir, it_, subtree_->Root(), action_sequence_, kMaxUInt);
   } else {
     // Need both players regrets
     regrets_.reset(new CFRValues(nullptr, false, subtree_streets_,
 				 subtree_, root_bd_, root_bd_st_,
-				 card_abstraction_, buckets_,
+				 card_abstraction_, buckets_.NumBuckets(),
 				 compressed_streets_));
     // Only need the opponent's sumprobs
     sumprobs_.reset(new CFRValues(sp_players.get(), true, subtree_streets_,
 				  subtree_, root_bd_, root_bd_st_,
-				  card_abstraction_, buckets_,
+				  card_abstraction_, buckets_.NumBuckets(),
 				  compressed_streets_));
 
     if (it_ == 1) {
@@ -235,7 +235,8 @@ void VCFRSubgame::Go(void) {
   // Should set action sequence
   unsigned int **street_buckets = AllocateStreetBuckets();
   VCFRState state(opp_probs_, hand_tree_, 0, action_sequence_, root_bd_,
-		  root_bd_st_, street_buckets, p_);
+		  root_bd_st_, street_buckets, p_, regrets_.get(),
+		  sumprobs_.get());
   SetStreetBuckets(root_bd_st_, root_bd_, state);
   final_vals_ = Process(subtree_->Root(), 0, state, subtree_st - 1);
   DeleteStreetBuckets(street_buckets);

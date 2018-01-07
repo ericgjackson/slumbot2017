@@ -28,9 +28,21 @@ static void Walk(Node *node, CFRValues *sumprobs, const Buckets &buckets,
   if (node->Terminal()) return;
   unsigned int st1 = node->Street();
   unsigned int num_succs = node->NumSuccs();
+  unsigned int csi = node->CallSuccIndex();
+  unsigned int fsi = node->FoldSuccIndex();
+  bool valid = false;
   if (st1 == st && node->PlayerActing() == 1) {
+    bool bet_option = false;
+    for (unsigned int s = 0; s < num_succs; ++s) {
+      if (s != csi && s != fsi) {
+	bet_option = true;
+	break;
+      }
+    }
+    if (bet_option) valid = true;
+  }
+  if (valid) {
     unsigned int nt = node->NonterminalID();
-    unsigned int csi = node->CallSuccIndex();
     unsigned int num_buckets = buckets.NumBuckets(st);
     int *i_values;
     sumprobs->Values(1, st, nt, &i_values);
@@ -43,8 +55,12 @@ static void Walk(Node *node, CFRValues *sumprobs, const Buckets &buckets,
 	}
 	int csp = i_values[b * num_succs + csi];
 	double call_prob = csp / (double)sum;
-	if (call_prob > 0.01) {
+	if (nt == 97 && b == 87486) {
+	  fprintf(stderr, "nt %u b %u p %f csp %i\n", nt, b, call_prob, csp);
+	}
+	if (call_prob > 0.01 && csp >= 50) {
 	  printf("nt %u b %u p %f csp %i\n", nt, b, call_prob, csp);
+	  fflush(stdout);
 	}
       }
     }
@@ -52,6 +68,64 @@ static void Walk(Node *node, CFRValues *sumprobs, const Buckets &buckets,
   for (unsigned int s = 0; s < num_succs; ++s) {
     Walk(node->IthSucc(s), sumprobs, buckets, nut_bs, st);
   }
+}
+
+static bool *GetNutBuckets(const CardAbstraction &card_abstraction,
+			   unsigned int street) {
+  unsigned int num_nut_bs = 0;
+  Buckets buckets(card_abstraction, false);
+  unsigned int num_buckets = buckets.NumBuckets(street);
+  bool *nut_bs = new bool[num_buckets];
+  unsigned long long int *sums = new unsigned long long int[num_buckets];
+  unsigned int *nums = new unsigned int[num_buckets];
+  for (unsigned int b = 0; b < num_buckets; ++b) {
+    sums[b] = 0;
+    nums[b] = 0;
+    nut_bs[b] = false;
+  }
+  // Just need this to get number of hands
+  BoardTree::Create();
+  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(street);
+  unsigned int num_hands =
+    BoardTree::NumBoards(street) * num_hole_card_pairs;
+  fprintf(stderr, "%u hands\n", num_hands);
+  
+  char buf[500];
+  sprintf(buf, "%s/features.%s.%u.hsone.%u", Files::StaticBase(),
+	  Game::GameName().c_str(), Game::NumRanks(), street);
+  Reader reader(buf);
+  unsigned int num_features = reader.ReadUnsignedIntOrDie();
+  fprintf(stderr, "%u features\n", num_features);
+  for (unsigned int h = 0; h < num_hands; ++h) {
+    for (unsigned int f = 0; f < num_features; ++f) {
+      short fv = reader.ReadShortOrDie();
+      unsigned int b = buckets.Bucket(street, h);
+      sums[b] += (unsigned long long int)(fv + 990);
+      ++nums[b];
+    }
+  }
+  for (unsigned int b = 0; b < num_buckets; ++b) {
+    if (nums[b] == 0) {
+      fprintf(stderr, "No hands in bucket %u\n", b);
+      exit(-1);
+    } else  {
+      double avg = sums[b] / (double)nums[b];
+      if (b == 87486) {
+	fprintf(stderr, "87486 avg %f\n", avg);
+      }
+      if (avg >= 1980) {
+	nut_bs[b] = true;
+	++num_nut_bs;
+      }
+    }
+  }
+  delete [] sums;
+  delete [] nums;
+  // Temporary
+  nut_bs[87486] = true;
+  ++num_nut_bs;
+  fprintf(stderr, "%u nut buckets\n", num_nut_bs);
+  return nut_bs;
 }
 
 static void Usage(const char *prog_name) {
@@ -82,56 +156,8 @@ int main(int argc, char *argv[]) {
   if (sscanf(argv[5], "%u", &it) != 1) Usage(argv[0]);
   unsigned int street;
   if (sscanf(argv[6], "%u", &street) != 1) Usage(argv[0]);
-  bool *nut_bs;
-  unsigned int num_nut_bs = 0;
-  {
-    Buckets buckets(*card_abstraction, false);
-    unsigned int num_buckets = buckets.NumBuckets(street);
-    nut_bs = new bool[num_buckets];
-    unsigned long long int *sums = new unsigned long long int[num_buckets];
-    unsigned int *nums = new unsigned int[num_buckets];
-    for (unsigned int b = 0; b < num_buckets; ++b) {
-      sums[b] = 0;
-      nums[b] = 0;
-      nut_bs[b] = false;
-    }
-    // Just need this to get number of hands
-    BoardTree::Create();
-    unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(street);
-    unsigned int num_hands =
-      BoardTree::NumBoards(street) * num_hole_card_pairs;
-    fprintf(stderr, "%u hands\n", num_hands);
 
-    char buf[500];
-    sprintf(buf, "%s/features.%s.%u.hsone.%u", Files::StaticBase(),
-	    Game::GameName().c_str(), Game::NumRanks(), street);
-    Reader reader(buf);
-    unsigned int num_features = reader.ReadUnsignedIntOrDie();
-    fprintf(stderr, "%u features\n", num_features);
-    for (unsigned int h = 0; h < num_hands; ++h) {
-      for (unsigned int f = 0; f < num_features; ++f) {
-	short fv = reader.ReadShortOrDie();
-	unsigned int b = buckets.Bucket(street, h);
-	sums[b] += (unsigned long long int)(fv + 990);
-	++nums[b];
-      }
-    }
-    for (unsigned int b = 0; b < num_buckets; ++b) {
-      if (nums[b] == 0) {
-	fprintf(stderr, "No hands in bucket %u\n", b);
-	exit(-1);
-      } else  {
-	double avg = sums[b] / (double)nums[b];
-	if (avg >= 1980) {
-	  nut_bs[b] = true;
-	  ++num_nut_bs;
-	}
-      }
-    }
-    delete [] sums;
-    delete [] nums;
-  }
-  fprintf(stderr, "%u nut buckets\n", num_nut_bs);
+  bool *nut_bs = GetNutBuckets(*card_abstraction, street);
   unique_ptr<BettingTree>
     betting_tree(BettingTree::BuildTree(*betting_abstraction));
 

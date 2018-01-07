@@ -88,7 +88,6 @@ BCBRThread::BCBRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
   value_calculation_ = true;
   prune_ = false;
 
-  regrets_.reset(nullptr);
   // Always want sumprobs for the opponent.
   unsigned int num_players = Game::NumPlayers();
   unique_ptr<bool []> players(new bool[num_players]);
@@ -100,7 +99,7 @@ BCBRThread::BCBRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
     // Should honor sumprobs_streets_
     sumprobs_.reset(new CFRValues(players.get(), true, nullptr,
 				  betting_tree_, 0, 0, card_abstraction_,
-				  buckets_, compressed_streets_));
+				  buckets_.NumBuckets(), compressed_streets_));
 
     char dir[500];
     sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
@@ -116,27 +115,6 @@ BCBRThread::BCBRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
     }
 #endif
     sumprobs_->Read(dir, it_, betting_tree_->Root(), "x", kMaxUInt);
-
-    unique_ptr<bool []> bucketed_streets(new bool[max_street + 1]);
-    bucketed_ = false;
-    for (unsigned int st = 0; st <= max_street; ++st) {
-      bucketed_streets[st] = ! buckets_.None(st);
-      if (bucketed_streets[st]) bucketed_ = true;
-    }
-    if (bucketed_) {
-      // Current strategy always uses doubles
-      // This doesn't generalize to multiplayer
-      current_strategy_.reset(new CFRValues(players.get(), false,
-					    bucketed_streets.get(),
-					    betting_tree_, 0, 0,
-					    card_abstraction_, buckets_,
-					    compressed_streets_));
-      current_strategy_->AllocateAndClearDoubles(betting_tree_->Root(),
-						 kMaxUInt);
-      SetCurrentStrategy(betting_tree_->Root());
-    } else {
-      current_strategy_.reset(nullptr);
-    }
 
     unsigned int num_terminals = betting_tree_->NumTerminals();
     terminal_bucket_vals_ = new double *[num_terminals];
@@ -447,7 +425,8 @@ void BCBRThread::CardPass(bool first_pass) {
   first_pass_ = first_pass;
   double *opp_probs = AllocateOppProbs(true);
   unsigned int **street_buckets = AllocateStreetBuckets();
-  VCFRState state(opp_probs, street_buckets, trunk_hand_tree_, p_);
+  VCFRState state(opp_probs, street_buckets, trunk_hand_tree_, p_, nullptr,
+		  sumprobs_.get());
   SetStreetBuckets(0, 0, state);
   double *vals = Process(betting_tree_->Root(), 0, state, 0);
   DeleteStreetBuckets(street_buckets);

@@ -11,6 +11,9 @@
 
 #include "acpc_protocol.h"
 #include "cards.h"
+#include "constants.h"
+#include "game.h"
+#include "sorting.h"
 #include "split.h"
 
 using namespace std;
@@ -126,8 +129,96 @@ bool ParseAllActions(const string &action_str, bool limit, bool exit_on_error,
   return true;
 }
 
+static bool ParseHoleCards(const string &cards, unsigned int num_players,
+			   unsigned int p, Card *hi, Card *lo,
+			   unsigned int *len) {
+  unsigned int i = 0;
+  unsigned int sz = cards.size();
+  for (unsigned int p1 = 0; p1 < num_players; ++p1) {
+    if (p1 == p) {
+      if (i > sz - 4) {
+	fprintf(stderr, "Hole card string too short?!?\n");
+	fprintf(stderr, "%s\n", cards.c_str());
+	return false;
+      }
+      Card c1 = ParseCard(cards.c_str() + i);
+      Card c2 = ParseCard(cards.c_str() + i + 2);
+      if (c1 > c2) { *hi = c1; *lo = c2; }
+      else         { *hi = c2; *lo = c1; }
+      i += 4;
+    } else {
+      // Opponents' hole cards may be either missing or present
+      if (i < sz && cards[i] != '|' && cards[i] != '/') {
+	// Hole cards are present
+	if (i > sz - 4) {
+	  fprintf(stderr, "Hole card string too short?!?\n");
+	  fprintf(stderr, "%s\n", cards.c_str());
+	  return false;
+	}
+	i += 4;
+      }
+    }
+    // Expect a vertical bar after every player's hole cards except for the
+    // last player
+    if (p1 != num_players - 1) {
+      if (i >= sz) {
+	fprintf(stderr, "Hole card string too short?!?\n");
+	fprintf(stderr, "%s\n", cards.c_str());
+	return false;
+      }
+      if (cards[i] != '|') {
+	fprintf(stderr, "Expected | after hole cards; p %u\n", p1);
+	fprintf(stderr, "%s\n", cards.c_str());
+	return false;
+      }
+      ++i;
+    }
+  }
+  *len = i;
+  return true;
+}
+
+static bool ParseBoard(const string &cards, Card *board,
+		       unsigned int *street) {
+  *street = 0;
+  for (int i = 0; i < 5; ++i) board[i] = 0;
+  if (cards.size() == 0) return true;
+  vector<string> card_groups;
+  Split(cards.c_str(), '/', false, &card_groups);
+  if (card_groups.size() < 1) {
+    fprintf(stderr, "Couldn't parse card groups\n");
+    fprintf(stderr, "%s\n", cards.c_str());
+    return false;
+  }
+  if (card_groups.size() > 3) {
+    fprintf(stderr, "Too many card groups?!?\n");
+    fprintf(stderr, "%s\n", cards.c_str());
+    return false;
+  }
+
+  *street = 1;
+  unsigned int num_flop_cards = Game::NumBoardCards(1);
+  for (unsigned int i = 0; i < num_flop_cards; ++i) {
+    // Parse flop.  Order flop from high to low.
+    board[i] = ParseCard(card_groups[0].c_str() + 2 * i);
+    SortCards(board, num_flop_cards);
+  }
+
+  if (card_groups.size() >= 2) {
+    *street = 2;
+    board[num_flop_cards] = ParseCard(card_groups[1].c_str());
+  }
+
+  if (card_groups.size() >= 3) {
+    *street = 3;
+    board[num_flop_cards + 1] = ParseCard(card_groups[2].c_str());
+  }
+
+  return true;
+}
+
 // The card string contains one or two hole card pairs and also between zero
-// and five coard cards.  Examples:
+// and five board cards.  Examples:
 //   AdAc|KsKh/4s3h2d/8c/7d
 //   AdAc|KsKh/4s3h2d
 //   AdAc|
@@ -379,16 +470,14 @@ bool ParseNoLimitLine(const string &line, unsigned int *street,
 // 3) Hand number
 // 4) The betting action
 // 5) The cards
-bool ParseMatchState(const string &match_state, bool *p1, int *hand_no,
-		     string *action, Card *our_hi, Card *our_lo, Card *opp_hi,
-		     Card *opp_lo, Card *board, unsigned int *street) {
-  *p1 = true;
+bool ParseMatchState(const string &match_state, unsigned int num_players,
+		     unsigned int *p, unsigned int *hand_no, string *action,
+		     Card *hi, Card *lo, Card *board, unsigned int *street) {
   *hand_no = 0;
   *action = "";
-  *our_hi = 0;
-  *our_lo = 0;
-  *opp_hi = 0;
-  *opp_lo = 0;
+  *hi = kMaxUInt;
+  *lo = kMaxUInt;
+  *street = 0;
   for (int i = 0; i < 5; ++i) board[i] = 0;
   vector<string> comps;
   Split(match_state.c_str(), ':', true, &comps);
@@ -402,41 +491,40 @@ bool ParseMatchState(const string &match_state, bool *p1, int *hand_no,
     fprintf(stderr, "%s\n", match_state.c_str());
     return false;
   }
-  if (comps[1] == "0") {
-    *p1 = false;
-  } else if (comps[1] == "1") {
-    *p1 = true;
-  } else {
-    fprintf(stderr, "Expected 0 or 1 as second component of match state\n");
+  if (sscanf(comps[1].c_str(), "%u", p) != 1) {
+    fprintf(stderr, "Couldn't parse player index\n");
     fprintf(stderr, "%s\n", match_state.c_str());
     return false;
   }
-  if (sscanf(comps[2].c_str(), "%i", hand_no) != 1) {
+  if (*p >= 6) {
+    fprintf(stderr, "Expected 0-5 as second component of match state\n");
+    fprintf(stderr, "%s\n", match_state.c_str());
+    return false;
+  }
+  if (sscanf(comps[2].c_str(), "%u", hand_no) != 1) {
     fprintf(stderr, "Couldn't parse hand number from match state\n");
     fprintf(stderr, "%s\n", match_state.c_str());
     return false;
   }
   *action = comps[3];
-  Card p2_hi, p2_lo, p1_hi, p1_lo;
-  if (! ParseCardString(comps[4], &p2_hi, &p2_lo, &p1_hi, &p1_lo, board,
-			street)) {
+
+  unsigned int hc_len;
+  if (! ParseHoleCards(comps[4], num_players, *p, hi, lo, &hc_len)) {
     return false;
   }
-  if (*p1) {
-    *our_hi = p1_hi;
-    *our_lo = p1_lo;
-    *opp_hi = p2_hi;
-    *opp_lo = p2_lo;
-  } else {
-    *our_hi = p2_hi;
-    *our_lo = p2_lo;
-    *opp_hi = p1_hi;
-    *opp_lo = p1_lo;
+
+  if (comps[4].size() > hc_len) {
+    if (comps[4][hc_len] != '/') {
+      fprintf(stderr, "Expect slash after hole cards; see %c; len %u\n",
+	      comps[4][hc_len], hc_len);
+      fprintf(stderr, "%s\n", match_state.c_str());
+      return false;
+    }
+    string board_cards(comps[4], hc_len + 1, comps[4].size() - (hc_len + 1));
+    if (! ParseBoard(board_cards, board, street)) {
+      return false;
+    }
   }
-  if (*our_hi == 0) {
-    fprintf(stderr, "We expect to always have hole cards for ourself\n");
-    fprintf(stderr, "%s\n", comps[4].c_str());
-    return false;
-  }
+
   return true;
 }

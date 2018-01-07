@@ -175,7 +175,8 @@ cbr/card/zero-sum/avg/pure/mem
 cbr/card/zero-sum/current/pure/mem (FTL in endgame) (cfrpsm5)
   Exploitability: 78.88 mbb/g
 cbr/card/zero-sum/current/pure 2,3/mem (FTL in endgame)
-  Exploitability: 4429.48 mbb/g
+  Exploitability: 1682.70 mbb/g
+
 
 play
 nhs3 96/200 (avg, mixed) vs. hshshshsbc3 16/200 (avg, mixed):

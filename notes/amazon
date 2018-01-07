@@ -1,3 +1,9 @@
+Setting up for first time.
+  Install gcc, emacs, what else?
+  sudo yum list available
+  sudo yum install emacs.x86_64
+  sudo yum install gcc48-c++.x86_64
+
 When launching spot instance, select "attach instance store at launch".
 
 Do lsblk on instance to find device.
@@ -15,3 +21,4 @@ build_suit_features (river)
 build_unique_buckets (river)
 crossproduct (river)
 Compile code
+Scripts to run under nohup

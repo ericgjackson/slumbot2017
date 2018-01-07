@@ -48,6 +48,7 @@ public:
   ~Player(void);
   void Go(unsigned long long int num_duplicate_hands, bool deterministic);
 private:
+  void DealNCards(Card *cards, unsigned int n);
   void SetHCPsAndBoards(Card **raw_hole_cards, const Card *raw_board);
   void Play(Node *node, unsigned int b_pos, unsigned int *contributions,
 	    unsigned int last_bet_to, bool *folded, unsigned int num_remaining,
@@ -70,6 +71,7 @@ private:
   unique_ptr<bool []> winners_;
   unsigned short **sorted_hcps_;
   unique_ptr<double []> sum_pos_outcomes_;
+  struct drand48_data *rand_bufs_;
 };
 
 void Player::Play(Node *node, unsigned int b_pos, unsigned int *contributions,
@@ -179,9 +181,9 @@ void Player::Play(Node *node, unsigned int b_pos, unsigned int *contributions,
       }
       a_offset = b * num_succs;
     }
+    unsigned int hcp;
     if (b_buckets_->None(st)) {
-      unsigned int hcp = st == Game::MaxStreet() ? sorted_hcps_[bd][raw_hcp] :
-	raw_hcp;
+      hcp = st == Game::MaxStreet() ? sorted_hcps_[bd][raw_hcp] : raw_hcp;
       b_offset = bd * num_hole_card_pairs * num_succs + hcp * num_succs;
     } else {
       unsigned int h = bd * num_hole_card_pairs + raw_hcp;
@@ -193,40 +195,49 @@ void Player::Play(Node *node, unsigned int b_pos, unsigned int *contributions,
       }
       b_offset = b * num_succs;
     }
-    double r = RandZeroToOne();
+    double r;
+    // r = RandZeroToOne();
+    drand48_r(&rand_bufs_[actual_pa], &r);
+    
     double cum = 0;
+    unique_ptr<double []> probs(new double[num_succs]);
+    if (actual_pa == b_pos) {
+      b_probs_->Probs(orig_pa, st, nt, b_offset, num_succs, dsi, probs.get());
+#if 0
+      fprintf(stderr, "b pa %u st %u nt %u bd %u nhcp %u hcp %u b_offset %u "
+	      "probs %f %f r %f\n", orig_pa, st, nt, bd, num_hole_card_pairs,
+	      hcp, b_offset, probs[0], probs[1], r);
+#endif
+    } else {
+      a_probs_->Probs(orig_pa, st, nt, a_offset, num_succs, dsi, probs.get());
+#if 0
+      fprintf(stderr, "a pa %u st %u nt %u bd %u nhcp %u hcp %u b_offset %u "
+	      "probs %f %f r %f\n", orig_pa, st, nt, bd, num_hole_card_pairs,
+	      hcp, a_offset, probs[0], probs[1], r);
+#endif
+    }
     int s;
     for (s = 0; s < ((int)num_succs) - 1; ++s) {
       // Look up probabilities with orig_pa which may be different from
       // actual_pa.
-      double prob;
-      if (actual_pa == b_pos) {
-	prob = b_probs_->Prob(orig_pa, st, nt, b_offset, s, num_succs, dsi);
-      } else {
-	prob = a_probs_->Prob(orig_pa, st, nt, a_offset, s, num_succs, dsi);
-      }
+      double prob = probs[s];
       cum += prob;
       if (r < cum) break;
     }
     if (s == (int)node->CallSuccIndex()) {
+      // fprintf(stderr, "Call\n");
       contributions[actual_pa] = last_bet_to;
       Play(node->IthSucc(s), b_pos, contributions, last_bet_to, folded,
 	   num_remaining, actual_pa, st, outcomes);
     } else if (s == (int)node->FoldSuccIndex()) {
+      // fprintf(stderr, "Fold\n");
       folded[actual_pa] = true;
       outcomes[actual_pa] = -(int)contributions[actual_pa];
       Play(node->IthSucc(s), b_pos, contributions, last_bet_to, folded,
 	   num_remaining - 1, actual_pa, st, outcomes);
     } else {
       Node *succ = node->IthSucc(s);
-#if 0
-      unsigned int new_bet_to;
-      if (num_players_ == 2) {
-	Node *call = succ->IthSucc(succ->CallSuccIndex());
-	unsigned int new_pot_size = call->PotSize();
-	new_bet_to = new_pot_size / 2;
-      }
-#endif
+      // fprintf(stderr, "Bet\n");
       unsigned int new_bet_to = succ->LastBetTo();
       contributions[actual_pa] = new_bet_to;
       Play(succ, b_pos, contributions, new_bet_to, folded, num_remaining,
@@ -255,7 +266,6 @@ void Player::PlayDuplicateHand(unsigned long long int h, const Card *cards,
   *a_sum = 0;
   *b_sum = 0;
   for (unsigned int b_pos = 0; b_pos < num_players_; ++b_pos) {
-#if 0
     if (deterministic) {
       // Reseed the RNG again before play within this loop.  This ensure
       // that if we play a system against itself, the duplicate outcome will
@@ -264,9 +274,16 @@ void Player::PlayDuplicateHand(unsigned long long int h, const Card *cards,
       // This has a big impact on the average P1 outcome - why?  Too much
       // coordination between the RNG for dealing the cards and the RNG for
       // actions?
-      SeedRand(h);
+      //
+      // Temporary - to match play_agents
+      // SeedRand(h);
+      // Generate a separate seed for each player that depends on the hand
+      // index.
+      for (unsigned int p = 0; p < num_players_; ++p) {
+	srand48_r(h * num_players_ + p, &rand_bufs_[p]);
+      }
     }
-#endif
+    
     for (unsigned int p = 0; p < num_players_; ++p) {
       folded[p] = false;
       if (p == small_blind_p) {
@@ -290,12 +307,15 @@ void Player::PlayDuplicateHand(unsigned long long int h, const Card *cards,
   }
 }
 
-static void DealNCards(Card *cards, unsigned int n) {
+void Player::DealNCards(Card *cards, unsigned int n) {
   unsigned int max_card = Game::MaxCard();
   for (unsigned int i = 0; i < n; ++i) {
     Card c;
     while (true) {
-      c = RandBetween(0, max_card);
+      // c = RandBetween(0, max_card);
+      double r;
+      drand48_r(&rand_bufs_[0], &r);
+      c = (max_card + 1) * r;
       unsigned int j;
       for (j = 0; j < i; ++j) {
 	if (cards[j] == c) break;
@@ -357,10 +377,20 @@ void Player::Go(unsigned long long int num_duplicate_hands,
     if (deterministic) {
       // Seed just as we do in play_agents so we can get the same cards and
       // compare results.
-      SeedRand(h);
+      // SeedRand(h);
+      srand48_r(h, &rand_bufs_[0]);
     }
     // Assume 2 hole cards
     DealNCards(cards, num_board_cards + 2 * num_players_);
+#if 0
+    OutputNCards(cards + 2 * num_players_, num_board_cards);
+    printf("\n");
+    OutputTwoCards(cards);
+    printf("\n");
+    OutputTwoCards(cards + 2);
+    printf("\n");
+    fflush(stdout);
+#endif
     for (unsigned int p = 0; p < num_players_; ++p) {
       SortCards(cards + 2 * p, 2);
     }
@@ -382,6 +412,7 @@ void Player::Go(unsigned long long int num_duplicate_hands,
     }
     
     SetHCPsAndBoards(hole_cards, cards + 2 * num_players_);
+
     // PlayDuplicateHand() returns the result of a duplicate hand (which is
     // N hands if N is the number of players)
     double a_outcome, b_outcome;
@@ -464,9 +495,9 @@ Player::Player(BettingTree *betting_tree, const BettingAbstraction &ba,
   BoardTree::CreateLookup();
   unsigned int max_street = Game::MaxStreet();
   a_probs_ = new CFRValues(nullptr, true, nullptr, betting_tree, 0, 0,
-			   a_ca, *a_buckets_, nullptr);
+			   a_ca, a_buckets_->NumBuckets(), nullptr);
   b_probs_ = new CFRValues(nullptr, true, nullptr, betting_tree, 0, 0,
-			   b_ca, *b_buckets_, nullptr);
+			   b_ca, b_buckets_->NumBuckets(), nullptr);
 
   char dir[500];
   sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
@@ -501,9 +532,6 @@ Player::Player(BettingTree *betting_tree, const BettingAbstraction &ba,
     unsigned int num_hole_cards = Game::NumCardsForStreet(0);
     unsigned int num_board_cards = Game::NumBoardCards(max_street);
     for (unsigned int bd = 0; bd < num_boards; ++bd) {
-      if (bd % 100000 == 0) {
-	fprintf(stderr, "bd %u\n", bd);
-      }
       const Card *board = BoardTree::Board(max_street, bd);
       for (unsigned int i = 0; i < num_board_cards; ++i) {
 	cards[i + num_hole_cards] = board[i];
@@ -530,9 +558,12 @@ Player::Player(BettingTree *betting_tree, const BettingAbstraction &ba,
   for (unsigned int p = 0; p < num_players_; ++p) {
     sum_pos_outcomes_[p] = 0;
   }
+
+  rand_bufs_ = new drand48_data[num_players_];
 }
 
 Player::~Player(void) {
+  delete [] rand_bufs_;
   if (sorted_hcps_) {
     unsigned int max_street = Game::MaxStreet();
     unsigned int num_boards = BoardTree::NumBoards(max_street);

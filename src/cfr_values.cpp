@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <cmath>
+
 #include "betting_tree.h"
 #include "board_tree.h"
 #include "buckets.h"
@@ -22,7 +24,8 @@ CFRValues::CFRValues(const bool *players, bool sumprobs, bool *streets,
 		     const BettingTree *betting_tree, unsigned int root_bd,
 		     unsigned int root_bd_st,
 		     const CardAbstraction &card_abstraction,
-		     const Buckets &buckets, const bool *compressed_streets) {
+		     const unsigned int *num_buckets,
+		     const bool *compressed_streets) {
   unsigned int num_players = Game::NumPlayers();
   players_.reset(new bool[num_players]);
   if (players == nullptr) {
@@ -90,10 +93,10 @@ CFRValues::CFRValues(const bool *players, bool sumprobs, bool *streets,
 	BoardTree::NumLocalBoards(root_bd_st_, root_bd_, st);
       unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
       num_card_holdings_[p][st] = num_local_boards * num_hole_card_pairs;
-      if (buckets.None(st)) {
+      if (num_buckets == nullptr) {
 	num_bucket_holdings_[p][st] = 0;
       } else {
-	num_bucket_holdings_[p][st] = buckets.NumBuckets(st);
+	num_bucket_holdings_[p][st] = num_buckets[st];
       }
     }
   }
@@ -543,8 +546,17 @@ Writer ***CFRValues::InitializeWriters(const char *dir, unsigned int it,
 	(*compressors)[p][st] = nullptr;
 	continue;
       }
-      const char *suffix = i_values_ && i_values_[p] && i_values_[p][st] ?
-	"i" : "d";
+      const char *suffix;
+      if (c_values_ && c_values_[p] && c_values_[p][st]) {
+	suffix = "c";
+      } else if (i_values_ && i_values_[p] && i_values_[p][st]) {
+	suffix = "i";
+      } else if (d_values_ && d_values_[p] && d_values_[p][st]) {
+	suffix = "d";
+      } else {
+	fprintf(stderr, "No values?!?\n");
+	exit(-1);
+      }
       sprintf(buf, "%s/%s.%s.%u.%u.%u.%u.p%u.%s", dir,
 	      sumprobs_ ? "sumprobs" : "regrets", action_sequence.c_str(),
 	      root_bd_st_, root_bd_, st, it, p, suffix);
@@ -803,11 +815,11 @@ void CFRValues::InitializeValuesForReading(unsigned int p, unsigned int st,
   }
 }
 
-void CFRValues::ReadNode(Node *node, Reader *reader, void *decompressor,
+bool CFRValues::ReadNode(Node *node, Reader *reader, void *decompressor,
 			 unsigned int num_holdings, CFRValueType value_type,
 			 unsigned int offset) {
   unsigned int num_succs = node->NumSuccs();
-  if (num_succs <= 1) return;
+  if (num_succs <= 1) return false;
   unsigned int st = node->Street();
   unsigned int p = node->PlayerActing();
   unsigned int nt = node->NonterminalID();
@@ -821,7 +833,7 @@ void CFRValues::ReadNode(Node *node, Reader *reader, void *decompressor,
        i_values_[p][st] && i_values_[p][st][nt]) ||
       (value_type == CFR_DOUBLE && d_values_ && d_values_[p] &&
        d_values_[p][st] && d_values_[p][st][nt])) {
-    return;
+    return true;
   }
   InitializeValuesForReading(p, st, nt, node, value_type);
   unsigned int num_actions = num_holdings * num_succs;
@@ -868,6 +880,8 @@ void CFRValues::ReadNode(Node *node, Reader *reader, void *decompressor,
       d_values_[p][st][nt][offset + a] = reader->ReadDoubleOrDie();
     }
   }
+
+  return false;
 }
 
 void CFRValues::Read(Node *node, Reader ***readers, void ***decompressors,
@@ -876,6 +890,12 @@ void CFRValues::Read(Node *node, Reader ***readers, void ***decompressors,
   unsigned int st = node->Street();
   unsigned int num_succs = node->NumSuccs();
   unsigned int p = node->PlayerActing();
+  unsigned int max_street = Game::MaxStreet();
+  unsigned int st1;
+  for (st1 = st; st1 <= max_street; ++st1) {
+    if (streets_[st1]) break;
+  }
+  if (st1 > max_street) return;
   if (streets_[st] && players_[p] && ! (only_p <= 1 && p != only_p)) {
     Reader *reader = readers[p][st];
     if (reader == nullptr) {
@@ -890,8 +910,10 @@ void CFRValues::Read(Node *node, Reader ***readers, void ***decompressors,
     } else {
       num_holdings = num_card_holdings_[p][st];
     }
-    ReadNode(node, reader, decompressors ? decompressors[p][st] : nullptr,
-	     num_holdings, value_types[p][st], 0);
+    if (ReadNode(node, reader, decompressors ? decompressors[p][st] : nullptr,
+		 num_holdings, value_types[p][st], 0)) {
+      return;
+    }
 
   }
   for (unsigned int s = 0; s < num_succs; ++s) {
@@ -1644,4 +1666,75 @@ void CFRValues::ReadSubtreeFromFull(const char *dir, unsigned int it,
     delete [] value_types[p];
   }
   delete [] value_types;
+}
+
+void CFRValues::Probs(unsigned int p, unsigned int st, unsigned int nt,
+		      unsigned int offset, unsigned int num_succs,
+		      unsigned int dsi, double *probs) const {
+  if (num_succs == 1) {
+    probs[0] = 1.0;
+    return;
+  }
+  if (c_values_ && c_values_[p] && c_values_[p][st]) {
+    double sum = 0;
+    for (unsigned int s = 0; s < num_succs; ++s) {
+      int cv = c_values_[p][st][nt][offset + s];
+      if (cv < 0) {
+	fprintf(stderr, "Negative char sumprob?!?\n");
+	exit(-1);
+      }
+      if (cv > 0) sum += cv;
+    }
+    if (sum == 0) {
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	probs[s] = (s == dsi ? 1.0 : 0);
+      }
+    } else {
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	int cv = c_values_[p][st][nt][offset + s];
+	if (cv > 0) probs[s] = cv / sum;
+	else        probs[s] = 0;
+      }
+    }
+  } else if (s_values_ && s_values_[p] && s_values_[p][st]) {
+    fprintf(stderr, "Probs() method not supported on short values\n");
+    exit(-1);
+  } else if (i_values_ && i_values_[p] && i_values_[p][st]) {
+    double sum = 0;
+    for (unsigned int s = 0; s < num_succs; ++s) {
+      int iv = i_values_[p][st][nt][offset + s];
+      if (iv > 0) sum += iv;
+    }
+    if (sum == 0) {
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	probs[s] = (s == dsi ? 1.0 : 0);
+      }
+    } else {
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	int iv = i_values_[p][st][nt][offset + s];
+	if (iv > 0) probs[s] = iv / sum;
+	else        probs[s] = 0;
+      }
+    }
+  } else if (d_values_ && d_values_[p] && d_values_[p][st]) {
+    double sum = 0;
+    for (unsigned int s = 0; s < num_succs; ++s) {
+      double dv = d_values_[p][st][nt][offset + s];
+      if (dv > 0) sum += dv;
+    }
+    if (sum == 0) {
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	probs[s] = (s == dsi ? 1.0 : 0);
+      }
+    } else {
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	double dv = d_values_[p][st][nt][offset + s];
+	if (dv > 0) probs[s] = dv / sum;
+	else        probs[s] = 0;
+      }
+    }
+  } else {
+    fprintf(stderr, "CFRValues::Probs() No values?!?\n");
+    exit(-1);
+  }
 }

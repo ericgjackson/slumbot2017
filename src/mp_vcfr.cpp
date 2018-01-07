@@ -37,20 +37,12 @@ MPVCFR::MPVCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
     compressed_streets_[st] = true;
   }
 
-  sumprob_streets_ = new bool[max_street + 1];
-  const vector<unsigned int> &ssv = cfr_config_.SumprobStreets();
-  unsigned int num_ssv = ssv.size();
-  if (num_ssv == 0) {
+  unsigned int num_players = Game::NumPlayers();
+  sumprob_streets_ = new bool *[num_players];
+  for (unsigned int p = 0; p < num_players; ++p) {
+    sumprob_streets_[p] = new bool[max_street + 1];
     for (unsigned int st = 0; st <= max_street; ++st) {
-      sumprob_streets_[st] = true;
-    }
-  } else {
-    for (unsigned int st = 0; st <= max_street; ++st) {
-      sumprob_streets_[st] = false;
-    }
-    for (unsigned int i = 0; i < num_ssv; ++i) {
-      unsigned int st = ssv[i];
-      sumprob_streets_[st] = true;
+      sumprob_streets_[p][st] = cfr_config_.SumprobStreet(p, st);
     }
   }
 
@@ -192,7 +184,7 @@ double *MPVCFR::OppChoice(Node *node, unsigned int lbd,
     // sumprobs_->Players(pa) check is there because in asymmetric systems
     // (e.g., endgame solving with CFR-D method) we are only saving probs for
     // one player.
-    if (! value_calculation_ && sumprob_streets_[st] &&
+    if (! value_calculation_ && sumprob_streets_[pa][st] &&
 	sumprobs_->Players(pa)) {
       if (sumprobs_->Ints(pa, st)) {
 	sumprobs_->Values(pa, st, nt, &i_all_sumprobs);

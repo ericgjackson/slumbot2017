@@ -11,6 +11,52 @@
 
 using namespace std;
 
+// 1,1;1,1;1,1;0,0
+// Semicolons separate values for different streets
+// Commas separate values for different players
+static bool **ParseSumprobStreets(const string &str) {
+  unsigned int num_players = Game::NumPlayers();
+  unsigned int max_street = Game::MaxStreet();
+  bool **sumprob_streets = new bool *[num_players];
+  for (unsigned int p = 0; p < num_players; ++p) {
+    sumprob_streets[p] = new bool[max_street + 1];
+    for (unsigned int st = 0; st <= max_street; ++st) {
+      // Default
+      sumprob_streets[p][st] = true;
+    }
+  }
+  if (str == "") return sumprob_streets;
+  vector<string> comps1;
+  Split(str.c_str(), ';', false, &comps1);
+  if (comps1.size() != max_street + 1) {
+    fprintf(stderr, "ParseSumprobStreets: Expected %u values\n",
+	    max_street + 1);
+    exit(-1);
+  }
+  for (unsigned int st = 0; st <= max_street; ++st) {
+    const string &s = comps1[st];
+    vector<string> comps2;
+    Split(s.c_str(), ',', false, &comps2);
+    if (comps2.size() != num_players) {
+      fprintf(stderr, "ParseSumprobStreets: Expected %u values\n",
+	      num_players);
+      exit(-1);
+    }
+    for (unsigned int p = 0; p < num_players; ++p) {
+      const string &s2 = comps2[p];
+      if (s2 == "0") {
+	sumprob_streets[p][st] = false;
+      } else if (s2 == "1") {
+	sumprob_streets[p][st] = true;
+      } else {
+	fprintf(stderr, "Expect 0 or 1 for sumprob streets value\n");
+	exit(-1);
+      }
+    }
+  }
+  return sumprob_streets;
+}
+
 CFRConfig::CFRConfig(const Params &params) {
   cfr_config_name_ = params.GetStringValue("CFRConfigName");
   algorithm_ = params.GetStringValue("Algorithm");
@@ -36,16 +82,8 @@ CFRConfig::CFRConfig(const Params &params) {
   if (params.IsSet("SamplingRate")) {
     sampling_rate_ = params.GetIntValue("SamplingRate");
   }
-  const string &str = params.GetStringValue("SumprobStreets");
-  if (str == "") {
-    // Default is to maintain sumprobs for all streets
-    unsigned int max_street = Game::MaxStreet();
-    for (unsigned int st = 0; st <= max_street; ++st) {
-      sumprob_streets_.push_back(st);
-    }
-  } else {
-    ParseUnsignedInts(str, &sumprob_streets_);
-  }
+  sumprob_streets_ =
+    ParseSumprobStreets(params.GetStringValue("SumprobStreets"));
   unsigned int max_street = Game::MaxStreet();
   const string &pstr = params.GetStringValue("PruningThresholds");
   if (pstr == "") {

@@ -61,7 +61,8 @@ public:
 		 unsigned int solve_st, ResolvingMethod method,
 		 bool cfrs, bool card_level, bool zero_sum, bool current,
 		 const bool *pure_streets, bool base_mem, unsigned int base_it,
-		 unsigned int num_endgame_its, unsigned int num_threads);
+		 unsigned int num_endgame_its, unsigned int num_threads,
+		 unsigned int asym_p);
   ~EndgameSolver4(void) {}
   void Walk(Node *node, const string &action_sequence, unsigned int gbd,
 	    double **reach_probs, unsigned int last_st);
@@ -86,6 +87,7 @@ private:
   unique_ptr<BettingTree> base_betting_tree_;
   unique_ptr<HandTree> trunk_hand_tree_;
   unique_ptr<CFRValues> trunk_sumprobs_;
+  unique_ptr<CFRValues> base_regrets_;
   unique_ptr<DynamicCBR2> dynamic_cbr_;
   unsigned int solve_st_;
   ResolvingMethod method_;
@@ -98,6 +100,7 @@ private:
   unsigned int base_it_;
   unsigned int num_endgame_its_;
   unsigned int num_threads_;
+  unsigned int asym_p_;
 };
 
 EndgameSolver4::EndgameSolver4(const CardAbstraction &base_card_abstraction,
@@ -115,7 +118,8 @@ EndgameSolver4::EndgameSolver4(const CardAbstraction &base_card_abstraction,
 			       bool current, const bool *pure_streets,
 			       bool base_mem, unsigned int base_it,
 			       unsigned int num_endgame_its,
-			       unsigned int num_threads) :
+			       unsigned int num_threads,
+			       unsigned int asym_p) :
   base_card_abstraction_(base_card_abstraction),
   endgame_card_abstraction_(endgame_card_abstraction),
   base_betting_abstraction_(base_betting_abstraction),
@@ -133,8 +137,15 @@ EndgameSolver4::EndgameSolver4(const CardAbstraction &base_card_abstraction,
   base_it_ = base_it;
   num_endgame_its_ = num_endgame_its;
   num_threads_ = num_threads;
-  
-  base_betting_tree_.reset(BettingTree::BuildTree(base_betting_abstraction_));
+  asym_p_ = asym_p;
+
+  if (base_betting_abstraction_.Asymmetric()) {
+    base_betting_tree_.reset(
+	BettingTree::BuildAsymmetricTree(base_betting_abstraction_, asym_p_));
+  } else {
+    base_betting_tree_.reset(
+        BettingTree::BuildTree(base_betting_abstraction_));
+  }
 
   // We need probs for both players
   unsigned int max_street = Game::MaxStreet();
@@ -154,7 +165,8 @@ EndgameSolver4::EndgameSolver4(const CardAbstraction &base_card_abstraction,
   }
   trunk_sumprobs_.reset(new CFRValues(nullptr, true, trunk_streets.get(),
 				      base_betting_tree_.get(), 0, 0,
-				      base_card_abstraction_, base_buckets_,
+				      base_card_abstraction_,
+				      base_buckets_.NumBuckets(),
 				      compressed_streets.get()));
   char dir[500];
   sprintf(dir, "%s/%s.%u.%s.%i.%i.%i.%s.%s", Files::OldCFRBase(),
@@ -165,19 +177,10 @@ EndgameSolver4::EndgameSolver4(const CardAbstraction &base_card_abstraction,
 	  base_betting_abstraction_.BettingAbstractionName().c_str(),
 	  base_cfr_config_.CFRConfigName().c_str());
   if (base_betting_abstraction_.Asymmetric()) {
-    // Maybe move trunk_sumprob initialization to inside of loop over
-    // target players.
-    fprintf(stderr, "Asymmetric not supported yet\n");
-    exit(-1);
-  }
-#if 0
-  // How do I handle this?
-  if (base_betting_abstraction_.Asymmetric()) {
     char buf[100];
-    sprintf(buf, ".p%u", target_p_);
+    sprintf(buf, ".p%u", asym_p_);
     strcat(dir, buf);
   }
-#endif
   trunk_sumprobs_->Read(dir, base_it_, base_betting_tree_->Root(), "x",
 			kMaxUInt);
 
@@ -192,16 +195,13 @@ EndgameSolver4::EndgameSolver4(const CardAbstraction &base_card_abstraction,
       for (unsigned int st = 0; st <= max_street; ++st) {
 	endgame_streets[st] = st >= solve_st_;
       }
-      unique_ptr<CFRValues> regrets;
-      regrets.reset(new CFRValues(nullptr, false, endgame_streets.get(),
-				  base_betting_tree_.get(), 0, 0,
-				  base_card_abstraction_, base_buckets_,
-				  compressed_streets.get()));
-      regrets->Read(dir, base_it_, base_betting_tree_->Root(), "x",
-		    kMaxUInt);
-      dynamic_cbr_->MoveRegrets(regrets);
-    } else {
-      dynamic_cbr_->MoveSumprobs(trunk_sumprobs_);
+      base_regrets_.reset(new CFRValues(nullptr, false, endgame_streets.get(),
+					base_betting_tree_.get(), 0, 0,
+					base_card_abstraction_,
+					base_buckets_.NumBuckets(),
+					compressed_streets.get()));
+      base_regrets_->Read(dir, base_it_, base_betting_tree_->Root(), "x",
+			  kMaxUInt);
     }
   }
 
@@ -353,53 +353,84 @@ void EndgameSolver4::Resolve(Node *node, unsigned int gbd,
 			     const string &action_sequence,
 			     double **reach_probs) {
   unsigned int st = node->Street();
-  printf("Resolve %s st %u nt %u gbd %u\n",
-	 action_sequence.c_str(), st, node->NonterminalID(), gbd);
+  fprintf(stderr, "Resolve %s st %u nt %u gbd %u\n",
+	  action_sequence.c_str(), st, node->NonterminalID(), gbd);
   unsigned int num_players = Game::NumPlayers();
   HandTree hand_tree(st, gbd, Game::MaxStreet());
   bool cfrs = false;
   bool zero_sum = true;
-  EGCFR eg_cfr(endgame_card_abstraction_, base_card_abstraction_,
-	       endgame_betting_abstraction_, base_betting_abstraction_,
-	       endgame_cfr_config_, base_cfr_config_, endgame_buckets_,
-	       st, method_, cfrs, zero_sum, 1);
-  
+  EGCFR eg_cfr(endgame_card_abstraction_, endgame_betting_abstraction_, 
+	       endgame_cfr_config_, endgame_buckets_, st, method_, cfrs,
+	       zero_sum, 1);
+  const Card *board = BoardTree::Board(st, gbd);
+  unsigned int num_board_cards = Game::NumBoardCards(st);
+#if 0
+  OutputNCards(board, num_board_cards);
+  printf("\n");
+#endif
+  unsigned int max_card1 = Game::MaxCard() + 1;
+  for (unsigned int p = 0; p <= 1; ++p) {
+    double sum = 0;
+    for (Card hi = 1; hi < max_card1; ++hi) {
+      if (InCards(hi, board, num_board_cards)) continue;
+      for (Card lo = 0; lo < hi; ++lo) {
+	if (InCards(lo, board, num_board_cards)) continue;
+	unsigned int enc = hi * max_card1 + lo;
+	double reach = reach_probs[p][enc];
+	sum += reach;
+      }
+    }
+    fprintf(stderr, "P%u sum-reach-probs %f\n", p, sum);
+  }
   unsigned int num_asym_players =
     base_betting_abstraction_.Asymmetric() ? num_players : 1;
-  for (unsigned int asym_p = 0; asym_p < num_asym_players; ++asym_p) {
+  unique_ptr<CFRValues> base_subgame_strategy;
+  for (unsigned int p = 0; p < num_asym_players; ++p) {
+    unsigned int target_p;
+    if (base_betting_abstraction_.Asymmetric()) {
+      target_p = asym_p_;
+    } else {
+      target_p = p;
+    }
     BettingTree *base_subtree = nullptr;
-    BettingTree *endgame_subtree = CreateSubtree(node, asym_p, false);
+    BettingTree *endgame_subtree = CreateSubtree(node, target_p, false);
     if (! base_mem_) {
-      base_subtree = CreateSubtree(node, asym_p, true);
+      base_subtree = CreateSubtree(node, target_p, true);
       // The action sequence passed in should specify the root of the system
       // we are reading (the base system).
-      unique_ptr<CFRValues> base_subgame_strategy(
+      base_subgame_strategy.reset(
 	    ReadBaseEndgameStrategy(base_card_abstraction_,
 				    base_betting_abstraction_,
 				    base_cfr_config_, base_betting_tree_.get(),
 				    base_buckets_, endgame_buckets_, base_it_,
 				    node,  gbd, "x", reach_probs, base_subtree,
-				    current_, asym_p));
+				    current_, target_p));
       // We are calculating CBRs from the *base* strategy, not the resolved
       // endgame strategy.  So pass in base_card_abstraction_, etc.
       dynamic_cbr_.reset(new DynamicCBR2(base_card_abstraction_,
 					 base_betting_abstraction_,
 					 base_cfr_config_, base_buckets_, 1));
-      if (current_) dynamic_cbr_->MoveRegrets(base_subgame_strategy);
-      else          dynamic_cbr_->MoveSumprobs(base_subgame_strategy);
     }
 
     if (method_ == ResolvingMethod::UNSAFE) {
+      unsigned int max_street = Game::MaxStreet();
+      unique_ptr<bool []> streets(new bool[max_street + 1]);
+      for (unsigned int st1 = 0; st1 <= max_street; ++st1) {
+	streets[st1] = st1 >= st;
+      }
+      CFRValues sumprobs(nullptr, true, streets.get(), endgame_subtree,
+			 gbd, st, endgame_card_abstraction_,
+			 endgame_buckets_.NumBuckets(), nullptr);
       eg_cfr.SolveSubgame(endgame_subtree, gbd, reach_probs, action_sequence,
 			  &hand_tree, nullptr, kMaxUInt, true,
-			  num_endgame_its_);
+			  num_endgame_its_, &sumprobs);
       // Write out the P0 and P1 strategies
       for (unsigned int solve_p = 0; solve_p < num_players; ++solve_p) {
 	WriteEndgame(endgame_subtree->Root(), action_sequence, action_sequence,
 		     gbd, base_card_abstraction_, endgame_card_abstraction_,
 		     base_betting_abstraction_, endgame_betting_abstraction_,
 		     base_cfr_config_, endgame_cfr_config_, method_,
-		     eg_cfr.Sumprobs(), st, gbd, asym_p, solve_p, st);
+		     &sumprobs, st, gbd, target_p, solve_p, st);
       }
     } else {
       for (unsigned int solve_p = 0; solve_p < num_players; ++solve_p) {
@@ -415,31 +446,66 @@ void EndgameSolver4::Resolve(Node *node, unsigned int gbd,
 	  // hand tree and have a global base strategy.
 	  // We assume that pure_streets_[st] tells us whether to purify
 	  // for the entire endgame.
-	  t_vals.reset(dynamic_cbr_->Compute(node, reach_probs, gbd,
-					     trunk_hand_tree_.get(), 0, 0,
-					     solve_p^1, cfrs_, zero_sum_,
-					     current_, pure_streets_[st]));
+	  if (current_) {
+	    t_vals.reset(dynamic_cbr_->Compute(node, reach_probs, gbd,
+					       trunk_hand_tree_.get(), 0, 0,
+					       solve_p^1, cfrs_, zero_sum_,
+					       current_, pure_streets_[st],
+					       base_regrets_.get(), nullptr));
+	  } else {
+	    t_vals.reset(dynamic_cbr_->Compute(node, reach_probs, gbd,
+					       trunk_hand_tree_.get(), 0, 0,
+					       solve_p^1, cfrs_, zero_sum_,
+					       current_, pure_streets_[st],
+					       nullptr,
+					       trunk_sumprobs_.get()));
+	  }
 	} else {
 	  // base_subtree is just for the subgame
 	  // st and gbd define the subgame
-	  t_vals.reset(dynamic_cbr_->Compute(base_subtree->Root(),
-					     reach_probs, gbd, &hand_tree,
-					     st, gbd, solve_p^1, cfrs_,
-					     zero_sum_, current_,
-					     pure_streets_[st]));
+	  if (current_) {
+	    t_vals.reset(dynamic_cbr_->Compute(base_subtree->Root(),
+					       reach_probs, gbd, &hand_tree,
+					       st, gbd, solve_p^1, cfrs_,
+					       zero_sum_, current_,
+					       pure_streets_[st],
+					       base_subgame_strategy.get(),
+					       nullptr));
+	  } else {
+	    t_vals.reset(dynamic_cbr_->Compute(base_subtree->Root(),
+					       reach_probs, gbd, &hand_tree,
+					       st, gbd, solve_p^1, cfrs_,
+					       zero_sum_, current_,
+					       pure_streets_[st], nullptr,
+					       base_subgame_strategy.get()));
+	  }
 	}
-	
+
+	unsigned int num_players = Game::NumPlayers();
+	unique_ptr<bool []> players(new bool[num_players]);
+	for (unsigned int p = 0; p < num_players; ++p) {
+	  players[p] = p == solve_p;
+	}
+	unsigned int max_street = Game::MaxStreet();
+	unique_ptr<bool []> streets(new bool[max_street + 1]);
+	for (unsigned int st1 = 0; st1 <= max_street; ++st1) {
+	  streets[st1] = st1 >= st;
+	}
+	CFRValues sumprobs(players.get(), true, streets.get(), endgame_subtree,
+			   gbd, st, endgame_card_abstraction_,
+			   endgame_buckets_.NumBuckets(), nullptr);
+	sumprobs.AllocateAndClearDoubles(endgame_subtree->Root(), kMaxUInt);
 	// Pass in false for both_players.  I am doing separate solves for
 	// each player.
 	eg_cfr.SolveSubgame(endgame_subtree, gbd, reach_probs, action_sequence,
 			    &hand_tree, t_vals.get(), solve_p, false,
-			    num_endgame_its_);
+			    num_endgame_its_, &sumprobs);
 	      
 	WriteEndgame(endgame_subtree->Root(), action_sequence, action_sequence,
 		     gbd, base_card_abstraction_, endgame_card_abstraction_,
 		     base_betting_abstraction_, endgame_betting_abstraction_,
 		     base_cfr_config_, endgame_cfr_config_, method_,
-		     eg_cfr.Sumprobs(), st, gbd, asym_p, solve_p, st);
+		     &sumprobs, st, gbd, target_p, solve_p, st);
       }
     }
   
@@ -460,21 +526,41 @@ void EndgameSolver4::Walk(Node *node, const string &action_sequence,
   if (st == solve_st_) {
     // Do we assume that this is a street-initial node?
     // We do assume no bet pending
+#if 0
+    // Temporary
+    unsigned int num_players = Game::NumPlayers();
+    for (unsigned int p = 0; p < num_players; ++p) {
+      double sum = 0;
+      const Card *board = BoardTree::Board(3, gbd);
+      unsigned int num_board_cards = Game::NumBoardCards(3);
+      unsigned int max_card1 = Game::MaxCard() + 1;
+      for (Card hi = 1; hi < max_card1; ++hi) {
+	if (InCards(hi, board, num_board_cards)) continue; 
+	for (Card lo = 0; lo < hi; ++lo) {
+	  if (InCards(lo, board, num_board_cards)) continue;
+	  unsigned int enc = hi * max_card1 + lo;
+	  sum += reach_probs[p][enc];
+	  if (p == 1 && reach_probs[p][enc] > 0.9) {
+	    OutputNCards(board, num_board_cards);
+	    printf(" / ");
+	    OutputTwoCards(hi, lo);
+	    printf(" (%u) %f\n", enc, reach_probs[p][enc]);
+	  }
+	}
+      }
+      fprintf(stderr, "P%u sum-reach-probs %f\n", p, sum);
+    }
+#endif
     Resolve(node, gbd, action_sequence, reach_probs);
     return;
   }
   
   Node *new_node = node;
   
-  const CFRValues *sumprobs;
-  if (base_mem_ && ! current_) {
-    sumprobs = dynamic_cbr_->Sumprobs();
-  } else {
-    sumprobs = trunk_sumprobs_.get();
-  }
   double ***succ_reach_probs =
     GetSuccReachProbs(new_node, gbd, trunk_hand_tree_.get(), base_buckets_,
-		      sumprobs, reach_probs, 0, 0, pure_streets_[st]);
+		      trunk_sumprobs_.get(), reach_probs, 0, 0,
+		      pure_streets_[st]);
   
   unsigned int num_succs = new_node->NumSuccs();
   for (unsigned int s = 0; s < num_succs; ++s) {
@@ -521,7 +607,7 @@ static void Usage(const char *prog_name) {
 	  "<solve street> <base it> <num endgame its> "
 	  "[unsafe|cfrd|maxmargin|combined] [cbrs|cfrs] [card|bucket] "
 	  "[zerosum|raw] [current|avg] <pure streets> [mem|disk] "
-	  "<num threads>\n", prog_name);
+	  "<num threads> (player)\n", prog_name);
   fprintf(stderr, "\n");
   fprintf(stderr, "\"current\" or \"avg\" signifies whether we use the "
 	  "opponent's current strategy (from regrets) in the endgame CBR "
@@ -543,7 +629,7 @@ static void Usage(const char *prog_name) {
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 19) Usage(argv[0]);
+  if (argc != 19 && argc != 20) Usage(argv[0]);
   Files::Init();
   unique_ptr<Params> game_params = CreateGameParams();
   game_params->ReadFromFile(argv[1]);
@@ -620,6 +706,17 @@ int main(int argc, char *argv[]) {
   else                    Usage(argv[0]);
   unsigned int num_threads;
   if (sscanf(argv[18], "%u", &num_threads) != 1) Usage(argv[0]);
+  unsigned int asym_p = kMaxUInt;
+  if (base_betting_abstraction->Asymmetric()) {
+    if (argc != 20) {
+      Usage(argv[0]);
+    }
+    if (sscanf(argv[19]+1, "%u", &asym_p) != 1) Usage(argv[0]);
+  } else {
+    if (argc == 20) {
+      Usage(argv[0]);
+    }
+  }
 
   // If card abstractions are the same, should not load both.
   Buckets base_buckets(*base_card_abstraction, false);
@@ -633,11 +730,17 @@ int main(int argc, char *argv[]) {
 			*endgame_cfr_config, base_buckets, endgame_buckets,
 			solve_st, method, cfrs, card_level, zero_sum, current,
 			pure_streets.get(), base_mem, base_it,
-			num_endgame_its, num_threads);
-  for (unsigned int asym_p = 0; asym_p <= 1; ++asym_p) {
+			num_endgame_its, num_threads, asym_p);
+  if (base_betting_abstraction->Asymmetric()) {
     DeleteAllEndgames(*base_card_abstraction, *endgame_card_abstraction,
 		      *base_betting_abstraction, *endgame_betting_abstraction,
 		      *base_cfr_config, *endgame_cfr_config, method, asym_p);
+  } else {
+    for (unsigned int p = 0; p <= 1; ++p) {
+      DeleteAllEndgames(*base_card_abstraction, *endgame_card_abstraction,
+			*base_betting_abstraction, *endgame_betting_abstraction,
+			*base_cfr_config, *endgame_cfr_config, method, p);
+    }
   }
   solver.Walk();
 }

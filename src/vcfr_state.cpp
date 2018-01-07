@@ -47,15 +47,19 @@ double *AllocateOppProbs(bool initialize) {
 // Called at the root of the tree.  We need to initialize total_card_probs_
 // and sum_opp_probs_ because an open fold is allowed.
 VCFRState::VCFRState(double *opp_probs, unsigned int **street_buckets,
-		     const HandTree *hand_tree, unsigned int p) {
+		     const HandTree *hand_tree, unsigned int p,
+		     CFRValues *regrets, CFRValues *sumprobs) {
   opp_probs_ = opp_probs;
   street_buckets_ = street_buckets;
   action_sequence_ = "x";
   hand_tree_ = hand_tree;
   p_ = p;
+  regrets_ = regrets;
+  sumprobs_ = sumprobs;
   root_bd_ = 0;
   root_bd_st_ = 0;
   unsigned int max_card1 = Game::MaxCard() + 1;
+  // Wait, this never gets deleted
   total_card_probs_ = new double[max_card1];
   const CanonicalCards *hands = hand_tree_->Hands(0, 0);
   CommonBetResponseCalcs(0, hands, opp_probs_, &sum_opp_probs_,
@@ -68,7 +72,8 @@ VCFRState::VCFRState(double *opp_probs, unsigned int **street_buckets,
 VCFRState::VCFRState(double *opp_probs, const HandTree *hand_tree,
 		     unsigned int lbd, const string &action_sequence,
 		     unsigned int root_bd, unsigned int root_bd_st,
-		     unsigned int **street_buckets, unsigned int p) {
+		     unsigned int **street_buckets, unsigned int p,
+		     CFRValues *regrets, CFRValues *sumprobs) {
   opp_probs_ = opp_probs;
   total_card_probs_ = nullptr;
   sum_opp_probs_ = 0;
@@ -78,6 +83,19 @@ VCFRState::VCFRState(double *opp_probs, const HandTree *hand_tree,
   root_bd_st_ = root_bd_st;
   street_buckets_ = street_buckets;
   p_ = p;
+  regrets_ = regrets;
+  sumprobs_ = sumprobs;
+#if 0
+  // Temporary below
+  unsigned int max_card1 = Game::MaxCard() + 1;
+  total_card_probs_ = new double[max_card1];
+  // const CanonicalCards *hands = hand_tree_->Hands(root_bd_st, root_bd);
+  // Assume local hand tree
+  const CanonicalCards *hands = hand_tree_->Hands(1, lbd);
+  CommonBetResponseCalcs(1, hands, opp_probs_, &sum_opp_probs_,
+			 total_card_probs_);
+  fprintf(stderr, "p %u root sop %f\n", p, sum_opp_probs_);
+#endif
 }
 
 // Called at an internal street-initial node.  Unlike the above constructor,
@@ -86,7 +104,8 @@ VCFRState::VCFRState(double *opp_probs, double *total_card_probs,
 		     const HandTree *hand_tree, unsigned int st,
 		     unsigned int lbd, const string &action_sequence,
 		     unsigned int root_bd, unsigned int root_bd_st,
-		     unsigned int **street_buckets, unsigned int p) {
+		     unsigned int **street_buckets, unsigned int p,
+		     CFRValues *regrets, CFRValues *sumprobs) {
   opp_probs_ = opp_probs;
   total_card_probs_ = total_card_probs;
   hand_tree_ = hand_tree;
@@ -95,6 +114,8 @@ VCFRState::VCFRState(double *opp_probs, double *total_card_probs,
   root_bd_st_ = root_bd_st;
   street_buckets_ = street_buckets;
   p_ = p;
+  regrets_ = regrets;
+  sumprobs_ = sumprobs;
   const CanonicalCards *hands = hand_tree_->Hands(st, lbd);
   CommonBetResponseCalcs(root_bd_st_, hands, opp_probs_, &sum_opp_probs_,
 			 total_card_probs_);
@@ -111,6 +132,8 @@ VCFRState::VCFRState(const VCFRState &pred, Node *node, unsigned int s) {
   total_card_probs_ = pred.TotalCardProbs();
   sum_opp_probs_ = pred.SumOppProbs();
   p_ = pred.P();
+  regrets_ = pred.Regrets();
+  sumprobs_ = pred.Sumprobs();
 }
 
 // Create a new VCFRState corresponding to taking an opponent action.
@@ -126,6 +149,8 @@ VCFRState::VCFRState(const VCFRState &pred, Node *node, unsigned int s,
   sum_opp_probs_ = sum_opp_probs;
   total_card_probs_ = total_card_probs;
   p_ = pred.P();
+  regrets_ = pred.Regrets();
+  sumprobs_ = pred.Sumprobs();
 }
 
 // We don't own any of the arrays.  Caller must delete.

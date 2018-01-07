@@ -248,6 +248,8 @@ double *VCFR::OurChoice(Node *node, unsigned int lbd, const VCFRState &state) {
     } else {
       bool bucketed = ! buckets_.None(st) &&
 	node->LastBetTo() < card_abstraction_.BucketThreshold(st);
+      CFRValues *regrets = state.Regrets();
+      CFRValues *sumprobs = state.Sumprobs();
       if (bucketed && ! value_calculation_) {
 	// When running CFR+ on a bucketed system, we want to use the
 	// regrets from the beginning of the iteration to determine the
@@ -263,14 +265,14 @@ double *VCFR::OurChoice(Node *node, unsigned int lbd, const VCFRState &state) {
 	  }
 	}
 	if (! value_calculation_ && ! pre_phase_) {
-	  if (regrets_->Ints(pa, st)) {
+	  if (regrets->Ints(pa, st)) {
 	    int *i_all_regrets;
-	    regrets_->Values(pa, st, nt, &i_all_regrets);
+	    regrets->Values(pa, st, nt, &i_all_regrets);
 	    UpdateRegretsBucketed(node, street_buckets, vals, succ_vals,
 				  i_all_regrets);
 	  } else {
 	    double *d_all_regrets;
-	    regrets_->Values(pa, st, nt, &d_all_regrets);
+	    regrets->Values(pa, st, nt, &d_all_regrets);
 	    UpdateRegretsBucketed(node, street_buckets, vals, succ_vals,
 				  d_all_regrets);
 	  }
@@ -287,19 +289,19 @@ double *VCFR::OurChoice(Node *node, unsigned int lbd, const VCFRState &state) {
 	double explore;
 	if (value_calculation_) {
 	  // For example, when called from build_cbrs.
-	  if (sumprobs_->Ints(pa, st)) {
-	    sumprobs_->Values(pa, st, nt, &i_all_cs_vals);
+	  if (sumprobs->Ints(pa, st)) {
+	    sumprobs->Values(pa, st, nt, &i_all_cs_vals);
 	  } else {
-	    sumprobs_->Values(pa, st, nt, &d_all_cs_vals);
+	    sumprobs->Values(pa, st, nt, &d_all_cs_vals);
 	  }
 	  nonneg = true;
 	  // Don't want to impose exploration when working off of sumprobs.
 	  explore = 0;
 	} else {
-	  if (regrets_->Ints(pa, st)) {
-	    regrets_->Values(pa, st, nt, &i_all_cs_vals);
+	  if (regrets->Ints(pa, st)) {
+	    regrets->Values(pa, st, nt, &i_all_cs_vals);
 	  } else {
-	    regrets_->Values(pa, st, nt, &d_all_cs_vals);
+	    regrets->Values(pa, st, nt, &d_all_cs_vals);
 	  }
 	  nonneg = nn_regrets_ && regret_floors_[st] >= 0;
 	  explore = explore_;
@@ -409,6 +411,8 @@ double *VCFR::OppChoice(Node *node, unsigned int lbd, const VCFRState &state) {
       succ_opp_probs[0][i] = opp_probs[i];
     }
   } else {
+    CFRValues *regrets = state.Regrets();
+    CFRValues *sumprobs = state.Sumprobs();
     unsigned int **street_buckets = state.StreetBuckets();
     unsigned int nt = node->NonterminalID();
     for (unsigned int s = 0; s < num_succs; ++s) {
@@ -420,6 +424,7 @@ double *VCFR::OppChoice(Node *node, unsigned int lbd, const VCFRState &state) {
     double *d_all_current_probs = nullptr;
     double *d_all_cs_vals = nullptr;
     int *i_all_cs_vals = nullptr;
+    unsigned char *c_all_cs_vals = nullptr;
 
     double explore;
     if (value_calculation_ && ! br_current_) explore = 0;
@@ -437,19 +442,26 @@ double *VCFR::OppChoice(Node *node, unsigned int lbd, const VCFRState &state) {
       // sumprobs.
 
       if (value_calculation_ && ! br_current_) {
-	if (sumprobs_ == nullptr) {
+	if (sumprobs == nullptr) {
 	  fprintf(stderr, "VCFR::OppChoice() no sumprobs?!?\n");
 	  exit(-1);
 	}
-	if (sumprobs_->Ints(pa, st)) {
-	  sumprobs_->Values(pa, st, nt, &i_all_cs_vals);
+	if (sumprobs->Chars(pa, st)) {
+	  sumprobs->Values(pa, st, nt, &c_all_cs_vals);
+	  if (c_all_cs_vals == nullptr) {
+	    fprintf(stderr, "No char sumprob cs vals???  pa %u st %u nt %u\n",
+		    pa, st, nt);
+	    exit(-1);
+	  }
+	} else if (sumprobs->Ints(pa, st)) {
+	  sumprobs->Values(pa, st, nt, &i_all_cs_vals);
 	  if (i_all_cs_vals == nullptr) {
 	    fprintf(stderr, "No int sumprob cs vals???  pa %u st %u nt %u\n",
 		    pa, st, nt);
 	    exit(-1);
 	  }
 	} else {
-	  sumprobs_->Values(pa, st, nt, &d_all_cs_vals);
+	  sumprobs->Values(pa, st, nt, &d_all_cs_vals);
 	  if (d_all_cs_vals == nullptr) {
 	    fprintf(stderr, "No double sumprob cs vals???  pa %u st %u "
 		    "nt %u\n", pa, st, nt);
@@ -457,19 +469,26 @@ double *VCFR::OppChoice(Node *node, unsigned int lbd, const VCFRState &state) {
 	  }
 	}
       } else {
-	if (regrets_ == nullptr) {
+	if (regrets == nullptr) {
 	  fprintf(stderr, "VCFR::OppChoice() no regrets?!?\n");
 	  exit(-1);
 	}
-	if (regrets_->Ints(pa, st)) {
-	  regrets_->Values(pa, st, nt, &i_all_cs_vals);
+	if (regrets->Chars(pa, st)) {
+	  regrets->Values(pa, st, nt, &c_all_cs_vals);
+	  if (c_all_cs_vals == nullptr) {
+	    fprintf(stderr, "No char regret cs vals???  pa %u st %u nt %u\n",
+		    pa, st, nt);
+	    exit(-1);
+	  }
+	} else if (regrets->Ints(pa, st)) {
+	  regrets->Values(pa, st, nt, &i_all_cs_vals);
 	  if (i_all_cs_vals == nullptr) {
 	    fprintf(stderr, "No int regret cs vals???  pa %u st %u nt %u\n",
 		    pa, st, nt);
 	    exit(-1);
 	  }
 	} else {
-	  regrets_->Values(pa, st, nt, &d_all_cs_vals);
+	  regrets->Values(pa, st, nt, &d_all_cs_vals);
 	  if (d_all_cs_vals == nullptr) {
 	    fprintf(stderr, "No double regret cs vals???  pa %u st %u "
 		    "nt %u\n", pa, st, nt);
@@ -482,30 +501,34 @@ double *VCFR::OppChoice(Node *node, unsigned int lbd, const VCFRState &state) {
     // The "all" values point to the values for all hands.
     double *d_all_sumprobs = nullptr;
     int *i_all_sumprobs = nullptr;
-    // sumprobs_->Players(pa) check is there because in asymmetric systems
+    // sumprobs->Players(pa) check is there because in asymmetric systems
     // (e.g., endgame solving with CFR-D method) we are only saving probs for
     // one player.
     // Don't update sumprobs during pre phase
-    if (! pre_phase_ && ! value_calculation_ && sumprob_streets_[st] &&
-	sumprobs_->Players(pa)) {
-      if (sumprobs_->Ints(pa, st)) {
-	sumprobs_->Values(pa, st, nt, &i_all_sumprobs);
+    if (! pre_phase_ && ! value_calculation_ && sumprob_streets_[pa][st] &&
+	sumprobs->Players(pa)) {
+      if (sumprobs->Ints(pa, st)) {
+	sumprobs->Values(pa, st, nt, &i_all_sumprobs);
       } else {
-	sumprobs_->Values(pa, st, nt, &d_all_sumprobs);
+	sumprobs->Values(pa, st, nt, &d_all_sumprobs);
       }
     }
 
     // These values will point to the values for the current board
     double *d_cs_vals = nullptr, *d_sumprobs = nullptr;
     int *i_cs_vals = nullptr, *i_sumprobs = nullptr;
+    unsigned char *c_cs_vals = nullptr;
 
     if (bucketed) {
       i_cs_vals = i_all_cs_vals;
       d_cs_vals = d_all_cs_vals;
       i_sumprobs = i_all_sumprobs;
       d_sumprobs = d_all_sumprobs;
+      c_cs_vals = c_all_cs_vals;
     } else {
-      if (i_all_cs_vals) {
+      if (c_all_cs_vals) {
+	c_cs_vals = c_all_cs_vals + lbd * num_hole_card_pairs * num_succs;
+      } else if (i_all_cs_vals) {
 	i_cs_vals = i_all_cs_vals + lbd * num_hole_card_pairs * num_succs;
       } else {
 	d_cs_vals = d_all_cs_vals + lbd * num_hole_card_pairs * num_succs;
@@ -548,7 +571,11 @@ double *VCFR::OppChoice(Node *node, unsigned int lbd, const VCFRState &state) {
 				d_all_current_probs, i_sumprobs);
       }
     } else {
-      if (i_cs_vals) {
+      if (c_cs_vals) {
+	ProcessOppProbs(node, hands, bucketed, street_buckets, nonneg,
+			uniform_, explore, prob_method_, it_, opp_probs,
+			succ_opp_probs, c_cs_vals);
+      } else if (i_cs_vals) {
 	if (d_sumprobs) {
 	  // Int regrets, double sumprobs
 	  bool update_sumprobs =
@@ -623,8 +650,8 @@ class VCFRThread {
 public:
   VCFRThread(VCFR *vcfr, unsigned int thread_index, unsigned int num_threads,
 	     Node *node, const string &action_sequence, double *opp_probs,
-	     const HandTree *hand_tree, unsigned int p,
-	     unsigned int *prev_canons);
+	     const HandTree *hand_tree, unsigned int p, CFRValues *regrets,
+	     CFRValues *sumprobs, unsigned int *prev_canons);
   ~VCFRThread(void);
   void Run(void);
   void Join(void);
@@ -639,6 +666,8 @@ private:
   double *opp_probs_;
   const HandTree *hand_tree_;
   unsigned int p_;
+  CFRValues *regrets_;
+  CFRValues *sumprobs_;
   unsigned int *prev_canons_;
   double *ret_vals_;
   pthread_t pthread_id_;
@@ -648,6 +677,7 @@ VCFRThread::VCFRThread(VCFR *vcfr, unsigned int thread_index,
 		       unsigned int num_threads, Node *node,
 		       const string &action_sequence, double *opp_probs,
 		       const HandTree *hand_tree, unsigned int p,
+		       CFRValues *regrets, CFRValues *sumprobs,
 		       unsigned int *prev_canons) :
   action_sequence_(action_sequence) {
   vcfr_ = vcfr;
@@ -657,6 +687,8 @@ VCFRThread::VCFRThread(VCFR *vcfr, unsigned int thread_index,
   opp_probs_ = opp_probs;
   hand_tree_ = hand_tree;
   p_ = p;
+  regrets_ = regrets;
+  sumprobs_ = sumprobs;
   prev_canons_ = prev_canons;
 }
 
@@ -689,7 +721,7 @@ void VCFRThread::Go(void) {
   for (unsigned int bd = thread_index_; bd < num_boards; bd += num_threads_) {
     unsigned int **street_buckets = AllocateStreetBuckets();
     VCFRState state(opp_probs_, hand_tree_, bd, action_sequence_, 0, 0,
-		    street_buckets, p_);
+		    street_buckets, p_, regrets_, sumprobs_);
     // Initialize buckets for this street
     vcfr_->SetStreetBuckets(st, bd, state);
     double *bd_vals = vcfr_->Process(node_, bd, state, st);
@@ -714,8 +746,9 @@ void VCFRThread::Go(void) {
 // Only support splitting on the flop for now.
 // Ugly that we pass prev_canons in.
 void VCFR::Split(Node *node, double *opp_probs, const HandTree *hand_tree,
-		 unsigned int p, const string &action_sequence,
-		 unsigned int *prev_canons, double *vals) {
+		 unsigned int p, CFRValues *regrets, CFRValues *sumprobs,
+		 const string &action_sequence, unsigned int *prev_canons,
+		 double *vals) {
   unsigned int nst = node->Street();
   unsigned int pst = nst - 1;
   unsigned int prev_num_hole_card_pairs = Game::NumHoleCardPairs(pst);
@@ -723,7 +756,8 @@ void VCFR::Split(Node *node, double *opp_probs, const HandTree *hand_tree,
   unique_ptr<VCFRThread * []> threads(new VCFRThread *[num_threads_]);
   for (unsigned int t = 0; t < num_threads_; ++t) {
     threads[t] = new VCFRThread(this, t, num_threads_, node, action_sequence,
-				opp_probs, hand_tree, p, prev_canons);
+				opp_probs, hand_tree, p, regrets, sumprobs,
+				prev_canons);
   }
   for (unsigned int t = 1; t < num_threads_; ++t) {
     threads[t]->Run();
@@ -743,7 +777,7 @@ void VCFR::Split(Node *node, double *opp_probs, const HandTree *hand_tree,
 }
 
 void VCFR::SetStreetBuckets(unsigned int st, unsigned int gbd,
-			    const VCFRState &state) {
+			    const VCFRState &state) const {
   if (buckets_.None(st)) return;
   unsigned int num_board_cards = Game::NumBoardCards(st);
   const Card *board = BoardTree::Board(st, gbd);
@@ -829,7 +863,8 @@ double *VCFR::StreetInitial(Node *node, unsigned int plbd,
   if (nst == 1 && subgame_street_ == kMaxUInt && num_threads_ > 1) {
     // Currently only flop supported
     Split(node, state.OppProbs(), state.GetHandTree(), state.P(),
-	  state.ActionSequence(), prev_canons, vals);
+	  state.Regrets(), state.Sumprobs(), state.ActionSequence(),
+	  prev_canons, vals);
   } else {
     unsigned int pgbd = BoardTree::GlobalIndex(state.RootBdSt(),
 					       state.RootBd(), pst, plbd);
@@ -1028,7 +1063,8 @@ double *VCFR::Process(Node *node, unsigned int lbd, const VCFRState &state,
   }
 }
 
-void VCFR::SetCurrentStrategy(Node *node) {
+void VCFR::SetCurrentStrategy(Node *node, CFRValues *regrets,
+			      CFRValues *sumprobs) {
   if (node->Terminal()) return;
   unsigned int num_succs = node->NumSuccs();
   unsigned int st = node->Street();
@@ -1061,19 +1097,19 @@ void VCFR::SetCurrentStrategy(Node *node) {
     double explore;
     if (value_calculation_ && ! br_current_) {
       // Use average strategy for the "cs vals"
-      if (sumprobs_->Ints(p, st)) {
-	sumprobs_->Values(p, st, nt, &i_all_cs_vals);
+      if (sumprobs->Ints(p, st)) {
+	sumprobs->Values(p, st, nt, &i_all_cs_vals);
       } else {
-	sumprobs_->Values(p, st, nt, &d_all_cs_vals);
+	sumprobs->Values(p, st, nt, &d_all_cs_vals);
       }
       nonneg = true;
       explore = 0;
     } else {
       // Use regrets for the "cs vals"
-      if (regrets_->Ints(p, st)) {
-	regrets_->Values(p, st, nt, &i_all_cs_vals);
+      if (regrets->Ints(p, st)) {
+	regrets->Values(p, st, nt, &i_all_cs_vals);
       } else {
-	regrets_->Values(p, st, nt, &d_all_cs_vals);
+	regrets->Values(p, st, nt, &d_all_cs_vals);
       }
       nonneg = nn_regrets_ && regret_floors_[st] >= 0;
       explore = explore_;
@@ -1098,7 +1134,7 @@ void VCFR::SetCurrentStrategy(Node *node) {
     delete [] nonterminal_succs;
   }
   for (unsigned int s = 0; s < num_succs; ++s) {
-    SetCurrentStrategy(node->IthSucc(s));
+    SetCurrentStrategy(node->IthSucc(s), regrets, sumprobs);
   }
 }
 
@@ -1140,20 +1176,11 @@ VCFR::VCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
     compressed_streets_[st] = true;
   }
 
-  sumprob_streets_ = new bool[max_street + 1];
-  const vector<unsigned int> &ssv = cfr_config_.SumprobStreets();
-  unsigned int num_ssv = ssv.size();
-  if (num_ssv == 0) {
+  sumprob_streets_ = new bool *[num_players_];
+  for (unsigned int p = 0; p < num_players_; ++p) {
+    sumprob_streets_[p] = new bool[max_street + 1];
     for (unsigned int st = 0; st <= max_street; ++st) {
-      sumprob_streets_[st] = true;
-    }
-  } else {
-    for (unsigned int st = 0; st <= max_street; ++st) {
-      sumprob_streets_[st] = false;
-    }
-    for (unsigned int i = 0; i < num_ssv; ++i) {
-      unsigned int st = ssv[i];
-      sumprob_streets_[st] = true;
+      sumprob_streets_[p][st] = cfr_config_.SumprobStreet(p, st);
     }
   }
 
@@ -1297,6 +1324,10 @@ VCFR::~VCFR(void) {
   delete [] regret_ceilings_;
   delete [] regret_scaling_;
   delete [] sumprob_scaling_;
+  unsigned int num_players = Game::NumPlayers();
+  for (unsigned int p = 0; p < num_players; ++p) {
+    delete [] sumprob_streets_[p];
+  }
   delete [] sumprob_streets_;
   delete [] compressed_streets_;
   delete [] best_response_streets_;

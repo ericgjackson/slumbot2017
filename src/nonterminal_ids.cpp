@@ -54,6 +54,9 @@ static void CountNumNonterminals(Node *node, unsigned int **num_nonterminals) {
   unsigned int nt_id = node->NonterminalID();
   if (nt_id >= num_nonterminals[pa][st]) {
     num_nonterminals[pa][st] = nt_id + 1;
+  } else {
+    // Should only see lower nonterminal ID in case of reentrancy.
+    return;
   }
   unsigned int num_succs = node->NumSuccs();
   for (unsigned int s = 0; s < num_succs; ++s) {

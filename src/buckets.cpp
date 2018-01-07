@@ -8,6 +8,83 @@
 #include "game.h"
 #include "io.h"
 
+// Create a dummy buckets object for an unabstracted system
+Buckets::Buckets(void) {
+  unsigned int max_street = Game::MaxStreet();
+  none_ = new bool[max_street + 1];
+  short_buckets_ = new unsigned short *[max_street + 1];
+  int_buckets_ = new unsigned int *[max_street + 1];
+  for (unsigned int st = 0; st <= max_street; ++st) {
+    short_buckets_[st] = nullptr;
+    int_buckets_[st] = nullptr;
+  }
+  num_buckets_ = new unsigned int[max_street + 1];
+  for (unsigned int st = 0; st <= max_street; ++st) {
+    none_[st] = true;
+    num_buckets_[st] = 0;
+  }
+}
+
+Buckets::Buckets(const CardAbstraction &ca, unsigned int final_street) {
+  BoardTree::Create();
+  unsigned int max_street = Game::MaxStreet();
+  none_ = new bool[max_street + 1];
+  short_buckets_ = new unsigned short *[max_street + 1];
+  int_buckets_ = new unsigned int *[max_street + 1];
+  for (unsigned int st = 0; st <= max_street; ++st) {
+    short_buckets_[st] = nullptr;
+    int_buckets_[st] = nullptr;
+  }
+  char buf[500];
+  num_buckets_ = new unsigned int[max_street + 1];
+  for (unsigned int st = 0; st <= final_street; ++st) {
+    if (ca.Bucketing(st) == "none") {
+      none_[st] = true;
+      num_buckets_[st] = 0;
+      continue;
+    }
+    none_[st] = false;
+    sprintf(buf, "%s/num_buckets.%s.%i.%i.%i.%s.%i", Files::StaticBase(),
+	    Game::GameName().c_str(), Game::NumRanks(), Game::NumSuits(),
+	    max_street, ca.Bucketing(st).c_str(), st);
+    Reader reader(buf);
+    num_buckets_[st] = reader.ReadUnsignedIntOrDie();
+  }
+  for (unsigned int st = final_street + 1; st <= max_street; ++st) {
+    none_[st] = false;
+    num_buckets_[st] = 0;
+  }
+
+  for (unsigned int st = 0; st <= final_street; ++st) {
+    if (none_[st]) continue;
+    unsigned int num_boards = BoardTree::NumBoards(st);
+    unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
+    unsigned int num_hands = num_boards * num_hole_card_pairs;
+    long long int lli_num_hands = num_hands;
+    
+    sprintf(buf, "%s/buckets.%s.%u.%u.%u.%s.%u", Files::StaticBase(),
+	    Game::GameName().c_str(), Game::NumRanks(), Game::NumSuits(),
+	    max_street, ca.Bucketing(st).c_str(), st);
+    Reader reader(buf);
+    long long int file_size = reader.FileSize();
+    if (file_size == lli_num_hands * 2) {
+      short_buckets_[st] = new unsigned short[num_hands];
+      for (unsigned int h = 0; h < num_hands; ++h) {
+	short_buckets_[st][h] = reader.ReadUnsignedShortOrDie();
+      }
+    } else if (file_size == lli_num_hands * 4) {
+      int_buckets_[st] = new unsigned int[num_hands];
+      for (unsigned int h = 0; h < num_hands; ++h) {
+	int_buckets_[st][h] = reader.ReadUnsignedIntOrDie();
+      }
+    } else {
+      fprintf(stderr, "Buckets::Buckets: Unexpected file size %lli\n",
+	      file_size);
+      exit(-1);
+    }
+  }
+}
+
 Buckets::Buckets(const CardAbstraction &ca, bool numb_only) {
   BoardTree::Create();
   unsigned int max_street = Game::MaxStreet();
@@ -58,14 +135,12 @@ Buckets::Buckets(const CardAbstraction &ca, bool numb_only) {
 	  int_buckets_[st][h] = reader.ReadUnsignedIntOrDie();
 	}
       } else {
-	fprintf(stderr,
-		"BucketsInstance::Initialize: Unexpected file size %lli\n",
+	fprintf(stderr, "Buckets::Buckets: Unexpected file size %lli\n",
 		file_size);
 	exit(-1);
       }
     }
   }
-
 }
 
 Buckets::~Buckets(void) {
@@ -89,6 +164,8 @@ Buckets::~Buckets(void) {
 BucketsFile::BucketsFile(const CardAbstraction &ca) {
   BoardTree::Create();
   unsigned int max_street = Game::MaxStreet();
+  int_buckets_ = nullptr;
+  short_buckets_ = nullptr;
   none_ = new bool[max_street + 1];
   num_buckets_ = new unsigned int[max_street + 1];
   shorts_ = new bool[max_street + 1];
@@ -139,10 +216,8 @@ BucketsFile::~BucketsFile(void) {
   for (unsigned int st = 0; st <= max_street; ++st) {
     delete readers_[st];
   }
-  delete [] none_;
-  delete [] num_buckets_;
-  delete [] shorts_;
   delete [] readers_;
+  delete [] shorts_;
 }
 
 unsigned int BucketsFile::Bucket(unsigned int st, unsigned int h) const {

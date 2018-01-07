@@ -45,6 +45,7 @@
 #include "game.h"
 #include "game_params.h"
 #include "hand_tree.h"
+#include "hand_value_tree.h"
 #include "io.h"
 #include "params.h"
 #include "rand.h"
@@ -52,11 +53,141 @@
 
 using namespace std;
 
+class ApproxRGBRThread {
+public:
+  ApproxRGBRThread(CFRValues *sumprobs, DynamicCBR2 *dynamic_cbr2,
+		   unsigned int *board_samples, Node *node,
+		   double **reach_probs, unsigned int thread_index,
+		   unsigned int num_threads);
+  virtual ~ApproxRGBRThread(void) {}
+  void Run(void);
+  void Join(void);
+  void Go(void);
+  double TotalBRVal(unsigned int p) const {return total_br_vals_[p];}
+  double TotalBRNorm(unsigned int p) const {return total_br_norms_[p];}
+private:
+  double GetBRVal(unsigned int bd, unsigned int p, HandTree *hand_tree,
+		  double *br_norm);
+
+  CFRValues *sumprobs_;
+  DynamicCBR2 *dynamic_cbr2_;
+  unsigned int *board_samples_;
+  Node *node_;
+  double **reach_probs_;
+  unsigned int thread_index_;
+  unsigned int num_threads_;
+  unique_ptr<double []> total_br_vals_;
+  unique_ptr<double []> total_br_norms_;
+  pthread_t pthread_id_;
+};
+
+ApproxRGBRThread::ApproxRGBRThread(CFRValues *sumprobs,
+				   DynamicCBR2 *dynamic_cbr2,
+				   unsigned int *board_samples,
+				   Node *node, double **reach_probs, 
+				   unsigned int thread_index,
+				   unsigned int num_threads) {
+  sumprobs_ = sumprobs;
+  dynamic_cbr2_ = dynamic_cbr2;
+  board_samples_ = board_samples;
+  node_ = node;
+  reach_probs_ = reach_probs;
+  thread_index_ = thread_index;
+  num_threads_ = num_threads;
+  unsigned int num_players = Game::NumPlayers();
+  total_br_vals_.reset(new double[num_players]);
+  total_br_norms_.reset(new double[num_players]);
+  for (unsigned int p = 0; p < num_players; ++p) {
+    total_br_vals_[p] = 0;
+    total_br_norms_[p] = 0;
+  }
+}
+
+static void *thread_run(void *v_t) {
+  ApproxRGBRThread *t = (ApproxRGBRThread *)v_t;
+  t->Go();
+  return NULL;
+}
+
+void ApproxRGBRThread::Run(void) {
+  pthread_create(&pthread_id_, NULL, thread_run, this);
+}
+
+void ApproxRGBRThread::Join(void) {
+  pthread_join(pthread_id_, NULL); 
+}
+
+double ApproxRGBRThread::GetBRVal(unsigned int bd, unsigned int p,
+				  HandTree *hand_tree, double *br_norm) {
+  unsigned int st = node_->Street();
+  double *cbrs = dynamic_cbr2_->Compute(node_, reach_probs_, bd, hand_tree,
+                                        st, bd, p, false, false, false, false,
+					nullptr, sumprobs_);
+  // hand_tree is local to this board
+  const CanonicalCards *hands = hand_tree->Hands(st, 0);
+  double sum_joint_probs = 0;
+  double sum_weighted_cbrs = 0;
+  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
+  unsigned int maxcard1 = Game::MaxCard() + 1;
+  for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
+    const Card *our_cards = hands->Cards(i);
+    Card our_hi = our_cards[0];
+    Card our_lo = our_cards[1];
+    unsigned int our_enc = our_hi * maxcard1 + our_lo;
+    double our_prob = reach_probs_[p][our_enc];
+    double sum_opp_probs = 0;
+    for (unsigned int j = 0; j < num_hole_card_pairs; ++j) {
+      const Card *opp_cards = hands->Cards(j);
+      Card opp_hi = opp_cards[0];
+      Card opp_lo = opp_cards[1];
+      if (opp_hi == our_hi || opp_hi == our_lo || opp_lo == our_hi ||
+	  opp_lo == our_lo) {
+	continue;
+      }
+      unsigned int opp_enc = opp_hi * maxcard1 + opp_lo;
+      double opp_prob = reach_probs_[p^1][opp_enc];
+      sum_opp_probs += opp_prob;
+    }
+    // sum_opp_probs is already incorporated into the CBR values
+    sum_joint_probs += our_prob * sum_opp_probs;
+    sum_weighted_cbrs += our_prob * cbrs[i];
+  }
+  delete [] cbrs;
+  *br_norm = sum_joint_probs;
+  return sum_weighted_cbrs;
+}
+
+// I could do a lazy initialization of sumprobs when needed for the first
+// time.
+void ApproxRGBRThread::Go(void) {
+  unsigned int st = node_->Street();
+  unsigned int num_players = Game::NumPlayers();
+  unsigned int num_boards = BoardTree::NumBoards(st);
+  unsigned int sampled_count = 0;
+  for (unsigned int bd = 0; bd < num_boards; ++bd) {
+    unsigned int num_samples = board_samples_[bd];
+    if (num_samples == 0) continue;
+    if (sampled_count % num_threads_ != thread_index_) {
+      ++sampled_count;
+      continue;
+    }
+    ++sampled_count;
+    fprintf(stderr, "Evaluating NT %u bd %u\n", node_->NonterminalID(), bd);
+    HandTree hand_tree(st, bd, Game::MaxStreet());
+    for (unsigned int p = 0; p < num_players; ++p) {
+      double br_norm;
+      double br_val = GetBRVal(bd, p, &hand_tree, &br_norm);
+      total_br_vals_[p] += br_val * num_samples;
+      total_br_norms_[p] += br_norm * num_samples;
+    }
+  }
+}
+
 class ApproxRGBR {
 public:
   ApproxRGBR(const CardAbstraction &ca, const BettingAbstraction &ba,
 	     const CFRConfig &cc, unsigned int it, double sample_prob,
-	     bool always_call);
+	     bool always_call, unsigned int num_threads);
   ~ApproxRGBR(void);
   void Go(void);
 private:
@@ -77,6 +208,7 @@ private:
   unsigned int target_st_;
   double sample_prob_;
   bool always_call_;
+  unsigned int num_threads_;
   const CardAbstraction &card_abstraction_;
   const BettingAbstraction &betting_abstraction_;
   const CFRConfig &cfr_config_;
@@ -86,6 +218,7 @@ private:
   unique_ptr<DynamicCBR2> dynamic_cbr2_;
   unique_ptr<HandTree> trunk_hand_tree_;
   unique_ptr<CFRValues> trunk_sumprobs_;
+  unique_ptr<CFRValues> sumprobs_;
   unique_ptr<unsigned int []> board_samples_;
   unsigned int terminal_scaling_;
 };
@@ -105,13 +238,15 @@ static unsigned int NumTargetNodes(Node *node, unsigned int target_st) {
 
 ApproxRGBR::ApproxRGBR(const CardAbstraction &ca, const BettingAbstraction &ba,
 		       const CFRConfig &cc, unsigned int it,
-		       double sample_prob, bool always_call) :
+		       double sample_prob, bool always_call,
+		       unsigned int num_threads) :
   card_abstraction_(ca), betting_abstraction_(ba), cfr_config_(cc),
   buckets_(ca, false) {
   it_ = it;
   target_st_ = 1; // Hard-coded for now
   sample_prob_ = sample_prob;
   always_call_ = false;
+  num_threads_ = num_threads;
 
   unsigned int max_street = Game::MaxStreet();
   for (unsigned int st = target_st_; st <= max_street; ++st) {
@@ -145,7 +280,7 @@ ApproxRGBR::ApproxRGBR(const CardAbstraction &ca, const BettingAbstraction &ba,
   }
   trunk_sumprobs_.reset(new CFRValues(nullptr, true, trunk_streets.get(),
 				      betting_tree_.get(), 0, 0,
-				      card_abstraction_, buckets_,
+				      card_abstraction_, buckets_.NumBuckets(),
 				      compressed_streets.get()));
   char dir[500];
   sprintf(dir, "%s/%s.%u.%s.%i.%i.%i.%s.%s", Files::OldCFRBase(),
@@ -208,7 +343,8 @@ double ApproxRGBR::GetBRVal(Node *node, double **reach_probs, unsigned int bd,
 			    double *br_norm) {
   double *cbrs = dynamic_cbr2_->Compute(node, reach_probs, bd, hand_tree,
                                         target_st_, bd, p, false, false,
-					false, false);
+					false, false, nullptr,
+					sumprobs_.get());
   // hand_tree is local to this board
   const CanonicalCards *hands = hand_tree->Hands(target_st_, 0);
   double sum_joint_probs = 0;
@@ -274,13 +410,11 @@ void ApproxRGBR::SetSumprobs(void) {
   }
   // Pass in 0/0 for root_bd_st/root_bd.  We will have globally indexed
   // sumprobs.
-  unique_ptr<CFRValues> sumprobs(
+  sumprobs_.reset(
     new CFRValues(nullptr, true, streets.get(), betting_tree_.get(), 0, 0,
-		  card_abstraction_, buckets_, nullptr));
-  sumprobs->Read(dir, it_, betting_tree_->Root(), "x", kMaxUInt);
+		  card_abstraction_, buckets_.NumBuckets(), nullptr));
+  sumprobs_->Read(dir, it_, betting_tree_->Root(), "x", kMaxUInt);
   fprintf(stderr, "Read sumprobs\n");
-  dynamic_cbr2_->MoveSumprobs(sumprobs);
-
 }
 
 // I could do a lazy initialization of sumprobs when needed for the first
@@ -393,9 +527,10 @@ double ***ApproxRGBR::GetSuccReachProbs(Node *node, unsigned int bd,
       unsigned int b = buckets_.Bucket(st, h);
       offset = b * num_succs;
     }
+    unique_ptr<double []> probs(new double[num_succs]);
+    trunk_sumprobs_->Probs(pa, st, nt, offset, num_succs, dsi, probs.get());
     for (unsigned int s = 0; s < num_succs; ++s) {
-      double prob =
-	trunk_sumprobs_->Prob(pa, st, nt, offset, s, num_succs, dsi);
+      double prob = probs[s];
       if (prob > 1.0) {
 	fprintf(stderr, "Prob > 1\n");
 	fprintf(stderr, "num_succs %u bd %u nhcp %u hcp %u\n", num_succs,
@@ -545,11 +680,37 @@ void ApproxRGBR::Walk(Node *node, unsigned int bd, double **reach_probs,
   }
   unsigned int st = node->Street();
   if (st == target_st_) {
-    if (always_call_) {
-      AlwaysCallSampledCompute(node, reach_probs, total_br_vals,
-			       total_br_norms);
+    if (num_threads_ >= 1) {
+      unique_ptr<ApproxRGBRThread * []>
+	threads(new ApproxRGBRThread *[num_threads_]);
+      for (unsigned int t = 0; t < num_threads_; ++t) {
+	threads[t] = new ApproxRGBRThread(sumprobs_.get(), dynamic_cbr2_.get(),
+					  board_samples_.get(), node,
+					  reach_probs, t, num_threads_);
+      }
+      for (unsigned int t = 1; t < num_threads_; ++t) {
+	threads[t]->Run();
+      }
+      // Do first thread in main thread
+      threads[0]->Go();
+      for (unsigned int t = 1; t < num_threads_; ++t) {
+	threads[t]->Join();
+      }
+      unsigned int num_players = Game::NumPlayers();
+      for (unsigned int t = 0; t < num_threads_; ++t) {
+	for (unsigned int p = 0; p < num_players; ++p) {
+	  total_br_vals[p] += threads[t]->TotalBRVal(p);
+	  total_br_norms[p] += threads[t]->TotalBRNorm(p);
+	}
+	delete threads[t];
+      }
     } else {
-      SampledCompute(node, reach_probs, total_br_vals, total_br_norms);
+      if (always_call_) {
+	AlwaysCallSampledCompute(node, reach_probs, total_br_vals,
+				 total_br_norms);
+      } else {
+	SampledCompute(node, reach_probs, total_br_vals, total_br_norms);
+      }
     }
     return;
   }
@@ -671,7 +832,8 @@ int main(int argc, char *argv[]) {
   
   BoardTree::Create();
   BoardTree::BuildBoardCounts();
+  HandValueTree::Create();
   ApproxRGBR rgbr(*card_abstraction, *betting_abstraction, *cfr_config, it,
-		  sample_prob, always_call);
+		  sample_prob, always_call, num_threads);
   rgbr.Go();
 }

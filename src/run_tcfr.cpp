@@ -24,7 +24,7 @@ using namespace std;
 static void Usage(const char *prog_name) {
   fprintf(stderr, "USAGE: %s <game params> <card params> <betting params> "
 	  "<CFR params> <num threads> <start it> <end it> <batch size> "
-	  "<save interval> ([p1|p2])\n", prog_name);
+	  "<save interval> ([p0|p1])\n", prog_name);
   exit(-1);
 }
 

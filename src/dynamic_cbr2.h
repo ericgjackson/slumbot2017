@@ -20,11 +20,13 @@ public:
   double *Compute(Node *node, double **reach_probs, unsigned int gbd,
 		  HandTree *hand_tree, unsigned int root_bd_st,
 		  unsigned int root_bd, unsigned int target_p, bool cfrs,
-		  bool zero_sum, bool current, bool purify_opp);
+		  bool zero_sum, bool current, bool purify_opp,
+		  CFRValues *regrets, CFRValues *sumprobs);
 private:
   double *Compute(Node *node, unsigned int p, double *opp_probs,
 		  unsigned int gbd, HandTree *hand_tree,
-		  unsigned int root_bd_st, unsigned int root_bd);
+		  unsigned int root_bd_st, unsigned int root_bd,
+		  CFRValues *regrets, CFRValues *sumprobs);
 
   bool cfrs_;
 };

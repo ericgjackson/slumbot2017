@@ -108,16 +108,7 @@ string Node::ActionName(unsigned int s) {
     return "f";
   } else {
     Node *b = IthSucc(s);
-    unsigned int bet_size;
-    if (Game::NumPlayers() > 2) {
-      bet_size = b->LastBetTo() - LastBetTo();
-    } else {
-      if (! b->HasCallSucc()) {
-	fprintf(stderr, "Expected node to have call succ\n");
-	exit(-1);
-      }
-      bet_size = b->LastBetTo() - LastBetTo();
-    }
+    unsigned int bet_size = b->LastBetTo() - LastBetTo();
     char buf[100];
     sprintf(buf, "b%u", bet_size);
     return buf;
@@ -175,10 +166,61 @@ unsigned int Node::DefaultSuccIndex(void) const {
   return 0;
 }
 
+bool PrintNode(Node *node, unsigned int target_st, unsigned int target_pa,
+	       unsigned int target_nt, const string &action_sequence,
+	       bool ***seen) {
+  if (node->Terminal()) return false;
+  unsigned int st = node->Street();
+  if (st > target_st) return false;
+  unsigned int pa = node->PlayerActing();
+  unsigned int nt = node->NonterminalID();
+  if (seen[st][pa][nt]) return false;
+  seen[st][pa][nt] = true;
+  if (st == target_st && pa == target_pa && nt == target_nt) {
+    printf("%s\n", action_sequence.c_str());
+    return true;
+  }
+  unsigned int num_succs = node->NumSuccs();
+  for (unsigned int s = 0; s < num_succs; ++s) {
+    string action = node->ActionName(s);
+    if (PrintNode(node->IthSucc(s), target_st, target_pa, target_nt,
+		  action_sequence + action, seen)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool BettingTree::PrintNode(unsigned int target_st, unsigned int target_pa,
+			    unsigned int target_nt) {
+  unsigned int num_players = Game::NumPlayers();
+  bool ***seen = new bool **[target_st + 1];
+  for (unsigned int st = 0; st <= target_st; ++st) {
+    seen[st] = new bool *[num_players];
+    for (unsigned int p = 0; p < num_players; ++p) {
+      unsigned int num_nt = NumNonterminals(p, st);
+      seen[st][p] = new bool[num_nt];
+      for (unsigned int i = 0; i < num_nt; ++i) {
+	seen[st][p][i] = false;
+      }
+    }
+  }
+  bool ret = ::PrintNode(Root(), target_st, target_pa, target_nt, "", seen);
+  for (unsigned int st = 0; st <= target_st; ++st) {
+    for (unsigned int p = 0; p < num_players; ++p) {
+      delete [] seen[st][p];
+    }
+    delete [] seen[st];
+  }
+  delete [] seen;
+  return ret;
+}
+
 void BettingTree::Display(void) {
   root_->PrintTree(0, "", initial_street_);
 }
 
+#if 0
 void BettingTree::FillTerminalArray(Node *node) {
   if (node->Terminal()) {
     unsigned int terminal_id = node->TerminalID();
@@ -199,6 +241,7 @@ void BettingTree::FillTerminalArray(void) {
   terminals_ = new Node *[num_terminals_];
   if (root_.get()) FillTerminalArray(root_.get());
 }
+#endif
 
 #if 0
 bool BettingTree::GetPathToNamedNode(const char *str, Node *node,
@@ -432,7 +475,7 @@ void BettingTree::Initialize(unsigned int target_player,
   initial_street_ = ba.InitialStreet();
   // pool_ = new Pool();
   root_ = NULL;
-  terminals_ = NULL;
+  // terminals_ = NULL;
   num_terminals_ = 0;
   unsigned int max_street = Game::MaxStreet();
   unsigned int num_players = Game::NumPlayers();
@@ -453,7 +496,7 @@ void BettingTree::Initialize(unsigned int target_player,
     delete [] maps[st];
   }
   delete [] maps;
-  FillTerminalArray();
+  // FillTerminalArray();
   // AssignNonterminalIDs(this, &num_nonterminals_);
   num_nonterminals_ = CountNumNonterminals(this);
 }
@@ -481,38 +524,18 @@ BettingTree *BettingTree::BuildSubtree(Node *subtree_root) {
   tree->initial_street_ = subtree_street;
   tree->num_terminals_ = 0;
   tree->root_ = tree->Clone(subtree_root, &tree->num_terminals_);
-  tree->FillTerminalArray();
+  // tree->FillTerminalArray();
   AssignNonterminalIDs(tree, &tree->num_nonterminals_);
   return tree;
 }
 
 BettingTree::~BettingTree(void) {
-  delete [] terminals_;
+  // delete [] terminals_;
   unsigned int num_players = Game::NumPlayers();
   for (unsigned int p = 0; p < num_players; ++p) {
     delete [] num_nonterminals_[p];
   }
   delete [] num_nonterminals_;
-}
-
-void BettingTree::GetStreetInitialNodes(Node *node, unsigned int street,
-					vector<Node *> *nodes) {
-  if (node->Street() == street) {
-    nodes->push_back(node);
-    return;
-  }
-  unsigned int num_succs = node->NumSuccs();
-  for (unsigned int s = 0; s < num_succs; ++s) {
-    GetStreetInitialNodes(node->IthSucc(s), street, nodes);
-  }
-}
-
-void BettingTree::GetStreetInitialNodes(unsigned int street,
-					vector<Node *> *nodes) {
-  nodes->clear();
-  if (root_) {
-    GetStreetInitialNodes(root_.get(), street, nodes);
-  }
 }
 
 // Two succs correspond if they are both call succs
@@ -536,4 +559,25 @@ bool TwoSuccsCorrespond(Node *node1, unsigned int s1, Node *node2,
   Node *b2 = node2->IthSucc(s2);
   Node *bc2 = b2->IthSucc(b2->CallSuccIndex());
   return (bc1->LastBetTo() == bc2->LastBetTo());
+}
+
+Node *FindNode(Node *node, unsigned int st, unsigned int pa,
+	       unsigned int nt) {
+  if (node->Terminal()) return nullptr;
+  unsigned int st1 = node->Street();
+  if (st1 > st) return nullptr;
+  if (st1 == st && node->PlayerActing() == pa && node->NonterminalID() == nt) {
+    return node;
+  }
+  unsigned int num_succs = node->NumSuccs();
+  for (unsigned int s = 0; s < num_succs; ++s) {
+    Node *ret = FindNode(node->IthSucc(s), st, pa, nt);
+    if (ret) return ret;
+  }
+  return nullptr;
+}
+
+Node *BettingTree::FindNode(unsigned int st, unsigned int pa,
+			    unsigned int nt) {
+  return ::FindNode(root_.get(), st, pa, nt);
 }

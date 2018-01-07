@@ -42,15 +42,11 @@
 
 using namespace std;
 
-EGCFR::EGCFR(const CardAbstraction &ca, const CardAbstraction &base_ca,
-	     const BettingAbstraction &ba, const BettingAbstraction &base_ba,
-	     const CFRConfig &cc, const CFRConfig &base_cc,
-	     const Buckets &buckets, unsigned int subtree_st,
-	     ResolvingMethod method, bool cfrs, bool zero_sum,
-	     unsigned int num_threads) :
-  VCFR(ca, ba, cc, buckets, nullptr, num_threads),
-  base_card_abstraction_(base_ca), base_betting_abstraction_(base_ba),
-  base_cfr_config_(base_cc) {
+EGCFR::EGCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
+	     const CFRConfig &cc, const Buckets &buckets,
+	     unsigned int subtree_st, ResolvingMethod method, bool cfrs,
+	     bool zero_sum, unsigned int num_threads) :
+  VCFR(ca, ba, cc, buckets, nullptr, num_threads) {
   subtree_st_ = subtree_st;
   method_ = method;
   cfrs_ = cfrs;
@@ -76,7 +72,6 @@ EGCFR::EGCFR(const CardAbstraction &ca, const CardAbstraction &base_ca,
   }
 
   hand_tree_ = nullptr;
-  sumprobs_ = nullptr;
   regrets_ = nullptr;
 }
 
@@ -367,16 +362,13 @@ void EGCFR::CombinedHalfIteration(BettingTree *subtree, unsigned int solve_bd,
   }
   
   double scale = 1.0;
-  // 0.2 best so far
-  double cfrd_cap = 0.2;
-#if 0
-  double gap_factor = avg_t_values_ / subtree->Root()->PotSize();
-  if (gap_factor > 0.02) {
-    cfrd_cap = 1.0;
-  }
-#endif
-  if (sum_to_add > sum_villain_reach_probs * cfrd_cap) {
-    scale = (sum_villain_reach_probs * cfrd_cap) / sum_to_add;
+  // Experiment
+  if (sum_villain_reach_probs > 0) {
+    // 0.2 best so far
+    double cfrd_cap = 0.2;
+    if (sum_to_add > sum_villain_reach_probs * cfrd_cap) {
+      scale = (sum_villain_reach_probs * cfrd_cap) / sum_to_add;
+    }
   }
 #if 0
   if (sum_villain_reach_probs < 10.0) {
@@ -559,11 +551,15 @@ void EGCFR::MaxMarginHalfIteration(BettingTree *subtree, unsigned int solve_bd,
 double *EGCFR::LoadCVs(Node *subtree_root, const string &action_sequence,
 		       unsigned int gbd, unsigned int base_it, unsigned int p,
 		       double **reach_probs, const CanonicalCards *hands,
-		       bool card_level) {
+		       bool card_level,
+		       const CardAbstraction &base_card_abstraction,
+		       const BettingAbstraction &base_betting_abstraction,
+		       const CFRConfig &base_cfr_config) {
+		       
   bool base_bucketed = false;
   unsigned int max_street = Game::MaxStreet();
   for (unsigned int st = 0; st <= max_street; ++st) {
-    const string &bk = base_card_abstraction_.Bucketing(st);
+    const string &bk = base_card_abstraction.Bucketing(st);
     if (bk != "none") {
       base_bucketed = true;
       break;
@@ -579,10 +575,10 @@ double *EGCFR::LoadCVs(Node *subtree_root, const string &action_sequence,
   // This assumes two players
   sprintf(dir, "%s/%s.%u.%s.%i.%i.%i.%s.%s/%s.%u.p%u/%s",
 	  Files::NewCFRBase(), Game::GameName().c_str(), Game::NumPlayers(),
-	  base_card_abstraction_.CardAbstractionName().c_str(),
+	  base_card_abstraction.CardAbstractionName().c_str(),
 	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
-	  base_betting_abstraction_.BettingAbstractionName().c_str(), 
-	  base_cfr_config_.CFRConfigName().c_str(),
+	  base_betting_abstraction.BettingAbstractionName().c_str(), 
+	  base_cfr_config.CFRConfigName().c_str(),
 	  card_level ? (cfrs_ ? "cfrs" : "cbrs") : (cfrs_ ? "bcfrs" : "bcbrs"),
 	  base_it, p, action_sequence.c_str());
   sprintf(buf, "%s/vals.%u", dir, gbd);
@@ -598,16 +594,24 @@ double *EGCFR::LoadCVs(Node *subtree_root, const string &action_sequence,
   return cvs;
 }
 
-double *EGCFR::LoadZeroSumCVs(Node *subtree_root,
-			      const string &action_sequence, unsigned int gbd,
-			      unsigned int target_p, unsigned int base_it,
-			      double **reach_probs,
-			      const CanonicalCards *hands, bool card_level) {
+double *
+EGCFR::LoadZeroSumCVs(Node *subtree_root,
+		      const string &action_sequence, unsigned int gbd,
+		      unsigned int target_p, unsigned int base_it,
+		      double **reach_probs,
+		      const CanonicalCards *hands, bool card_level,
+		      const CardAbstraction &base_card_abstraction,
+		      const BettingAbstraction &base_betting_abstraction,
+		      const CFRConfig &base_cfr_config) {
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(subtree_st_);
   double *p0_cvs = LoadCVs(subtree_root, action_sequence, gbd, base_it, 0,
-			   reach_probs, hands, card_level);
+			   reach_probs, hands, card_level,
+			   base_card_abstraction, base_betting_abstraction,
+			   base_cfr_config);
   double *p1_cvs = LoadCVs(subtree_root, action_sequence, gbd, base_it, 1,
-			   reach_probs, hands, card_level);
+			   reach_probs, hands, card_level,
+			   base_card_abstraction, base_betting_abstraction,
+			   base_cfr_config);
 
   ZeroSumCVs(p0_cvs, p1_cvs, num_hole_card_pairs, reach_probs, hands);
 
@@ -642,16 +646,24 @@ static Node *FindCorrespondingNode(Node *node1, Node *node2, Node *target1) {
 double *EGCFR::LoadOppCVs(Node *solve_root, const string &action_sequence,
 			  unsigned int bd, unsigned int target_p,
 			  unsigned int base_it, double **reach_probs,
-			  const CanonicalCards *hands, bool card_level) {
+			  const CanonicalCards *hands, bool card_level,
+			  const CardAbstraction &base_card_abstraction,
+			  const BettingAbstraction &base_betting_abstraction,
+			  const CFRConfig &base_cfr_config) {
+			  
   if (method_ == ResolvingMethod::CFRD ||
       method_ == ResolvingMethod::MAXMARGIN ||
       method_ == ResolvingMethod::COMBINED) {
     if (zero_sum_) {
       return LoadZeroSumCVs(solve_root, action_sequence, bd, target_p, base_it,
-			    reach_probs, hands, card_level);
+			    reach_probs, hands, card_level,
+			    base_card_abstraction, base_betting_abstraction,
+			    base_cfr_config);
     } else {
       return LoadCVs(solve_root, action_sequence, bd, base_it,
-		     target_p^1, reach_probs, hands, card_level);
+		     target_p^1, reach_probs, hands, card_level,
+		     base_card_abstraction, base_betting_abstraction,
+		     base_cfr_config);
     }
   } else {
     return nullptr;
@@ -667,7 +679,7 @@ void EGCFR::SolveSubgame(BettingTree *subtree, unsigned int solve_bd,
 			 double **reach_probs, const string &action_sequence,
 			 const HandTree *hand_tree, double *opp_cvs,
 			 unsigned int target_p, bool both_players,
-			 unsigned int num_its) {
+			 unsigned int num_its, CFRValues *sumprobs) {
   target_p_ = target_p;
   hand_tree_ = hand_tree;
   // DeleteOldFiles(gbd);
@@ -679,7 +691,7 @@ void EGCFR::SolveSubgame(BettingTree *subtree, unsigned int solve_bd,
   }
   regrets_.reset(new CFRValues(nullptr, false, subtree_streets,
 			       subtree, solve_bd, subtree_st_,
-			       card_abstraction_, buckets_,
+			       card_abstraction_, buckets_.NumBuckets(),
 			       compressed_streets_));
   
   regrets_->AllocateAndClearDoubles(subtree->Root(), kMaxUInt);
@@ -689,10 +701,11 @@ void EGCFR::SolveSubgame(BettingTree *subtree, unsigned int solve_bd,
   // Unsafe endgame solving always produces sumprobs for both players.
   if (method_ == ResolvingMethod::UNSAFE) both_players = true;
 
+#if 0
   if (both_players) {
     sumprobs_.reset(new CFRValues(nullptr, true, subtree_streets,
 				  subtree, solve_bd, subtree_st_,
-				  card_abstraction_, buckets_,
+				  card_abstraction_, buckets_.NumBuckets(),
 				  compressed_streets_));
   } else {
     unsigned int num_players = Game::NumPlayers();
@@ -702,9 +715,10 @@ void EGCFR::SolveSubgame(BettingTree *subtree, unsigned int solve_bd,
     }
     sumprobs_.reset(new CFRValues(players.get(), true, subtree_streets, subtree,
 				  solve_bd, subtree_st_, card_abstraction_,
-				  buckets_, compressed_streets_));
+				  buckets_.NumBuckets(), compressed_streets_));
   }
   sumprobs_->AllocateAndClearDoubles(subtree->Root(), kMaxUInt);
+#endif
   delete [] subtree_streets;
 
   unsigned int num_players = Game::NumPlayers();
@@ -722,7 +736,8 @@ void EGCFR::SolveSubgame(BettingTree *subtree, unsigned int solve_bd,
   for (unsigned int p = 0; p < num_players; ++p) {
     initial_states[p] = new VCFRState(reach_probs[p^1], hand_tree_, 0,
 				      action_sequence, solve_bd, subtree_st_,
-				      street_buckets, p);
+				      street_buckets, p, regrets_.get(),
+				      sumprobs);
   }
   SetStreetBuckets(subtree_st_, solve_bd, *initial_states[0]);
 
@@ -851,8 +866,11 @@ void EGCFR::SolveSubgame(BettingTree *subtree, unsigned int solve_bd,
 }
 
 void EGCFR::Write(BettingTree *subtree, Node *solve_root, Node *target_root,
-		  const string &action_sequence, unsigned int num_its,
-		  unsigned int target_bd) {
+		  const string &action_sequence,
+		  const CardAbstraction &base_card_abstraction,
+		  const BettingAbstraction &base_betting_abstraction,
+		  const CFRConfig &base_cfr_config, unsigned int num_its,
+		  unsigned int target_bd, CFRValues *sumprobs) {
   // I need the node that corresponds to target node within subtree
   Node *subtree_target = FindCorrespondingNode(solve_root, subtree->Root(),
 					       target_root);
@@ -860,21 +878,25 @@ void EGCFR::Write(BettingTree *subtree, Node *solve_root, Node *target_root,
     fprintf(stderr, "Could not find target node within subtree\n");
     exit(-1);
   }
-  Write(subtree_target, action_sequence, num_its, target_root->Street(),
-	target_bd);
+  Write(subtree_target, action_sequence, base_card_abstraction,
+	base_betting_abstraction, base_cfr_config, num_its,
+	target_root->Street(), target_bd, sumprobs);
 }
 
 void EGCFR::Write(Node *target_root, const string &action_sequence,
-		  unsigned int it, unsigned int target_st,
-		  unsigned int target_bd) {
+		  const CardAbstraction &base_card_abstraction,
+		  const BettingAbstraction &base_betting_abstraction,
+		  const CFRConfig &base_cfr_config, unsigned int num_its,
+		  unsigned int target_st, unsigned int target_bd,
+		  CFRValues *sumprobs) {
   char dir[500], dir2[500];
   sprintf(dir2, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::NewCFRBase(),
 	  Game::GameName().c_str(), Game::NumPlayers(),
-	  base_card_abstraction_.CardAbstractionName().c_str(),
+	  base_card_abstraction.CardAbstractionName().c_str(),
 	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
-	  base_betting_abstraction_.BettingAbstractionName().c_str(),
-	  base_cfr_config_.CFRConfigName().c_str());
-  if (base_betting_abstraction_.Asymmetric()) {
+	  base_betting_abstraction.BettingAbstractionName().c_str(),
+	  base_cfr_config.CFRConfigName().c_str());
+  if (base_betting_abstraction.Asymmetric()) {
     if (target_p_) strcat(dir2, ".p1");
     else           strcat(dir2, ".p2");
   }
@@ -888,26 +910,30 @@ void EGCFR::Write(Node *target_root, const string &action_sequence,
     fprintf(stderr, "Stopped supporting target_st > subtree_st_\n");
     exit(-1);
   } else {
-    sumprobs_->Write(dir, it, target_root, action_sequence, kMaxUInt);
+    sumprobs->Write(dir, num_its, target_root, action_sequence, kMaxUInt);
   }
 }
 
 void EGCFR::Read(BettingTree *subtree, const string &action_sequence,
-		 unsigned int subtree_bd, unsigned int target_st,
-		 bool both_players, unsigned int it) {
+		 const CardAbstraction &base_card_abstraction,
+		 const BettingAbstraction &base_betting_abstraction,
+		 const CFRConfig &base_cfr_config, unsigned int subtree_bd,
+		 unsigned int target_st, bool both_players, unsigned int it,
+		 CFRValues *sumprobs) {
   unsigned int max_street = Game::MaxStreet();
   bool *subtree_streets = new bool[max_street + 1];
   for (unsigned int st = 0; st <= max_street; ++st) {
     subtree_streets[st] = st >= subtree_st_;
   }
 
+#if 0
   // Should honor sumprobs_streets_
   // Unsafe endgame solving always produces sumprobs for both players.
   if (method_ == ResolvingMethod::UNSAFE) both_players = true;
   if (both_players) {
     sumprobs_.reset(new CFRValues(nullptr, true, subtree_streets, subtree,
 				  subtree_bd, subtree_st_,
-				  card_abstraction_, buckets_,
+				  card_abstraction_, buckets_.NumBuckets(),
 				  compressed_streets_));
   } else {
     unsigned int num_players = Game::NumPlayers();
@@ -917,18 +943,19 @@ void EGCFR::Read(BettingTree *subtree, const string &action_sequence,
     }
     sumprobs_.reset(new CFRValues(players.get(), true, subtree_streets,
 				  subtree, subtree_bd, subtree_st_,
-				  card_abstraction_, buckets_,
+				  card_abstraction_, buckets_.NumBuckets(),
 				  compressed_streets_));
   }
   delete [] subtree_streets;
+#endif
 
   char dir[500], dir2[500];;
   sprintf(dir2, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::NewCFRBase(),
 	  Game::GameName().c_str(), Game::NumPlayers(),
-	  base_card_abstraction_.CardAbstractionName().c_str(),
+	  base_card_abstraction.CardAbstractionName().c_str(),
 	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
-	  base_betting_abstraction_.BettingAbstractionName().c_str(),
-	  base_cfr_config_.CFRConfigName().c_str());
+	  base_betting_abstraction.BettingAbstractionName().c_str(),
+	  base_cfr_config.CFRConfigName().c_str());
   if (betting_abstraction_.Asymmetric()) {
     if (target_p_) strcat(dir2, ".p1");
     else           strcat(dir2, ".p2");
@@ -938,7 +965,7 @@ void EGCFR::Read(BettingTree *subtree, const string &action_sequence,
 	  betting_abstraction_.BettingAbstractionName().c_str(),
 	  cfr_config_.CFRConfigName().c_str(), ResolvingMethodName(method_),
 	  subtree_st_, target_st);
-  sumprobs_->Read(dir, it, subtree->Root(), action_sequence, kMaxUInt);
+  sumprobs->Read(dir, it, subtree->Root(), action_sequence, kMaxUInt);
 }
 
 #if 0
@@ -979,7 +1006,7 @@ void EGCFR::DeleteOldFiles(unsigned int gbd) {
 
 double *EGCFR::BRGo(BettingTree *subtree, unsigned int solve_bd,
 		    unsigned int p, double **reach_probs, HandTree *hand_tree,
-		    const string &action_sequence) {
+		    const string &action_sequence, CFRValues *sumprobs) {
   hand_tree_ = hand_tree;
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(subtree_st_);
   double *opp_probs = reach_probs[p^1];
@@ -992,7 +1019,7 @@ double *EGCFR::BRGo(BettingTree *subtree, unsigned int solve_bd,
   value_calculation_ = true;
   unsigned int **street_buckets = AllocateStreetBuckets();
   VCFRState state(opp_probs, hand_tree_, 0, action_sequence, solve_bd,
-		  subtree_st_, street_buckets, p);
+		  subtree_st_, street_buckets, p, regrets_.get(), sumprobs);
   SetStreetBuckets(subtree_root->Street(), solve_bd, state);
   // If no opponent reach the subtree with non-zero probability, then all
   // vals are zero.

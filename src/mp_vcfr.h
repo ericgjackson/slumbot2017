@@ -63,7 +63,7 @@ class MPVCFR {
   unsigned int hard_warmup_;
   double explore_;
   bool *compressed_streets_;
-  bool *sumprob_streets_;
+  bool **sumprob_streets_;
   int *regret_floors_;
   double *sumprob_scaling_;
   unsigned int it_;

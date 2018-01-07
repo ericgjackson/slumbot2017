@@ -10,6 +10,7 @@ using namespace std;
 class BettingTree;
 class Buckets;
 class CFRConfig;
+class CFRValues;
 class HandTree;
 class Node;
 
@@ -32,6 +33,7 @@ private:
   bool cfrs_;
   unsigned int p_;
   HandTree *trunk_hand_tree_;
+  unique_ptr<CFRValues> sumprobs_;
 };
 
 #endif

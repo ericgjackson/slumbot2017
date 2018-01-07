@@ -54,6 +54,8 @@ private:
   unsigned int sample_st_;
   unsigned int num_to_sample_;
   pthread_mutex_t ***mutexes_;
+  unique_ptr<CFRValues> regrets_;
+  unique_ptr<CFRValues> sumprobs_;
 };
 
 #endif

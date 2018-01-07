@@ -32,16 +32,13 @@ class VCFR {
   virtual double *Process(Node *node, unsigned int lbd, const VCFRState &state,
 			  unsigned int last_st);
   virtual void SetStreetBuckets(unsigned int st, unsigned int gbd,
-				const VCFRState &state);
+				const VCFRState &state) const;
   void SetIt(unsigned int it) {it_ = it;}
   void SetLastCheckpointIt(unsigned int it) {last_checkpoint_it_ = it;}
   void SetTargetP(unsigned int p) {target_p_ = p;}
   void SetBestResponseStreets(bool *sts);
   void SetBRCurrent(bool b) {br_current_ = b;}
   void SetValueCalculation(bool b) {value_calculation_ = b;}
-  void MoveSumprobs(unique_ptr<CFRValues> &src) {sumprobs_ = std::move(src);}
-  void MoveRegrets(unique_ptr<CFRValues> &src) {regrets_ = std::move(src);}
-  CFRValues *Sumprobs(void) const {return sumprobs_.get();}
   virtual void Post(unsigned int t);
   const Buckets &GetBuckets(void) const {return buckets_;}
  protected:
@@ -62,22 +59,22 @@ class VCFR {
   virtual double *OppChoice(Node *node, unsigned int lbd, 
 			    const VCFRState &state);
   virtual void Split(Node *node, double *opp_probs, const HandTree *hand_tree,
-		     unsigned int p, const string &action_sequence,
-		     unsigned int *prev_canons, double *vals);
+		     unsigned int p, CFRValues *regrets, CFRValues *sumprobs,
+		     const string &action_sequence, unsigned int *prev_canons,
+		     double *vals);
   virtual double *StreetInitial(Node *node, unsigned int lbd,
 				const VCFRState &state);
   virtual void WaitForFinalSubgames(void);
   virtual void SpawnSubgame(Node *node, unsigned int bd, unsigned int p,
 			    const string &action_sequence, double *opp_probs);
-  virtual void SetCurrentStrategy(Node *node);
+  virtual void SetCurrentStrategy(Node *node, CFRValues *regrets,
+				  CFRValues *sumprobs);
 
   const CardAbstraction &card_abstraction_;
   const BettingAbstraction &betting_abstraction_;
   const CFRConfig &cfr_config_;
   const Buckets &buckets_;
   const BettingTree *betting_tree_;
-  unique_ptr<CFRValues> regrets_;
-  unique_ptr<CFRValues> sumprobs_;
   unique_ptr<CFRValues> current_strategy_;
   bool subgame_;
   // best_response_ is true in run_rgbr, build_cbrs, build_prbrs
@@ -102,7 +99,7 @@ class VCFR {
   bool double_regrets_;
   bool double_sumprobs_;
   bool *compressed_streets_;
-  bool *sumprob_streets_;
+  bool **sumprob_streets_;
   int *regret_floors_;
   int *regret_ceilings_;
   double *regret_scaling_;

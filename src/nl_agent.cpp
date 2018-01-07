@@ -5,6 +5,8 @@
 //
 // The NLAgent class doesn't know about networking or the ACPC protocol.  That
 // logic is elsewhere.
+//
+// Don't need buckets on the river, I don't think.
 
 #include <math.h>
 #include <stdio.h>
@@ -17,110 +19,191 @@
 #include <vector>
 
 #include "acpc_protocol.h"
+#include "betting_abstraction.h"
 #include "betting_tree.h"
+#include "betting_tree_builder.h"
 #include "board_tree.h"
 #include "buckets.h"
 #include "canonical.h"
+#include "canonical_cards.h"
 #include "card_abstraction.h"
 #include "cfr_config.h"
-#include "cfr_values.h"
+#include "cfr_values_file.h"
 #include "constants.h"
-#include "fast_hash.h"
+#include "dynamic_cbr2.h"
+#include "eg_cfr.h"
+#include "endgame_utils.h"
 #include "files.h"
 #include "game.h"
 #include "hand_tree.h"
+#include "hand_value_tree.h"
 #include "io.h"
-#include "nearest_neighbors.h"
 #include "nl_agent.h"
 #include "rand.h"
+#include "resolving_method.h"
 #include "runtime_config.h"
 
 using namespace std;
 
-// The last node in path should be the node after the selected bet succ.
-void NLAgent::Recurse(const vector<Node *> *path, unsigned int path_index,
-		      Node *parent, Node *alt_node, unsigned int pa,
-		      bool smaller, bool changed,
-		      vector<Node *> *alternative_bet_nodes) {
-  if (path_index == path->size() - 1) {
-    if (changed) {
-      // Make sure we didn't already add alt_node to the vector.
-      // I think we always will have when prior_alternatives_ is true, and
-      // never will have otherwise.  But just to be safe, we check.
-      unsigned int num = alternative_bet_nodes->size();
-      if (num == 0 || (*alternative_bet_nodes)[num-1] != alt_node) {
-	alternative_bet_nodes->push_back(alt_node);
-      }
-    }
-    return;
-  } else {
-    Node *cur = (*path)[path_index];
-    Node *next = (*path)[path_index + 1];
-    unsigned int num_succs = cur->NumSuccs();
-    unsigned int s;
-    for (s = 0; s < num_succs; ++s) {
-      Node *n = cur->IthSucc(s);
-      if (n == next) break;
-    }
-    if (s == num_succs) {
-      fprintf(stderr, "Couldn't follow path\n");
-      if (exit_on_error_) exit(-1);
-      return;
-    }
-    if (s == cur->CallSuccIndex()) {
-      Node *call = alt_node->IthSucc(alt_node->CallSuccIndex());
-      Recurse(path, path_index + 1, alt_node, call, pa, smaller, changed,
-	      alternative_bet_nodes);
-    } else if (s == cur->FoldSuccIndex()) {
-      fprintf(stderr, "Shouldn't see fold succ on path\n");
-      if (exit_on_error_) exit(-1);
-      return;
-    } else {
-      Node *bet = cur->IthSucc(s);
-      unsigned int bet_size = bet->LastBetTo() - cur->LastBetTo();
-      double bet_frac = bet_size / (double)(2 * cur->LastBetTo());
-      unsigned int alt_num_succs = alt_node->NumSuccs();
-      for (unsigned int s1 = 0; s1 < alt_num_succs; ++s1) {
-	if (s1 == alt_node->CallSuccIndex() ||
-	    s1 == alt_node->FoldSuccIndex()) {
-	  continue;
-	}
-	Node *alt_bet = alt_node->IthSucc(s1);
-	unsigned int alt_bet_size =
-	  alt_bet->LastBetTo() - alt_node->LastBetTo();
-	double alt_bet_frac =
-	  alt_bet_size / (double)(2 * alt_node->LastBetTo());
-	if (smaller) {
-	  // Alternative bet size must be same size as actual bet size or
-	  // smaller.  Subtract 0.000001 for numerical stability reasons.
-	  if (alt_bet_frac - 0.000001 > bet_frac) continue;
-	} else {
-	  // Alternative bet size must be same size as actual bet size or
-	  // larger.  Add 0.000001 for numerical stability reasons.
-	  if (alt_bet_frac + 0.000001 < bet_frac) continue;
-	}
-	bool now_changed = fabs(alt_bet_frac - bet_frac) > 0.000001;
-	bool new_changed = (changed || now_changed);
-	if (new_changed && prior_alternatives_ &&
-	    pa != alt_node->PlayerActing()) {
-	  alternative_bet_nodes->push_back(alt_bet);
-	}
-	Recurse(path, path_index + 1, alt_node, alt_bet, pa, smaller,
-		new_changed, alternative_bet_nodes);
-      }
-    }
-  }
+// Assume no bet pending
+BettingTree *NLAgent::CreateSubtree(Node *node, unsigned int target_p,
+				    bool base) {
+  unsigned int player_acting = node->PlayerActing();
+  unsigned int bet_to = node->LastBetTo();
+  unsigned int st = node->Street();
+  unsigned int last_bet_size = 0;
+  unsigned int num_street_bets = 0;
+  unsigned int num_terminals = 0;
+  // Only need initial street, stack size and min bet from
+  // base_betting_abstraction_.
+  const BettingAbstraction &betting_abstraction = base ?
+    base_betting_abstraction_ : endgame_betting_abstraction_;
+  BettingTreeBuilder betting_tree_builder(betting_abstraction, target_p);
+  shared_ptr<Node> subtree_root =
+    betting_tree_builder.CreateNoLimitSubtree(st, last_bet_size, bet_to,
+					      num_street_bets, player_acting,
+					      target_p, &num_terminals);
+  return BettingTree::BuildSubtree(subtree_root.get());
 }
 
-void NLAgent::GetAlternativeBetNodes(const vector<Node *> *path,
-				     bool p1, bool smaller,
-				     vector<Node *> *alternative_bet_nodes) {
-  alternative_bet_nodes->clear();
-  BettingTree *tree;
-  if (p1) tree = p1_tree_;
-  else    tree = p0_tree_;
-  Recurse(path, 0, NULL, tree->Root(), p1, smaller, false,
-	  alternative_bet_nodes);
+// Need to set reach_probs
+void NLAgent::ResolveSubgame(unsigned int p, unsigned int bd,
+			     double **reach_probs) {
+  unsigned int num_players = Game::NumPlayers();
+  if (debug_) {
+    unsigned int max_card1 = Game::MaxCard() + 1;
+    // Temporary
+    for (unsigned int p = 0; p < num_players; ++p) {
+      double sum = 0;
+      const Card *board = BoardTree::Board(endgame_st_, bd);
+      unsigned int num_board_cards = Game::NumBoardCards(endgame_st_);
+      for (Card hi = 1; hi < max_card1; ++hi) {
+	if (InCards(hi, board, num_board_cards)) continue; 
+	for (Card lo = 0; lo < hi; ++lo) {
+	  if (InCards(lo, board, num_board_cards)) continue;
+	  unsigned int enc = hi * max_card1 + lo;
+	  sum += reach_probs[p][enc];
+	}
+      }
+      fprintf(stderr, "P%u sum-reach-probs %f\n", p, sum);
+    }
+  }
+
+  unsigned int max_street = Game::MaxStreet();
+  unsigned int num_path = path_->size();
+  HandTree hand_tree(endgame_st_, bd, Game::MaxStreet());
+  if (num_path == 0) {
+    fprintf(stderr, "ResolveSubgame: empty path?!?\n");
+    exit(-1);
+  }
+  Node *si_node = (*path_)[num_path - 1];
+  if (si_node->Street() != endgame_st_) {
+    fprintf(stderr,
+	    "ResolveSubgame: last node on path not on endgame street?!?\n");
+    exit(-1);
+  }
+
+  BettingTree *base_subtree = CreateSubtree(si_node, p, true);
+  if (debug_) {
+    fprintf(stderr, "Created subtree\n");
+  }
+  unique_ptr<double []> t_vals;
+  bool t_cfrs = false, t_zero_sum = true, current = true;
+  // This is a little confusing, but we actually want to set pure to false.
+  // Setting pure to true, in combination with current, will cause the FTL
+  // method to be applied to the regrets.  But, actually, in ReadPureSubtree(),
+  // we have created regret values that are 1 for the best-succ and 0 for
+  // the other succs.  So we want to use the prob method PURE or
+  // REGRET_MATCHING.
+  bool pure = false;
+  unique_ptr<bool []> base_streets(new bool[max_street + 1]);
+  for (unsigned int st1 = 0; st1 <= max_street; ++st1) {
+    base_streets[st1] = (st1 >= endgame_st_);
+  }
+  // We need both players because we are computing zero-sum T values
+  CFRValues base_regrets(nullptr, false, base_streets.get(),
+			 base_subtree, bd, endgame_st_, base_card_abstraction_,
+			 buckets_->NumBuckets(), nullptr);
+  if (debug_) {
+    fprintf(stderr, "Created base regrets\n");
+  }
+  char dir[500], buf[500];
+  sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
+	  base_card_abstraction_.CardAbstractionName().c_str(),
+	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
+	  base_betting_abstraction_.BettingAbstractionName().c_str(),
+	  base_cfr_config_.CFRConfigName().c_str());
+  if (base_betting_abstraction_.Asymmetric()) {
+    sprintf(buf, ".p%u", p);
+    strcat(dir, buf);
+  }
+  if (debug_) fprintf(stderr, "Calling ReadPureSubtree\n");
+  probs_[p]->ReadPureSubtree(si_node, base_subtree, &base_regrets);
+  if (debug_) fprintf(stderr, "Back from ReadPureSubtree\n");
+
+  t_vals.reset(dynamic_cbr_->Compute(base_subtree->Root(), reach_probs, bd,
+				     &hand_tree, endgame_st_, bd, p^1, t_cfrs,
+				     t_zero_sum, current, pure, &base_regrets,
+				     nullptr));
+  delete base_subtree;
+  delete endgame_subtree_;
+  endgame_subtree_ = CreateSubtree(si_node, p, false);
+  // Switch the street initial node for the endgame street to the root of
+  // the endgame subtree.
+  (*path_)[num_path-1] = endgame_subtree_->Root();
+  delete endgame_sumprobs_;
+
+  unique_ptr<bool []> subtree_streets(new bool[max_street + 1]);
+  for (unsigned int st = 0; st <= max_street; ++st) {
+    subtree_streets[st] = st >= endgame_st_;
+  }
+  unique_ptr<bool []> players(new bool[num_players]);
+  for (unsigned int p1 = 0; p1 < num_players; ++p1) {
+    players[p1] = p1 == p;
+  }
+  endgame_sumprobs_ = new CFRValues(players.get(), true, subtree_streets.get(),
+				    endgame_subtree_, bd, endgame_st_,
+				    endgame_card_abstraction_,
+				    endgame_buckets_->NumBuckets(),
+				    nullptr);
+
+  endgame_sumprobs_->AllocateAndClearDoubles(endgame_subtree_->Root(),
+					     kMaxUInt);
+  ResolvingMethod method = ResolvingMethod::COMBINED;
+  bool cfrs = false, zero_sum = true;
+  EGCFR eg_cfr(endgame_card_abstraction_, endgame_betting_abstraction_,
+	       endgame_cfr_config_, *endgame_buckets_, endgame_st_, method,
+	       cfrs, zero_sum, 1);
+  eg_cfr.SolveSubgame(endgame_subtree_, bd, reach_probs, "x", &hand_tree,
+		      t_vals.get(), p, false, num_endgame_its_,
+		      endgame_sumprobs_);
+}
+
+// Currently assume that this is a street-initial node.
+// Might need to do up to four solves.  Imagine we have an asymmetric base
+// betting tree, and an asymmetric solving method.
+void NLAgent::ResolveAndWrite(Node *node, unsigned int gbd,
+			      const string &action_sequence,
+			      double **reach_probs) {
+  unsigned int st = node->Street();
+  fprintf(stderr, "Resolve %s st %u nt %u gbd %u\n",
+	  action_sequence.c_str(), st, node->NonterminalID(), gbd);
+
+  unsigned int num_players = Game::NumPlayers();
+  for (unsigned int p = 0; p < num_players; ++p) {
+    path_->resize(1);
+    (*path_)[0] = node;
+    ResolveSubgame(p, gbd, reach_probs);
+
+    // Assume symmetric system for now
+    ResolvingMethod method = ResolvingMethod::COMBINED;
+    WriteEndgame(endgame_subtree_->Root(), action_sequence, action_sequence,
+		 gbd, base_card_abstraction_, endgame_card_abstraction_,
+		 base_betting_abstraction_, endgame_betting_abstraction_,
+		 base_cfr_config_, endgame_cfr_config_, method,
+		 endgame_sumprobs_, st, gbd, p, p, st);
+  }
 }
 
 // In order to do translation, find the two succs that most closely match
@@ -178,29 +261,7 @@ double NLAgent::BelowProb(unsigned int actual_bet_to,
 			  unsigned int above_bet_to,
 			  unsigned int actual_pot_size) {
   double below_prob;
-  if (translation_method_ == 0) {
-    // Buggy.  Uses bet-to amounts, but should use bet-size amounts (expressed
-    // as fractions of the pot).
-    below_prob =
-      (((double)(above_bet_to - actual_bet_to)) *
-       ((double)(1 + below_bet_to))) /
-      (((double)(above_bet_to - below_bet_to)) *
-       ((double)(1 + actual_bet_to)));
-  } else if (translation_method_ == 1) {
-    double span = above_bet_to - below_bet_to;
-    below_prob = 1.0 - (actual_bet_to - below_bet_to) / span;
-    if (below_prob < 0 || below_prob > 1.0) {
-      fprintf(stderr, "OOB below prob %i %i %i\n", actual_bet_to,
-	      below_bet_to, above_bet_to);
-      if (exit_on_error_) {
-	exit(-1);
-      } else if (below_prob < 0) {
-	below_prob = 0;
-      } else {
-	below_prob = 1.0;
-      }
-    }
-  } else if (translation_method_ == 2 || translation_method_ == 3) {
+  if (translation_method_ == 0 || translation_method_ == 1) {
     // Express bet sizes as fraction of pot
     unsigned int last_bet_to = actual_pot_size / 2;
     int actual_bet = ((int)actual_bet_to) - ((int)last_bet_to);
@@ -223,7 +284,7 @@ double NLAgent::BelowProb(unsigned int actual_bet_to,
       ((above_frac - below_frac) *
        (1.0 + actual_frac));
     if (debug_) fprintf(stderr, "Raw below prob: %f\n", below_prob);
-    if (translation_method_ == 3) {
+    if (translation_method_ == 1) {
       // Translate to nearest
       if (below_prob < 0.5) below_prob = 0;
       else                  below_prob = 1.0;
@@ -236,26 +297,16 @@ double NLAgent::BelowProb(unsigned int actual_bet_to,
   return below_prob;
 }
 
+#if 0
 // If opp has made a bet that we are treating as an all-in (but which is
 // actually less than all-in) then instead of just calling, we should reraise
 // all-in.
-bool NLAgent::StatelessForceAllIn(Node *last_node,
-				  unsigned int actual_opp_bet_to) {
+bool NLAgent::ForceAllIn(Node *last_node, unsigned int actual_opp_bet_to) {
   // Only applies after an opponent bet
   if (actual_opp_bet_to == 0) return false;
 
-#if 0
-  // What was the point of this test?
-
-  // Check if there is a call with non-zero probability.
-  if (! (response_actions[1] == 1 && probs[1] > 0)) {
-    return false;
-  }
-#endif
-  Node *call_node = last_node->IthSucc(last_node->CallSuccIndex());
-
   // Did we map opponent's bet to an all-in?
-  if (call_node->LastBetTo() * small_blind_ != stack_size_) {
+  if (last_node->LastBetTo() * small_blind_ != stack_size_) {
     return false;
   }
     // Is his actual bet less than an all-in?
@@ -272,144 +323,63 @@ bool NLAgent::StatelessForceAllIn(Node *last_node,
     return false;
   }
 }
-
-static bool StreetInitial(Node *node) {
-  return (node->IthSucc(node->CallSuccIndex())->Street() == node->Street());
-}
-
-// Interpret a previous action by ourselves.  Find the next node and stick it
-// on the end of the path.
-// Sometimes we will translate an opponent's bet to all-in and then raise
-// all-in just to make life simpler.  How do I recognize these situations?
-// We have only two succs, call and fold.  The pot size of the call is all in.
-// Tricky case.  Our bet could have been adjusted because it was illegally
-// small (perhaps it was less than a big blind, or less than previous raise
-// size).  We need to account for that in interpreting the previous bet.
-// This raises a problem in that multiple previous bets could be rounded up
-// to the actual bet size that we made.  I will have no way to tell which
-// bet size I actually made!
-void NLAgent::Interpret(Action a, vector<Node *> *path,
-			Node *sob_node, unsigned int last_bet_to,
-			unsigned int opp_bet_amount,
-			bool *forced_all_in) {
-  *forced_all_in = false;
-  Node *node = (*path)[path->size() - 1];
-  int csi = node->CallSuccIndex();
-  int fsi = node->FoldSuccIndex();
-  if (a.action_type == CALL || a.action_type == FOLD) {
-    if (debug_) {
-      fprintf(stderr, "We %s\n", a.action_type == CALL ? "call" : "fold");
-    }
-    // If sob_node is not NULL, we previously mapped a small bet down to
-    // a check or call.  Now we are faced with our call.  There's two
-    // possibilities.  If the action was /b1 then we mapped the small bet
-    // down to a check, then we need to interpret our call in the usual
-    // way to get to /cc in the abstraction.  At /cb1 if we mapped the small
-    // bet down to a check behind, then we are *already* at /cc, and we
-    // shouldn't try to follow another succ.
-    if (! (sob_node && (node->Terminal() || StreetInitial(node)))) {
-      int s;
-      if (a.action_type == CALL) s = csi;
-      else                       s = fsi;
-      Node *node2 = node->IthSucc(s);
-      path->push_back(node2);
-    } else {
-      if (debug_) {
-	fprintf(stderr, "Interpret: Ignored call action\n");
-      }
-    }
-  } else {
-    if (sob_node) {
-      // If sob_node is not NULL, that means the opponent's previous action
-      // was a small bet that we translated between a call and a bet.
-      // We got the raise probabilities from the bet.  But we put the call
-      // succ on the path.  If we chose to raise, then I must replace the call
-      // succ with the bet succ.
-      if (debug_) {
-	fprintf(stderr, "SOB: I see raise; changing call to bet for prior "
-		"action; path size %i\n", (int)path->size());
-      }
-      (*path)[path->size() - 1] = sob_node;
-      node = sob_node;
-      csi = node->CallSuccIndex();
-      fsi = node->FoldSuccIndex();
-    }
-    int actual_bet_to = a.bet_to;
-    int num_succs = node->NumSuccs();
-    for (int s = 0; s < num_succs; ++s) {
-      if (s == fsi) continue;
-      if (s == csi) continue;
-      Node *bet = node->IthSucc(s);
-      int this_bet_to = bet->LastBetTo() * small_blind_;
-      int this_bet_amount = this_bet_to - last_bet_to;
-      if (debug_) {
-	fprintf(stderr, "s %i bet to %i bet amount %i\n", s, this_bet_to,
-		this_bet_amount);
-      }
-      if (this_bet_amount < (int)(2 * small_blind_)) {
-	this_bet_amount = 2 * small_blind_;
-	if (debug_) {
-	  fprintf(stderr, "Interpret: rounded up to %i\n", this_bet_amount);
-	}
-      }
-      if (this_bet_amount < (int)opp_bet_amount) {
-	this_bet_amount = opp_bet_amount;
-	if (debug_) {
-	  fprintf(stderr, "Interpret: rounded up to %u\n", this_bet_amount);
-	}
-      }
-      // Update this_bet_to with results of two possible changes above
-      this_bet_to = last_bet_to + this_bet_amount;
-      // ... but make sure we don't go more than all-in
-      if (this_bet_to > (int)stack_size_) this_bet_to = stack_size_;
-      if (this_bet_to == actual_bet_to) {
-	Node *node2 = node->IthSucc(s);
-	path->push_back(node2);
-	return;
-      }
-    }
-    // Special case here.  We might have translated the opponent's bet up to
-    // an all-in and reraised all-in rather than calling.
-    if (num_succs == 2 &&
-	node->LastBetTo() * small_blind_ == 2 * stack_size_) {
-      fprintf(stderr, "All-in situation: mapping our raise down to a call\n");
-      Node *node2 = node->IthSucc(csi);
-      path->push_back(node2);
-      *forced_all_in = true;
-      return;
-    }
-    fprintf(stderr, "Couldn't interpret our bet of %u; path size %i\n",
-	    actual_bet_to, (int)path->size());
-    if (exit_on_error_) exit(-1);
-  }
-}
+#endif
 
 // Perform translation (if necessary) on the opponent's new action.
 // Generate our response (if any).
 // Can be called multiple times if there are multiple new opponent actions to
 // process.  There can't be multiple new bets though.
-void NLAgent::Translate(Action a, vector<Node *> *path,
-			Node **sob_node, unsigned int actual_pot_size,
-			unsigned int hand_index) {
+void NLAgent::Translate(Action a, Node **sob_node,
+			unsigned int actual_pot_size) {
   *sob_node = NULL;
-  Node *node = (*path)[path->size() - 1];
+  Node *node = (*path_)[path_->size() - 1];
   if (debug_) {
     fprintf(stderr, "Translate action type %i\n", a.action_type);
-    fprintf(stderr, "Node %i\n", node->NonterminalID());
   }
 
-  if (a.action_type == CALL || a.action_type == FOLD) {
-    if (debug_) {
-      fprintf(stderr, "Call or fold\n");
+  if (a.action_type == CALL) {
+    if (debug_) fprintf(stderr, "Translating call\n");
+    unsigned int s = node->CallSuccIndex();
+    if (s == kMaxUInt) {
+      if (node->Terminal()) {
+	// This can happen if there was a previous bet that got rounded
+	// up to all-in.
+	return;
+      } else {
+	fprintf(stderr, "No call succ?!?\n");
+	exit(-1);
+      }
     }
-    int s;
-    if (a.action_type == CALL) s = node->CallSuccIndex();
-    else                       s = node->FoldSuccIndex();
     Node *node2 = node->IthSucc(s);
-    path->push_back(node2);
+    path_->push_back(node2);
     if (debug_) {
-      fprintf(stderr, "Node2 %i %i\n", node2->NonterminalID(),
-	      node2->TerminalID());
+      fprintf(stderr, "Adding node st %u pa %u nt %u\n",
+	      node2->Street(), node2->PlayerActing(), node2->NonterminalID());
+    }
+  } else if (a.action_type == FOLD) {
+    if (debug_) fprintf(stderr, "Translating fold\n");
+    unsigned int s = node->FoldSuccIndex();
+    if (s == kMaxUInt) {
+      // This can happen if the player previously made a large bet that we
+      // translated up to an all-in.  He's not really all-in and folds to a
+      // following raise.
+      s = node->CallSuccIndex();
+      if (s == kMaxUInt) {
+	if (node->Terminal()) {
+	  // This can happen if there was a previous bet that got rounded
+	  // up to all-in.
+	  return;
+	} else {
+	  fprintf(stderr, "No call succ?!?\n");
+	  exit(-1);
+	}
+      }
+    }
+    Node *node2 = node->IthSucc(s);
+    path_->push_back(node2);
+    if (debug_) {
+      fprintf(stderr, "Adding node st %u pa %u nt %u\n",
+	      node2->Street(), node2->PlayerActing(), node2->NonterminalID());
     }
   } else {
     // We are facing a bet by the opponent.  Need to perform translation.
@@ -458,6 +428,8 @@ void NLAgent::Translate(Action a, vector<Node *> *path,
 	  smallest_bet_succ = s;
 	  break;
 	}
+#if 0
+	// This can happen in six-player
 	if (smallest_bet_succ == kMaxUInt) {
 	  fprintf(stderr, "No smallest bet succ?!?\n");
 	  fprintf(stderr, "below_succ %u above_succ %u call_succ %u\n",
@@ -467,8 +439,13 @@ void NLAgent::Translate(Action a, vector<Node *> *path,
 	  if (exit_on_error_) exit(-1);
 	  else                return;
 	}
+#endif
       }
       Node *smallest_bet_node = NULL;
+      if (smallest_bet_succ != kMaxUInt) {
+	smallest_bet_node = node->IthSucc(smallest_bet_succ);
+      }
+#if 0
       // When can smallest_bet_succ be unset?
       if (smallest_bet_succ == kMaxUInt) {
 	fprintf(stderr, "smallest_bet_succ unset?!?\n");
@@ -481,7 +458,7 @@ void NLAgent::Translate(Action a, vector<Node *> *path,
 	if (exit_on_error_) exit(-1);
 	else                return;
       }
-      smallest_bet_node = node->IthSucc(smallest_bet_succ);
+#endif
       if (translate_bet_to_call_ && ! translate_to_larger_) {
 	unsigned int selected_succ;
 	// Sometimes we have only one valid succ.
@@ -493,15 +470,12 @@ void NLAgent::Translate(Action a, vector<Node *> *path,
 	  // Opponent's bet size is between two bets in our abstraction.
 	  double below_prob = BelowProb(actual_opp_bet_to, below_bet_to,
 					above_bet_to, actual_pot_size);
-	  // See comment below
-	  unsigned int seed = hand_index * 967 +
-	    (node->PlayerActing() == 1 ? 23 : 0) + path->size() * 7;
-	  SeedRand(seed);
-	  double r = RandZeroToOne();
+	  double r;
+	  // r = RandZeroToOne();
+	  drand48_r(&rand_bufs_[node->PlayerActing()], &r);
 	  if (debug_) {
-	    fprintf(stderr, "hand_index %u pa %u path sz %i seed %u r %f\n",
-		    hand_index, node->PlayerActing(), (int)path->size(),
-		    seed, r);
+	    fprintf(stderr, "pa %u path sz %i r %f\n",
+		    node->PlayerActing(), (int)path_->size(), r);
 	  }
 	  if (r < below_prob) {
 	    if (debug_) {
@@ -518,20 +492,46 @@ void NLAgent::Translate(Action a, vector<Node *> *path,
 	if (debug_) fprintf(stderr, "selected_succ %i\n", selected_succ);
 	if (selected_succ == call_succ) {
 	  Node *call_node = node->IthSucc(call_succ);
-	  path->push_back(call_node);
+	  path_->push_back(call_node);
+	  if (debug_) {
+	    fprintf(stderr, "Adding node st %u pa %u nt %u\n",
+		    call_node->Street(),
+		    call_node->PlayerActing(), call_node->NonterminalID());
+	  }
 	  // Don't use above_succ; it might be kMaxUInt
 	  *sob_node = smallest_bet_node;
 	  if (debug_) fprintf(stderr, "sob_node is succ %u\n",
 			      smallest_bet_succ);
 	} else {
 	  Node *bet_node = node->IthSucc(selected_succ);
-	  path->push_back(bet_node);
+	  if (debug_) {
+	    fprintf(stderr, "Adding node st %u pa %u nt %u\n",
+		    bet_node->Street(),
+		    bet_node->PlayerActing(), bet_node->NonterminalID());
+	  }
+	  path_->push_back(bet_node);
 	}
       } else {
-	if (debug_) fprintf(stderr, "Mapping to smallest bet succ %u\n",
-			    smallest_bet_succ);
-	// Map this bet to the smallest bet in our abstraction
-	path->push_back(smallest_bet_node);
+	if (smallest_bet_node) {
+	  if (debug_) fprintf(stderr, "Mapping to smallest bet succ %u\n",
+			      smallest_bet_succ);
+	  // Map this bet to the smallest bet in our abstraction
+	  if (debug_) {
+	    fprintf(stderr, "Adding node st %u pa %u nt %u\n",
+		    smallest_bet_node->Street(),
+		    smallest_bet_node->PlayerActing(),
+		    smallest_bet_node->NonterminalID());
+	  }
+	  path_->push_back(smallest_bet_node);
+	} else {
+	  Node *call_node = node->IthSucc(call_succ);
+	  if (debug_) {
+	    fprintf(stderr, "Adding node st %u pa %u nt %u\n",
+		    call_node->Street(),
+		    call_node->PlayerActing(), call_node->NonterminalID());
+	  }
+	  path_->push_back(call_node);
+	}
       }
     } else {
       unsigned int selected_succ;
@@ -557,15 +557,10 @@ void NLAgent::Translate(Action a, vector<Node *> *path,
 	  // Opponent's bet size is between two bets in our abstraction.
 	  double below_prob = BelowProb(actual_opp_bet_to, below_bet_to,
 					above_bet_to, actual_pot_size);
-	  if (debug_) fprintf(stderr, "below_prob %f\n", below_prob);
-	  // I need to make sure we translate a given action the same way
-	  // each time we get here.  But also don't want my translation to
-	  // be deterministic preflop.  So seed the RNG to something based on
-	  // the hand index and the action index.
-	  unsigned int seed = hand_index * 967 +
-	    (node->PlayerActing() == 1 ? 23 : 0) + path->size() * 7;
-	  SeedRand(seed);
-	  double r = RandZeroToOne();
+	  double r;
+	  // r = RandZeroToOne();
+	  drand48_r(&rand_bufs_[node->PlayerActing()], &r);
+	  if (debug_) fprintf(stderr, "below_prob %f r %f\n", below_prob, r);
 	  if (r < below_prob) {
 	    if (debug_) {
 	      fprintf(stderr, "Selected below bet; succ %i\n", below_succ);
@@ -580,197 +575,207 @@ void NLAgent::Translate(Action a, vector<Node *> *path,
 	}
       }
       Node *bet_node = node->IthSucc(selected_succ);
-      path->push_back(bet_node);
+      if (debug_) {
+	fprintf(stderr, "Adding node st %u pa %u nt %u\n",
+		bet_node->Street(),
+		bet_node->PlayerActing(), bet_node->NonterminalID());
+      }
+      path_->push_back(bet_node);
     }
   }
 }
 
+// Does the right thing on the final street where 
+unsigned int NLAgent::MSHCPIndex(unsigned int bd,
+				 const Card *cards) {
+  unsigned int max_street = Game::MaxStreet();
+  unsigned int num_board_cards = Game::NumBoardCards(max_street);
+  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(max_street);
+  const Card *board = cards + 2;
+  unsigned int sg = BoardTree::SuitGroups(max_street, bd);
+  CanonicalCards hands(2, board, num_board_cards, sg, false);
+  hands.SortByHandStrength(board);
+  for (unsigned int shcp = 0; shcp < num_hole_card_pairs; ++shcp) {
+    const Card *hole_cards = hands.Cards(shcp);
+    if (hole_cards[0] == cards[0] && hole_cards[1] == cards[1]) {
+      return shcp;
+    }
+  }
+  fprintf(stderr, "Didn't find cards in hands\n");
+  exit(-1);
+}
+
 void NLAgent::UpdateCards(int street, Card our_hi, Card our_lo,
-			  Card *raw_board, unsigned int ***current_buckets) {
+			  Card *raw_board, unsigned int *current_buckets,
+			  unsigned int *bd) {
   if (debug_) fprintf(stderr, "UpdateCards %i\n", street);
   for (unsigned int st = 0; st <= (unsigned int)street; ++st) {
     if (st == 0) {
       Card cards[2];
       cards[0] = our_hi;
       cards[1] = our_lo;
+      *bd = 0;
+      // Assume 0 is not max street
       unsigned int hcp = HCPIndex(0, cards);
-      current_buckets[1][0][0] = p1_buckets_->Bucket(0, hcp);
-      if (p0_buckets_ == p1_buckets_) {
-	current_buckets[0][0][0] = current_buckets[1][0][0];
+      if (buckets_->None(0)) {
+	current_buckets[0] = hcp;
       } else {
-	current_buckets[0][0][0] = p0_buckets_->Bucket(0, hcp);
+	current_buckets[0] = buckets_->Bucket(0, hcp);
       }
     } else {
       unsigned int num_hole_cards = Game::NumCardsForStreet(0);
       unsigned int num_board_cards = Game::NumBoardCards(st);
-      Card raw_board[5], raw_hole_cards[2], canon_board[5];
-      Card canon_hole_cards[2];
+      Card raw_hole_cards[2], canon_board[5], canon_hole_cards[2];
       raw_hole_cards[0] = our_hi;
       raw_hole_cards[1] = our_lo;
       CanonicalizeCards(raw_board, raw_hole_cards, st, canon_board,
 			canon_hole_cards);
-      unsigned int bd = BoardTree::LookupBoard(canon_board, st);
+      *bd = BoardTree::LookupBoard(canon_board, st);
       // Put the hole cards at the beginning
       Card canon_cards[7];
       for (unsigned int i = 0; i < num_hole_cards; ++i) {
 	canon_cards[i] = canon_hole_cards[i];
       }
       for (unsigned int i = 0; i < num_board_cards; ++i) {
-	canon_cards[num_hole_cards + i] = canon_cards[i];
+	canon_cards[num_hole_cards + i] = canon_board[i];
       }
-      unsigned int hcp = HCPIndex(st, canon_cards);
       unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
-      unsigned int h = bd * num_hole_card_pairs + hcp;
-      current_buckets[1][st][0] = p1_buckets_->Bucket(st, h);
-      if (p0_buckets_ == p1_buckets_) {
-	current_buckets[0][st][0] = current_buckets[1][st][0];
+      unsigned int hcp, h;
+      if (buckets_->None(st) || st >= endgame_st_) {
+	if (st == Game::MaxStreet()) {
+	  hcp = MSHCPIndex(*bd, canon_cards);
+	} else {
+	  hcp = HCPIndex(st, canon_cards);
+	}
+	h = *bd * num_hole_card_pairs + hcp;
+	current_buckets[st] = h;
       } else {
-	current_buckets[0][st][0] = p0_buckets_->Bucket(st, h);
+	hcp = HCPIndex(st, canon_cards);
+	h = *bd * num_hole_card_pairs + hcp;
+	current_buckets[st] = buckets_->Bucket(st, h);
       }
+#if 0
+      // Would like this to go to stderr
+      if (debug_) {
+	OutputNCards(canon_board, num_board_cards);
+	printf(" / ");
+	OutputTwoCards(canon_hole_cards);
+	printf(" bd %u hcp %u h %u b %u\n", *bd, hcp, h, current_buckets[st]);
+	fflush(stdout);
+      }
+#endif
     }
   }
 }
 
-NLAgent::NLAgent(const CardAbstraction *p0_ca, const CardAbstraction *p1_ca, 
-		 const BettingAbstraction *ba, const CFRConfig *cc,
-		 const RuntimeConfig *p0_rc, const RuntimeConfig *p1_rc, 
-		 BettingTree *p0_tree, BettingTree *p1_tree, bool debug,
-		 bool exit_on_error, unsigned int small_blind,
-		 unsigned int stack_size) {
-  p0_tree_ = p0_tree;
-  p1_tree_ = p1_tree;
+NLAgent::NLAgent(const CardAbstraction &base_ca,
+		 const CardAbstraction &endgame_ca,
+		 const BettingAbstraction &base_ba,
+		 const BettingAbstraction &endgame_ba,
+		 const CFRConfig &base_cc, const CFRConfig &endgame_cc,
+		 const RuntimeConfig &rc, unsigned int *iterations,
+		 BettingTree **betting_trees, unsigned int endgame_st,
+		 unsigned int num_endgame_its, bool debug, bool exit_on_error,
+		 bool fixed_seed, unsigned int small_blind,
+		 unsigned int stack_size) :
+  base_card_abstraction_(base_ca), endgame_card_abstraction_(endgame_ca),
+  base_betting_abstraction_(base_ba), endgame_betting_abstraction_(endgame_ba),
+  base_cfr_config_(base_cc), endgame_cfr_config_(endgame_cc),
+  runtime_config_(rc) {
+  unsigned int num_players = Game::NumPlayers();
+  betting_trees_ = new BettingTree *[num_players];
+  for (unsigned int p = 0; p < num_players; ++p) {
+    betting_trees_[p] = betting_trees[p];
+  }
+  iterations_ = iterations;
+  endgame_st_ = endgame_st;
+  num_endgame_its_ = num_endgame_its;
   debug_ = debug;
   exit_on_error_ = exit_on_error;
+  fixed_seed_ = fixed_seed;
   small_blind_ = small_blind;
   stack_size_ = stack_size;
   // Assume these are shared by P0 and P1
-  respect_pot_frac_ = p1_rc->RespectPotFrac();
-  no_small_bets_ = p1_rc->NoSmallBets();
-  translation_method_ = p1_rc->TranslationMethod();
-  hard_coded_root_strategy_ = p1_rc->HardCodedRootStrategy();
-  hard_coded_r200_strategy_ = p1_rc->HardCodedR200Strategy();
-  hard_coded_r250_strategy_ = p1_rc->HardCodedR250Strategy();
-  hard_coded_r200r600_strategy_ = p1_rc->HardCodedR200R600Strategy();
-  hard_coded_r200r800_strategy_ = p1_rc->HardCodedR200R800Strategy();
-  unsigned int max_street = Game::MaxStreet();
+  respect_pot_frac_ = rc.RespectPotFrac();
+  no_small_bets_ = rc.NoSmallBets();
+  translation_method_ = rc.TranslationMethod();
   BoardTree::Create();
   BoardTree::CreateLookup();
+  path_ = new vector<Node *>;
 
-  const unsigned int *p0_num_buckets, *p1_num_buckets;
-  if (p0_ca == p1_ca) {
-    p1_buckets_ = new Buckets(*p1_ca, false);
-    p0_buckets_ = p1_buckets_;
-    p1_num_buckets = p1_buckets_->NumBuckets();
-    p0_num_buckets = p1_num_buckets;
-  } else {
-    p1_buckets_ = new Buckets(*p1_ca, false);
-    p0_buckets_ = new Buckets(*p0_ca, false);
-    p1_num_buckets = p1_buckets_->NumBuckets();
-    p0_num_buckets = p0_buckets_->NumBuckets();
-  }
-#if 0
-  bool *in_memory = new bool[max_street + 1];
-  for (unsigned int s = 0; s <= max_street; ++s) in_memory[s] = false;
-  // Assume these are shared by P0 and P1
-  const vector<unsigned int> &v = p1_rc->BucketMemoryStreets();
-  unsigned int num = v.size();
-  for (unsigned int i = 0; i < num; ++i) {
-    in_memory[v[i]] = true;
-  }
-  // Buckets now always in memory.  Need to change.
-  for (unsigned int st = 0; st <= max_street; ++st) {
-    if (in_memory[st]) {
-      p1_buckets_instance_->Initialize(st, MEMORY, p1_cai);
-      if (p1_buckets_instance_ != p2_buckets_instance_) {
-	p2_buckets_instance_->Initialize(st, MEMORY, p2_cai);
-      }
+  // Need this for MSHCPIndex().
+  HandValueTree::Create();
+  buckets_ = new BucketsFile(base_ca);
+
+  // In an asymmetric system, we need two probs_ objects because the
+  // betting trees are different.  We also need both players' strategies for
+  // each system, because of endgame solving.  (We need to calculate the
+  // reach probabilities.)
+  // In a symmetric system, we can create a single probs object with both
+  // players' strategies.
+  // We load all streets because we need the endgame probabilities for
+  // computing the T-values.
+  probs_ = new CFRValuesFile *[num_players];
+  for (unsigned int p = 0; p < num_players; ++p) {
+    unsigned int it = iterations_[p];
+    const BettingTree *betting_tree = betting_trees_[p];
+    const unsigned int *num_buckets = buckets_->NumBuckets();
+    if (base_betting_abstraction_.Asymmetric()) {
+      // Because of endgame solving we need both players' strategies for
+      // each asym_p system.
+      probs_[p] = new CFRValuesFile(nullptr, nullptr, base_ca, base_ba,
+				    base_cc, p, it, endgame_st_, betting_tree,
+				    num_buckets);
     } else {
-      p1_buckets_instance_->Initialize(st, DISK, p1_cai);
-      if (p1_buckets_instance_ != p2_buckets_instance_) {
-	p2_buckets_instance_->Initialize(st, DISK, p2_cai);
+      probs_[0] = new CFRValuesFile(nullptr, nullptr, base_ca, base_ba,
+				    base_cc, p, it, endgame_st_, betting_tree,
+				    num_buckets);
+      for (unsigned int p1 = 1; p1 < num_players; ++p1) {
+	probs_[p1] = probs_[0];
       }
     }
   }
-  delete [] in_memory;
-#endif
 
-  unique_ptr<bool []> players(new bool[2]);
-  probs_ = new CFRValues *[2];
-  players[0] = true;
-  players[1] = false;
-  probs_[0] = new CFRValues(players.get(), true, nullptr, p1_tree_,
-			    0, 0, *p1_ca, *p1_buckets_, nullptr);
-  players[0] = true;
-  players[1] = false;
-  probs_[0] = new CFRValues(players.get(), true, nullptr, p0_tree_,
-			    0, 0, *p0_ca, *p0_buckets_, nullptr);
+  min_prob_ = rc.MinProb();
+  fold_round_up_ = rc.FoldRoundUp();
+  purify_ = rc.Purify();
+  hard_coded_r200_strategy_ = rc.HardCodedR200Strategy();
+  translate_to_larger_ = rc.TranslateToLarger();
+  translate_bet_to_call_ = rc.TranslateBetToCall();
 
-  fold_to_alternative_streets_ = new bool[max_street + 1];
-  call_alternative_streets_ = new bool[max_street + 1];
-  for (unsigned int st = 0; st <= max_street; ++st) {
-    fold_to_alternative_streets_[st] = false;
-    call_alternative_streets_[st] = false;
-  }
-  const vector<unsigned int> &ftav = p1_rc->FoldToAlternativeStreets();
-  unsigned int fta_num = ftav.size();
-  for (unsigned int i = 0; i < fta_num; ++i) {
-    fold_to_alternative_streets_[ftav[i]] = true;
-  }
-  const vector<unsigned int> &cav = p1_rc->CallAlternativeStreets();
-  unsigned int ca_num = cav.size();
-  for (unsigned int i = 0; i < ca_num; ++i) {
-    if (cav[i] != max_street) {
-      fprintf(stderr, "Only max street can be a CallAlternativeStreet\n");
-      exit(-1);
-    }
-    call_alternative_streets_[cav[i]] = true;
-  }
-  ftann_ = p1_rc->FTANN();
-  eval_overrides_ = p1_rc->EvalOverrides();
-  override_min_pot_size_ = p1_rc->OverrideMinPotSize();
-  min_neighbor_folds_ = p1_rc->MinNeighborFolds();
-  if (min_neighbor_folds_ == 0) min_neighbor_folds_ = 1;
-  min_neighbor_frac_ = p1_rc->MinNeighborFrac();
-  min_alternative_folds_ = p1_rc->MinAlternativeFolds();
-  if (min_alternative_folds_ == 0) min_alternative_folds_ = 1;
-  min_actual_alternative_folds_ = p1_rc->MinActualAlternativeFolds();
-  if (min_actual_alternative_folds_ == 0) min_actual_alternative_folds_ = 1;
-  min_frac_alternative_folded_ = p1_rc->MinFracAlternativeFolded();
-  prior_alternatives_ = p1_rc->PriorAlternatives();
-  translate_to_larger_ = p1_rc->TranslateToLarger();
-  translate_bet_to_call_ = p1_rc->TranslateBetToCall();
+  endgame_buckets_.reset(new Buckets());
+  dynamic_cbr_.reset(new DynamicCBR2(base_ca, base_ba, base_cc, *buckets_, 1));
+  endgame_sumprobs_ = nullptr;
+  endgame_subtree_ = nullptr;
 
-  if (p1_rc->NearestNeighbors()) {
-    nearest_neighbors_ = new NearestNeighbors *[2];
-    nearest_neighbors_[0] = new NearestNeighbors(p0_ca, p0_rc,
-						 p0_num_buckets);
-    nearest_neighbors_[1] = new NearestNeighbors(p1_ca, p1_rc,
-						 p1_num_buckets);
-  } else {
-    nearest_neighbors_ = NULL;
-  }
+  last_hand_index_ = kMaxUInt;
+  folded_.reset(new bool[num_players]);
+
+  rand_bufs_ = new drand48_data[num_players];
 }
 
 NLAgent::~NLAgent(void) {
-  if (nearest_neighbors_) {
-    delete nearest_neighbors_[0];
-    delete nearest_neighbors_[1];
-    delete [] nearest_neighbors_;
-  }
-  delete [] fold_to_alternative_streets_;
-  delete [] call_alternative_streets_;
-  for (unsigned int p1 = 0; p1 <= 1; ++p1) {
-    delete probs_[p1];
+  delete [] rand_bufs_;
+  delete path_;
+  delete endgame_sumprobs_;
+  delete endgame_subtree_;
+  if (base_betting_abstraction_.Asymmetric()) {
+    unsigned int num_players = Game::NumPlayers();
+    for (unsigned int p = 0; p < num_players; ++p) {
+      delete probs_[p];
+    }
+  } else {
+    delete probs_[0];
   }
   delete [] probs_;
-  if (p1_buckets_ != p0_buckets_) {
-    delete p0_buckets_;
-  }
-  delete p1_buckets_;
+  delete buckets_;
+  delete [] betting_trees_;
   // Don't delete trees; we don't own them
 }
 
-float *NLAgent::CurrentProbs(Node *node, unsigned int b) {
+// h can be either a bucket or a hole-card-pair index or a max-street
+// hole-card-pair index.
+double *NLAgent::CurrentProbs(Node *node, unsigned int h, unsigned int p) {
   // Arbitrary response if node is NULL.  Does this ever happen?
   if (node == NULL) {
     fprintf(stderr, "NLAgent::CurrentProbs() NULL node?!?\n");
@@ -780,37 +785,109 @@ float *NLAgent::CurrentProbs(Node *node, unsigned int b) {
 
   unsigned int num_succs = node->NumSuccs();
   unsigned int dsi = node->DefaultSuccIndex();
-  unsigned int street = node->Street();
+  unsigned int st = node->Street();
   unsigned int pa = node->PlayerActing();
-  if (b == kMaxUInt) {
+  unsigned int num_players = Game::NumPlayers();
+  if (num_players == 2) {
+    // For reentrant trees, p may not be equal to pa.  I don't have a good
+    // way to test for reentrant trees, so I just test for 2 vs. more than
+    // 2 players, for now.
+    if (p != pa) {
+      fprintf(stderr, "CurrentProbs(): p != pa: p %u pa %u\n", p, pa);
+      exit(-1);
+    }
+  }
+  if (h == kMaxUInt) {
     fprintf(stderr, "Uninitialized bucket node %i street %i p%u\n",
-	    node->NonterminalID(), street, pa);
-    time_t rawtime;
-    time(&rawtime);
-    struct tm timeinfo;
-    localtime_r(&rawtime, &timeinfo);
-    char tbuf[100];
-    asctime_r(&timeinfo, tbuf);
-    tbuf[strlen(tbuf) - 1] = 0;
-    fprintf(stderr, "Timestamp: %s\n", tbuf);
+	    node->NonterminalID(), st, pa);
     if (exit_on_error_) exit(-1);
     return NULL;
   }
 
-  if (debug_) {
-    fprintf(stderr, "Node %i (%i) street %i b %i\n", node->NonterminalID(),
-	    node->TerminalID(), street, b);
-  }
 
-  unsigned int offset = b * num_succs;
-  float *probs = new float[num_succs];
-  for (unsigned int s = 0; s < num_succs; ++s) {
-    probs[s] = probs_[pa]->Prob(pa, street, node->NonterminalID(), offset, s,
-				num_succs, dsi);
+  double *probs = new double[num_succs];
+  // Expect the subgame to have been resolved if 1) we are on an endgame
+  // street, and 2) num_succs > 1.  (2) is there because we don't bother to
+  // resolve if we are already all-in.
+  if (st >= endgame_st_ && num_succs > 1) {
+    // We need the node from the endgame subtree.  We need the hand index,
+    // not the bucket.
+    if (endgame_sumprobs_ == nullptr) {
+      fprintf(stderr, "No endgame sumprobs?!?\n");
+      if (exit_on_error_) exit(-1);
+      else                return nullptr;
+    } else {
+      if (debug_) {
+	fprintf(stderr, "CurrentProbs(): node %u pa %u p %u street %u h %u\n",
+		node->NonterminalID(), pa, p, st, h);
+      }
+      // Confusing: CFRValues objects take an offset argument,
+      // while CFRValuesFile objects take a hand or bucket index.
+      // h is a global hand index.  But we resolved an endgame for exactly
+      // this board.  So we want the hcp_index.
+      unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
+      unsigned int hcp = h % num_hole_card_pairs;
+      if (debug_) fprintf(stderr, "HCP %u\n", hcp);
+      endgame_sumprobs_->Probs(p, st, node->NonterminalID(), hcp * num_succs,
+			       num_succs, dsi, probs);
+    }
+  } else {
+    if (debug_) {
+      fprintf(stderr, "CurrentProbs(): node %u pa %u p %u street %i h %i\n",
+	      node->NonterminalID(), pa, p, st, h);
+    }
+    // For multiplayer, pa may be different from p
+    probs_[p]->Probs(pa, st, node->NonterminalID(), h, num_succs, dsi, probs);
   }
   return probs;
 }
 
+void NLAgent::AllProbs(Node *node, unsigned int s, unsigned int gbd,
+		       CanonicalCards *hands, unsigned int p, double *probs) {
+  unsigned int st = node->Street();
+  unsigned int pa = node->PlayerActing();
+  unsigned int nt = node->NonterminalID();
+  unsigned int dsi = node->DefaultSuccIndex();
+  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
+  unsigned int num_succs = node->NumSuccs();
+  if (num_succs == 1) {
+    for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
+      probs[i] = 1.0;
+    }
+    return;
+  }
+  unique_ptr<double []> hand_probs(new double[num_succs]);
+  if (st >= endgame_st_ && num_succs > 1) {
+  } else {
+    // unsigned int max_card1 = Game::MaxCard() + 1;
+    const Card *board = BoardTree::Board(st, gbd);
+    unsigned int num_board_cards = Game::NumBoardCards(st);
+    unique_ptr<Card []> cards(new Card[num_board_cards + 2]);
+    for (unsigned int i = 0; i < num_board_cards; ++i) {
+      cards[i+2] = board[i];
+    }
+    for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
+      const Card *hole_cards = hands->Cards(i);
+      cards[0] = hole_cards[0];
+      cards[1] = hole_cards[1];
+      unsigned int holding;
+      unsigned int hcp = HCPIndex(st, cards.get());
+      unsigned int h = gbd * num_hole_card_pairs + hcp;
+      if (buckets_->None(st)) {
+	// This does wrong thing on river
+	holding = h;
+      } else {
+	holding = buckets_->Bucket(st, h);
+      }
+      
+      // For multiplayer, pa may be different from p
+      probs_[p]->Probs(pa, st, nt, holding, num_succs, dsi, hand_probs.get());
+      probs[i] = hand_probs[s];
+    }
+  }
+}
+
+#if 0
 // Check if we are all-in based on the actions in the current match state.
 // We are all-in if the final actions are one or more calls preceded by
 // a bet whose bet-to amount is the stack size.
@@ -833,49 +910,82 @@ bool NLAgent::AreWeAllIn(vector<Action> *actions) {
   }
   return false;
 }
+#endif
 
-void NLAgent::WhoseAction(vector<Action> *actions, bool *p0_to_act,
-			  bool *p1_to_act) {
+// p should be the first candidate player.  If player 3 just acted, then
+// pass in 4.  We will check if player 4 has not folded.
+static unsigned int NextPlayer(unsigned int p, unsigned int num_players,
+			       bool *folded) {
+  unsigned int p1 = p;
+  while (true) {
+    if (p1 == num_players) p1 = 0;
+    if (! folded[p1]) break;
+    ++p1;
+    if (p1 == p) {
+      fprintf(stderr, "No possible next player?!?\n");
+      exit(-1);
+    }
+  }
+  return p1;
+}
+
+// Assumes heads-up for now
+unsigned int NLAgent::WhoseAction(vector<Action> *actions) {
   unsigned int street = 0;
-  bool my_p1_to_act = true;
-  // This includes P1's first action preflop even though there is in some
-  // sense a bet pending (the big blind).
-  bool first_action_on_street = true;
+  unsigned int num_players = Game::NumPlayers();
+  unsigned int num_remaining = num_players;
+  unsigned int num_to_act_on_street = num_players;
+  unsigned int player_to_act = Game::FirstToAct(0);
+  unique_ptr<bool []> folded(new bool[num_players]);
+  for (unsigned int p = 0; p < num_players; ++p) {
+    folded[p] = false;
+  }
   unsigned int num_actions = actions->size();
   for (unsigned int i = 0; i < num_actions; ++i) {
     Action a = (*actions)[i];
     if (a.action_type == BET) {
-      my_p1_to_act = ! my_p1_to_act;
-      first_action_on_street = false;
+      num_to_act_on_street = num_remaining - 1;
+      player_to_act = NextPlayer(player_to_act + 1, num_players, folded.get());
     } else if (a.action_type == FOLD) {
-      *p0_to_act = false;
-      *p1_to_act = false;
-      return;
+      folded[player_to_act] = true;
+      --num_to_act_on_street;
+      --num_remaining;
+      if (num_remaining == 1) return kMaxUInt;
+      if (num_to_act_on_street == 0) {
+	// Advance to next street
+	num_to_act_on_street = num_remaining;
+	++street;
+	player_to_act = NextPlayer(Game::FirstToAct(street), num_players,
+				   folded.get());
+      } else {
+	player_to_act = NextPlayer(player_to_act + 1, num_players,
+				   folded.get());
+      }
     } else {
-      // Check/call
-      if (! first_action_on_street) {
-	if (street == 3) {
+      --num_to_act_on_street;
+      if (num_to_act_on_street == 0) {
+	// End of action on this street
+	if (street == Game::MaxStreet()) {
 	  // Showdown
-	  *p0_to_act = false;
-	  *p1_to_act = false;
-	  return;
+	  return kMaxUInt;
 	} else {
 	  // Advance to next street
+	  num_to_act_on_street = num_remaining;
 	  ++street;
-	  first_action_on_street = true;
-	  my_p1_to_act = false;
+	  player_to_act = NextPlayer(Game::FirstToAct(street), num_players,
+				     folded.get());
 	}
       } else {
-	// Open check, or open-call preflop
-	my_p1_to_act = ! my_p1_to_act;
-	first_action_on_street = false;
+	// Action continues on this street
+	player_to_act = NextPlayer(player_to_act + 1, num_players,
+				   folded.get());
       }
     }
   }
-  *p0_to_act = ! my_p1_to_act;
-  *p1_to_act = my_p1_to_act;
+  return player_to_act;
 }
 
+#if 0
 // Assumption is that if last action is a bet then it is a bet by the
 // opponent.
 bool NLAgent::AreWeFacingBet(const vector<Action> *actions,
@@ -902,80 +1012,243 @@ bool NLAgent::AreWeFacingBet(const vector<Action> *actions,
     }
   }
 }
+#endif
 
-// We keep track of p1_to_act, the current street and whether we are
-// street-initial.  We do *not* rely on the node in the tree to give us this
-// information.  When we translate a bet to a call the node in the path may
-// not accurately reflect whose action it really is.
-void NLAgent::ProcessActions(vector<Action> *actions, unsigned int pa,
-			     unsigned int hand_index,
-			     vector<Node *> *path, Node **sob_node,
-			     bool *terminate, unsigned int *last_bet_to) {
-  *sob_node = NULL;
-  *last_bet_to = 2 * small_blind_;
-  Node *node = pa == 1 ? p1_tree_->Root() : p0_tree_->Root();
-  path->clear();
-  path->push_back(node);
+double **NLAgent::GetReachProbs(unsigned int current_bd, unsigned int asym_p) {
+  unsigned int num_path = path_->size();
+  if (num_path < 1) {
+    fprintf(stderr, "Empty path?!?\n");
+    exit(-1);
+  }
+  Node *current = (*path_)[num_path - 1];
+  unsigned int current_st = current->Street();
+  unsigned int num_players = Game::NumPlayers();
+  double **reach_probs = new double *[num_players];
+  unsigned int max_card1 = Game::MaxCard() + 1;
+  unsigned int num_enc = max_card1 * max_card1;
+  for (unsigned int p = 0; p < num_players; ++p) {
+    reach_probs[p] = new double[num_enc];
+    for (unsigned int i = 0; i < num_enc; ++i) {
+      reach_probs[p][i] = 1.0;
+    }
+  }
+  Card cards[7];
+  const Card *board = BoardTree::Board(current_st, current_bd);
+  unsigned int num_board_cards = Game::NumBoardCards(current_st);
+  // Temporary?
+  if (debug_) {
+    OutputNCards(board, num_board_cards);
+    printf("\n");
+    fflush(stdout);
+  }
+  for (unsigned int i = 0; i < num_board_cards; ++i) {
+    cards[i + 2] = board[i];
+  }
+  Card max_card = Game::MaxCard();
+  for (unsigned int i = 0; i < num_path - 1; ++i) {
+    Node *before = (*path_)[i];
+    Node *after = (*path_)[i + 1];
+    // This can happen when we map large bets up to an all-in.
+    // For example, r19000c/cr19500c.  That last call doesn't correspond to
+    // any succ in the abstract game.
+    if (after == before) continue;
+    unsigned int num_succs = before->NumSuccs();
+    unsigned int s;
+    for (s = 0; s < num_succs; ++s) {
+      Node *n = before->IthSucc(s);
+      if (n == after) break;
+    }
+    if (s == num_succs) {
+      fprintf(stderr, "Couldn't connect nodes on path; i %u\n", i);
+      fprintf(stderr, "Before st %u pa %u nt %u\n", before->Street(),
+	      before->PlayerActing(), before->NonterminalID());
+      fprintf(stderr, "After st %u pa %u nt %u\n", after->Street(),
+	      after->PlayerActing(), after->NonterminalID());
+      exit(-1);
+    }
+    unsigned int st = before->Street();
+    if (buckets_->None(st)) {
+      fprintf(stderr, "Expect buckets in GetReachProbs()\n");
+      exit(-1);
+    }
+    if (st == Game::MaxStreet()) {
+      fprintf(stderr, "Don't expect max-street nodes in GetReachProbs()\n");
+      exit(-1);
+    }
+    unsigned int pa = before->PlayerActing();
+    unsigned int nt = before->NonterminalID();
+    unsigned int dsi = before->DefaultSuccIndex();
+    unique_ptr<double []> probs(new double[num_succs]);
+    unsigned int bd;
+    if (st == current_st) {
+      bd = current_bd;
+    } else {
+      bd = BoardTree::LookupBoard(board, st);
+    }
+    double sum = 0;
+    for (Card hi = 1; hi <= max_card; ++hi) {
+      if (InCards(hi, board, num_board_cards)) continue;
+      cards[0] = hi;
+      for (Card lo = 0; lo < hi; ++lo) {
+	if (InCards(lo, board, num_board_cards)) continue;
+	cards[1] = lo;
+	unsigned int hcp = HCPIndex(st, cards);
+	unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
+	unsigned int h = bd * num_hole_card_pairs + hcp;
+	unsigned int b = buckets_->Bucket(st, h);
+	probs_[asym_p]->Probs(pa, st, nt, b, num_succs, dsi,
+			      probs.get());
+	unsigned int enc = hi * max_card1 + lo;
+	reach_probs[pa][enc] *= probs[s];
+	sum += reach_probs[pa][enc];
+      }
+    }
+  }
+  return reach_probs;
+}
 
-  *terminate = false;
-  unsigned int num_actions = actions->size();
-  bool forced_all_in = false;
-  unsigned int opp_bet_amount = 0;
-  bool p1_to_act = true;
-  unsigned int st = 0;
-  bool street_initial = true;
-  for (unsigned int i = 0; i < num_actions; ++i) {
+#if 0
+static string ActionSequence(vector<Node *> *path) {
+  unsigned int num_path = path->size();
+  string action_sequence = "x";
+  if (num_path <= 1) return action_sequence;
+  for (unsigned int i = 0; i < num_path - 1; ++i) {
+    Node *before = (*path)[i];
+    Node *after = (*path)[i + 1];
+    unsigned int num_succs = before->NumSuccs();
+    unsigned int s;
+    for (s = 0; s < num_succs; ++s) {
+      Node *n = before->IthSucc(s);
+      if (n == after) break;
+    }
+    if (s == num_succs) {
+      fprintf(stderr, "Couldn't connect nodes on path\n");
+      exit(-1);
+    }
+    if (s == before->CallSuccIndex()) {
+      action_sequence += "c";
+    } else if (s == before->FoldSuccIndex()) {
+      action_sequence += "f";
+    } else {
+      unsigned int bet_size = after->LastBetTo() - before->LastBetTo();
+      char buf[100];
+      sprintf(buf, "b%u", bet_size);
+      action_sequence += buf;
+    }
+  }
+  return action_sequence;
+}
+#endif
+
+// Go through previously processed actions and determine the actual bet-to
+// amount of the last bet (by either ourselves or the opponent).
+unsigned int NLAgent::GetLastActualBetTo(vector<Action> *actions) {
+  unsigned int last_actual_bet_to = 2 * small_blind_;
+  for (unsigned int i = 0; i < action_index_; ++i) {
     Action a = (*actions)[i];
-    Node *current = (*path)[path->size() - 1];
-    if (forced_all_in) {
-      // This can happen when we translate an opponent's bet up into an
-      // all-in and then we send back a raise rather than a call.  The next
-      // opponent action may be out of sync.  This could be on the river
-      // or it could be on an earlier street, but either way I think we can
-      // just send back BA_NONE.
-      if (current->LastBetTo() * small_blind_ != stack_size_) {
-	if (debug_) {
-	  fprintf(stderr, "Unexpected pot size\n");
+    if (a.action_type == BET) last_actual_bet_to = a.bet_to;
+  }
+  return last_actual_bet_to;
+}
+
+// We keep track of the player to act, the current street and other things.
+// We do *not* rely on the node in the tree to give us this information.  When
+// we translate a bet to a call the node in the path may not accurately
+// reflect whose action it really is.  Bets getting mapped up to an all-in
+// also mess with us.
+void NLAgent::ProcessActions(vector<Action> *actions, unsigned int we_p,
+			     bool endgame, unsigned int *last_actual_bet_to,
+			     Node **sob_node) {
+  *sob_node = NULL;
+  // Do I want to set all-in in this scenario?
+  if (st_ == endgame_st_ && ! endgame) return;
+
+  unsigned int num_players = Game::NumPlayers();
+  unsigned int num_actions = actions->size();
+  if (debug_) {
+    fprintf(stderr, "ProcessActions action_index_ %u num_actions %u\n",
+	    action_index_, num_actions);
+  }
+  while (action_index_ < num_actions) {
+    Action a = (*actions)[action_index_];
+    ++action_index_;
+    Node *current_node = (*path_)[path_->size() - 1];
+    if (current_node->Street() > st_ || current_node->Terminal()) {
+      // This can happen when a bet gets mapped up to an all-in.
+      // We don't want to do any translation now.  Just consume actions
+      // until the streets match up.
+      if (debug_) {
+	fprintf(stderr, "Skipping translation because abstract street is "
+		"ahead of actual street.\n");
+      }
+    } else {
+      if (player_acting_ == we_p) {
+	fprintf(stderr, "Shouldn't see our action; ai %u we_p %u pa %u\n",
+		action_index_, we_p, player_acting_);
+	exit(-1);
+      }
+      if (debug_) {
+	fprintf(stderr, "Translating %i/%i\n", action_index_ - 1,
+		num_actions);
+      }
+      Translate(a, sob_node, 2 * *last_actual_bet_to);
+      if (debug_) fprintf(stderr, "Back from Translate()\n");
+    }
+    if (a.action_type == CALL) {
+      --num_to_act_on_street_;
+      if (num_to_act_on_street_ == 0) {
+	if (st_ == Game::MaxStreet()) {
+	  fprintf(stderr, "Shouldn't get to showdown in ProcessActions()\n");
+	  exit(-1);
 	}
-	if (exit_on_error_) exit(-1);
-      }
-      if (debug_) {
-	fprintf(stderr, "Ignoring opponent final action after forced all-in\n");
-      }
-      *terminate = true;
-      return;
-    }
-    if (p1_to_act == (pa == 1)) {
-      if (debug_) {
-	fprintf(stderr, "Interpreting %i/%i\n", i, num_actions);
-      }
-      Interpret(a, path, *sob_node, *last_bet_to, opp_bet_amount,
-		&forced_all_in);
-      *sob_node = NULL;
-      opp_bet_amount = 0;
-    } else {
-      if (debug_) {
-	fprintf(stderr, "Translating %i/%i\n", i, num_actions);
-      }
-      Translate(a, path, sob_node, 2 * *last_bet_to, hand_index);
-      if (a.action_type == BET) {
-	opp_bet_amount = a.bet_to - *last_bet_to;
+	// Advance to next street
+	num_to_act_on_street_ = num_remaining_;
+	++st_;
+	player_acting_ = NextPlayer(Game::FirstToAct(st_), num_players,
+				   folded_.get());
+	if (*last_actual_bet_to == stack_size_) {
+	  if (debug_) {
+	    fprintf(stderr, "No action possible; we are all-in\n");
+	  }
+	  all_in_ = true;
+	}
       } else {
-	opp_bet_amount = 0;
+	// Action continues on this street
+	player_acting_ = NextPlayer(player_acting_ + 1, num_players,
+				    folded_.get());
+      }
+    } else if (a.action_type == BET) {
+      *last_actual_bet_to = a.bet_to;
+      num_to_act_on_street_ = num_remaining_ - 1;
+      player_acting_ = NextPlayer(player_acting_ + 1, num_players,
+				  folded_.get());
+    } else if (a.action_type == FOLD) {
+      folded_[player_acting_] = true;
+      --num_to_act_on_street_;
+      --num_remaining_;
+      if (num_remaining_ == 1) {
+	fprintf(stderr, "Shouldn't get to fold state in ProcessActions()\n");
+	exit(-1);
+      }
+      if (num_to_act_on_street_ == 0) {
+	// Advance to next street
+	num_to_act_on_street_ = num_remaining_;
+	++st_;
+	player_acting_ = NextPlayer(Game::FirstToAct(st_), num_players,
+				   folded_.get());
+	if (*last_actual_bet_to == stack_size_) {
+	  if (debug_) {
+	    fprintf(stderr, "No action possible; we are all-in B\n");
+	  }
+	  all_in_ = true;
+	}
+      } else {
+	player_acting_ = NextPlayer(player_acting_ + 1, num_players,
+				    folded_.get());
       }
     }
-    if (a.action_type == BET) *last_bet_to = a.bet_to;
-    if (a.action_type == CALL && ! street_initial) {
-      // A (non-street-initial) call or check advances the street, leads to a
-      // P2 choice, and sets street_initial to true.  (It doesn't hurt to take
-      // all these steps when the call actually leads to showdown.)
-      ++st;
-      p1_to_act = false;
-      street_initial = true;
-    } else {
-      // Could be a check, a bet, a limp or a fold.
-      p1_to_act = ! p1_to_act;
-      street_initial = false;
+    if (st_ == endgame_st_ && ! endgame) {
+      return;
     }
   }
 }
@@ -987,15 +1260,14 @@ void NLAgent::ProcessActions(vector<Action> *actions, unsigned int pa,
 // random number and decide if we are raising or not.  If we decide to
 // raise, we replace the last node in the path (which was the opponent's
 // check) with the smallest opponent bet node.
-bool NLAgent::HandleRaise(Node *bet_node, unsigned int hand_index,
-			  unsigned int ***current_buckets,
-			  vector<Node *> *path) {
+bool NLAgent::HandleRaise(Node *bet_node, unsigned int *current_buckets,
+			  unsigned int p) {
   unsigned int num_succs = bet_node->NumSuccs();
   unsigned int fsi = bet_node->FoldSuccIndex();
   unsigned int csi = bet_node->CallSuccIndex();
   unsigned int st = bet_node->Street();
-  unsigned int b = current_buckets[bet_node->PlayerActing()][st][0];
-  float *raw_probs = CurrentProbs(bet_node, b);
+  unsigned int h = current_buckets[st];
+  double *raw_probs = CurrentProbs(bet_node, h, p);
   double sum_raise_probs = 0;
   for (unsigned int s = 0; s < num_succs; ++s) {
     if (s != fsi && s != csi) {
@@ -1006,18 +1278,22 @@ bool NLAgent::HandleRaise(Node *bet_node, unsigned int hand_index,
     fprintf(stderr, "HandleRaise: sum_raise_probs %f\n", sum_raise_probs);
   }
   delete [] raw_probs;
-  // I seed the RNG to something based on the hand index and the action index.
-  // So behaviour should be replicable, but only for the same hand and same
-  // action.
-  unsigned int seed = hand_index * 1971 + path->size() * 11;
-  SeedRand(seed);
-  double r = RandZeroToOne();
+  double r;
+  // r = RandZeroToOne();
+  drand48_r(&rand_bufs_[p], &r);
   if (r < sum_raise_probs) {
     if (debug_) {
-      fprintf(stderr, "HandRaise: decided to raise\n");
+      fprintf(stderr, "HandleRaise: decided to raise\n");
+      fprintf(stderr, "Replacing last node in path with st %u pa %u nt %u; "
+	      "pos %i\n", bet_node->Street(), bet_node->PlayerActing(),
+	      bet_node->NonterminalID(), (int)(path_->size() - 1));
+      Node *previous = (*path_)[path_->size() - 1];
+      fprintf(stderr, "Previously st %u pa %u nt %u\n", previous->Street(),
+	      previous->PlayerActing(), previous->NonterminalID());
+	      
     }
     // Replace the last node in the path with the bet node.
-    (*path)[path->size() - 1] = bet_node;
+    (*path_)[path_->size() - 1] = bet_node;
     return true;
   } else {
     if (debug_) {
@@ -1027,19 +1303,17 @@ bool NLAgent::HandleRaise(Node *bet_node, unsigned int hand_index,
   }
 }
 
-// actual_opp_bet_to can't be different from last_bet_to, can it?
+// actual_opp_bet_to can't be different from last_actual_bet_to, can it?
 double *NLAgent::GetActionProbs(const vector<Action> &actions,
-				vector<Node *> *path, Node *sob_node,
-				unsigned int hand_index,
-				unsigned int ***current_buckets,
-				bool p1, unsigned int *opp_bet_amount,
-				bool *force_all_in, bool *force_call) {
+				Node *sob_node, unsigned int *current_buckets,
+				unsigned int p,	unsigned int *opp_bet_amount,
+				bool *force_call) {
   bool force_raise =
-    (sob_node && HandleRaise(sob_node, hand_index, current_buckets, path));
-  Node *current_node = (*path)[path->size() - 1];
+    (sob_node &&
+     HandleRaise(sob_node, current_buckets, p));
+  Node *current_node = (*path_)[path_->size() - 1];
   unsigned int num_succs = current_node->NumSuccs();
   unsigned int csi = current_node->CallSuccIndex();
-  unsigned int dsi = current_node->DefaultSuccIndex();
 
   if (sob_node && ! force_raise) {
     // If we map a small bet down to a check/call *and* we decide not to
@@ -1047,28 +1321,13 @@ double *NLAgent::GetActionProbs(const vector<Action> &actions,
     // size zero bet.
     // Keep in mind the current node might be a terminal (showdown) node.
     *force_call = true;
-#if 0
-    double *probs = new double[num_succs];
-    for (unsigned int s = 0; s < num_succs; ++s) {
-      if (s == csi) probs[s] = 1.0;
-      else          probs[s] = 0;
-    }
-#endif
-    *force_all_in = false;
     if (debug_) {
       fprintf(stderr, "Not raising; forcing check/call\n");
-#if 0
-      fprintf(stderr, "Not raising; forcing check/call; probs:");
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	fprintf(stderr, " %f", probs[s]);
-      }
-      fprintf(stderr, "\n");
-#endif
     }
-    // return probs;
-    return NULL;
+    return nullptr;
   }
 
+#if 0
   // Note that the "bet amount" is different from the "bet to" amount.
   unsigned int actual_opp_bet_to;
   bool facing_bet = AreWeFacingBet(&actions, &actual_opp_bet_to,
@@ -1076,13 +1335,13 @@ double *NLAgent::GetActionProbs(const vector<Action> &actions,
   if (facing_bet) {
     if (debug_) fprintf(stderr, "Opp bet amount: %i\n", *opp_bet_amount);
   }
+#endif
 
   unsigned int fsi = current_node->FoldSuccIndex();
   unsigned int st = current_node->Street();
-  unsigned int max_street = Game::MaxStreet();
 
-  unsigned int b = current_buckets[current_node->PlayerActing()][st][0];
-  float *raw_probs = CurrentProbs(current_node, b);
+  unsigned int b = current_buckets[st];
+  double *raw_probs = CurrentProbs(current_node, b, p);
   if (debug_) {
     fprintf(stderr, "raw_probs:");
     for (unsigned int s = 0; s < num_succs; ++s) {
@@ -1094,7 +1353,6 @@ double *NLAgent::GetActionProbs(const vector<Action> &actions,
   double orig_call_prob = 0, fold_prob = 0;
   if (current_node->HasCallSucc()) orig_call_prob = raw_probs[csi];
   if (current_node->HasFoldSucc()) fold_prob = raw_probs[fsi];
-  unsigned int pot_size = current_node->LastBetTo() * 2;
 
   if (force_raise) {
     // Need to set call/fold probs to zero, scale up raise probs
@@ -1116,207 +1374,44 @@ double *NLAgent::GetActionProbs(const vector<Action> &actions,
     }
   }
 
-  // Should I only try calling if original decision is to fold?  Or also
-  // try calling if original decision is to raise?
-  if (facing_bet && fold_prob > 0 && call_alternative_streets_[st] &&
-      pot_size >= override_min_pot_size_) {
-    vector<Node *> alternative_bet_nodes;
-    GetAlternativeBetNodes(path, p1, false, &alternative_bet_nodes);
-
-    vector<unsigned int> buckets;
-    unsigned int b = current_buckets[p1][st][0];
-    if (ftann_ && nearest_neighbors_ && st == max_street) {
-      nearest_neighbors_[p1]->GetNeighbors(b, &buckets);
-      buckets.push_back(b);
-    } else {
-      buckets.push_back(b);
-    }
-    unsigned int num_neighbors = buckets.size();
-    double max_call_prob = orig_call_prob;
-    num_alternative_bets_ = alternative_bet_nodes.size();
-    unsigned int num_candidates = 0;
-    for (unsigned int i = 0; i < num_alternative_bets_; ++i) {
-      Node *alternative_bet_node = alternative_bet_nodes[i];
-      int acsi = alternative_bet_node->CallSuccIndex();
-      if (acsi >= 0) {
-	unsigned int ast = alternative_bet_node->Street();
-	if (debug_) {
-	  fprintf(stderr, "Alternative bet node %u\n",
-		  alternative_bet_node->NonterminalID());
-	}
-	if (ast < st) {
-	  ++num_candidates;
-	  unsigned int b = current_buckets[p1][ast][0];
-	  float *probs2 = CurrentProbs(alternative_bet_node, b);
-	  double alt_call_prob = probs2[acsi];
-	  if (alt_call_prob > max_call_prob) max_call_prob = alt_call_prob;
-	  if (alt_call_prob > 0) ++num_alternative_called_;
-	  delete [] probs2;
-	} else {
-	  for (unsigned int i = 0; i < num_neighbors; ++i) {
-	    ++num_candidates;
-	    // nb is the bucket that may be our actual bucket or a neighboring
-	    // bucket.
-	    unsigned int nb = buckets[i];
-	    float *probs2 = CurrentProbs(alternative_bet_node, nb);
-	    double alt_call_prob = probs2[acsi];
-	    if (alt_call_prob > max_call_prob) max_call_prob = alt_call_prob;
-	    if (alt_call_prob > 0) ++num_alternative_called_;
-	    delete [] probs2;
-	  }
-	}
-      }
-    }
-    if (num_alternative_bets_ > 0) {
-      frac_alternative_called_ =
-	num_alternative_called_ / (double)num_candidates;
-    }
-    if (max_call_prob > orig_call_prob) {
-      changed_fold_to_call_ = true;
-      double old_other = 1.0 - orig_call_prob;
-      double new_other = 1.0 - max_call_prob;
-      double scale_down = new_other / old_other;
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	if (s != csi) raw_probs[s] *= scale_down;
-      }
-      raw_probs[csi] = max_call_prob;
-    }
-  }
-
-  // Original code only invoked this logic if the original decision was to
-  // call.  Not sure if I can mimic that exactly.  But I can at least not
-  // invoke this logic if the call prob is zero.  And since we have purified
-  // probs, this is a pretty good approximation.
-  if (facing_bet && orig_call_prob > 0 && pot_size >= override_min_pot_size_) {
-    if (nearest_neighbors_ && st == max_street && min_neighbor_folds_ < 999) {
-      vector<unsigned int> v;
-      unsigned int b = current_buckets[p1][max_street][0];
-      nearest_neighbors_[p1]->GetNeighbors(b, &v);
-      unsigned int num_neighbors = v.size();
-      // Once we get up to as many as five neighbors it became too aggressive
-      // to fold if *any* neighbor said to fold.
-      if (num_neighbors > 0) {
-	num_neighbor_folded_ = 0;
-	for (unsigned int i = 0; i < num_neighbors; ++i) {
-	  unsigned int nb = v[i];
-	  unsigned int offset = nb * num_succs;
-	  double fold_prob = probs_[p1]->Prob(p1, max_street, 
-					      current_node->NonterminalID(),
-					      offset, fsi, num_succs, dsi);
-	  // Assume purified system
-	  if (fold_prob == 1.0) ++num_neighbor_folded_;
-	}
-	frac_neighbor_folded_ = num_neighbor_folded_ / (double)num_neighbors;
-	if (num_neighbor_folded_ >= min_neighbor_folds_ &&
-	    frac_neighbor_folded_ >= min_neighbor_frac_) {
-	  changed_call_to_fold_ = true;
-	  for (unsigned int s = 0; s < num_succs; ++s) {
-	    if (s == fsi)      raw_probs[s] = 1.0;
-	    else               raw_probs[s] = 0;
-	  }
-	}
-      }
-    }
-
-    // Make sure we didn't already set call prob to zero in nearest
-    // neighbor calculation above.
-    // When evaluating overrides, do this calculation even if we have already
-    // decided to call.
-    if (fold_to_alternative_streets_[st] &&
-	(eval_overrides_ || ! changed_call_to_fold_)) {
-      vector<Node *> alternative_bet_nodes;
-      GetAlternativeBetNodes(path, p1, true, &alternative_bet_nodes);
-      vector<unsigned int> buckets;
-      unsigned int b = current_buckets[p1][st][0];
-      if (ftann_ && nearest_neighbors_ && st == max_street) {
-	nearest_neighbors_[p1]->GetNeighbors(b, &buckets);
-	if (debug_) {
-	  printf("NN of b %u:", b);
-	  unsigned int num = buckets.size();
-	  for (unsigned int i = 0; i < num; ++i) {
-	    printf(" %u", buckets[i]);
-	  }
-	  printf("\n");
-	}
-	buckets.push_back(b);
-      } else {
-	buckets.push_back(b);
-      }
-      unsigned int num_neighbors = buckets.size();
-
-      num_alternative_bets_ = alternative_bet_nodes.size();
-      unsigned int num_candidates = 0;
-      for (unsigned int i = 0; i < num_alternative_bets_; ++i) {
-	Node *alternative_bet_node = alternative_bet_nodes[i];
-	unsigned int ast = alternative_bet_node->Street();
-	if (debug_) {
-	  fprintf(stderr, "Alternative bet node %u\n",
-		  alternative_bet_node->NonterminalID());
-	}
-	int afsi = alternative_bet_node->FoldSuccIndex();
-	if (ast < st) {
-	  ++num_candidates;
-	  unsigned int b = current_buckets[p1][ast][0];
-	  float *probs2 = CurrentProbs(alternative_bet_node, b);
-	  if (afsi >= 0) {
-	    double alt_fold_prob = probs2[afsi];
-	    if (alt_fold_prob > 0) {
-	      ++num_alternative_folded_;
-	      ++num_alternative_actual_folded_;
-	    }
-	  }
-	  delete [] probs2;
-	} else {
-	  for (unsigned int i = 0; i < num_neighbors; ++i) {
-	    ++num_candidates;
-	    // nb is the bucket that may be our actual bucket or a neighboring
-	    // bucket.
-	    unsigned int nb = buckets[i];
-	    float *probs2 = CurrentProbs(alternative_bet_node, nb);
-	    if (afsi >= 0) {
-	      double alt_fold_prob = probs2[afsi];
-	      if (alt_fold_prob > 0) {
-		if (debug_) {
-		  fprintf(stderr, "nb %u fold\n", nb);
-		}
-		++num_alternative_folded_;
-		if (nb == b) {
-		  ++num_alternative_actual_folded_;
-		}
-	      }
-	    }
-	    delete [] probs2;
-	  }
-	}
-      }
-      if (num_alternative_bets_ > 0) {
-	frac_alternative_folded_ =
-	  num_alternative_folded_ / (double)num_candidates;
-	if (debug_) {
-	  fprintf(stderr, "faf %f (%u / %u)\n", frac_alternative_folded_,
-		  num_alternative_folded_, num_candidates);
-	}
-      }
-      // Do an OR of the first two, combined with an AND.
-      if ((num_alternative_folded_ >= min_alternative_folds_ ||
-	   num_alternative_actual_folded_ >= min_actual_alternative_folds_) &&
-	  frac_alternative_folded_ >= min_frac_alternative_folded_) {
-	changed_call_to_fold_ = true;
-	for (unsigned int s = 0; s < num_succs; ++s) {
-	  if (s == fsi)      raw_probs[s] = 1.0;
-	  else               raw_probs[s] = 0;
-	}
-      }
-    }
-  }
-
   double *probs = new double[num_succs];
   for (unsigned int s = 0; s < num_succs; ++s) probs[s] = raw_probs[s];
-
   delete [] raw_probs;
 
-  *force_all_in = facing_bet && 
-    StatelessForceAllIn((*path)[path->size() - 1], actual_opp_bet_to);
+  if (purify_) {
+    double max_prob = -1;
+    unsigned int max_s = 0;
+    for (unsigned int s = 0; s < num_succs; ++s) {
+      if (probs[s] > max_prob) {
+	max_prob = probs[s];
+	max_s = s;
+      }
+    }
+    for (unsigned int s = 0; s < num_succs; ++s) {
+      probs[s] = (s == max_s ? 1.0 : 0);
+    }
+  } else {
+    if (fold_round_up_ > 0 && fsi < num_succs &&
+	probs[fsi] >= fold_round_up_) {
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	probs[s] = s == fsi ? 1.0 : 0;
+      }
+    } else {
+      if (min_prob_ > 0) {
+	double reassign_total = 0;
+	for (unsigned int s = 0; s < num_succs; ++s) {
+	  if (probs[s] < min_prob_) reassign_total += probs[s];
+	}
+	if (reassign_total > 0 && reassign_total < 0.99) {
+	  double rescaling = 1.0 / (1.0 - reassign_total);
+	  for (unsigned int s = 0; s < num_succs; ++s) {
+	    if (probs[s] < min_prob_) probs[s] = 0;
+	    else                      probs[s] *= rescaling;
+	  }
+	}
+      }
+    }
+  }
 
   if (debug_) {
     for (unsigned int s = 0; s < num_succs; ++s) {
@@ -1326,13 +1421,12 @@ double *NLAgent::GetActionProbs(const vector<Action> &actions,
   return probs;
 }
 
+// This will force the new-hand logic to be performed upon the next call to
+// HandleStateChange().
+void NLAgent::SetNewHand(void) {
+  last_hand_index_ = kMaxUInt;
+}
 
-// Now that I have a stateless interface I don't know the last hand number
-// and can't tell in the same way if I have a new hand.  But maybe I don't
-// need to know if I have a new hand.  Just look up the buckets each time.
-// I will desupport fixed_seed_ for now.  But if I want to resupport it,
-// seed based on a hash of the match state?  Or seed based on the hand number
-// at every call?  See comment about synchronized actions below.
 BotAction NLAgent::HandleStateChange(const string &match_state,
 				     unsigned int *we_bet_to) {
   if (debug_) {
@@ -1340,436 +1434,288 @@ BotAction NLAgent::HandleStateChange(const string &match_state,
     fprintf(stderr, "%s\n", match_state.c_str());
   }
   *we_bet_to = 0; // Default
-  bool p1;
+  unsigned int p;
   unsigned int hand_index;
   unsigned int board_street;
   string action_str;
-  Card our_hi, our_lo, opp_hi, opp_lo;
+  Card our_hi, our_lo;
   Card board[5];
-  if (! ParseMatchState(match_state, &p1, (int *)&hand_index, &action_str,
-			&our_hi, &our_lo, &opp_hi, &opp_lo, board,
-			&board_street)) {
+  unsigned int num_players = Game::NumPlayers();
+  if (! ParseMatchState(match_state, num_players, &p, &hand_index, &action_str,
+			&our_hi, &our_lo, board, &board_street)) {
     fprintf(stderr, "Couldn't parse match state message from server:\n");
     fprintf(stderr, "  %s\n", match_state.c_str());
     if (exit_on_error_) exit(-1);
     else                return BA_CALL;
   }
-  if (debug_) fprintf(stderr, "P1: %i\n", (int)p1);
-
-#if 0
-  // The hand index needs to be the same throughout the hand (so translation
-  // decisions are made consistently) so this code is definitely broken.
-  // For now, fixed_seed is mandatory.
-  //
-  // I now seed the RNG each time before a random number is needed.
-  if (! fixed_seed_) {
-    hand_index = RandBetween(0, 1000000);
-  }
-#endif
-
-  changed_call_to_fold_ = false;
-  changed_fold_to_call_ = false;
-  num_alternative_folded_ = 0;
-  num_alternative_actual_folded_ = 0;
-  num_alternative_called_ = 0;
-  frac_alternative_folded_ = 0;
-  frac_alternative_called_ = 0;
-  num_alternative_bets_ = 0;
-  num_neighbor_folded_ = 0;
-  frac_neighbor_folded_ = 0;
-
-  unsigned int max_street = Game::MaxStreet();
-  unsigned int ***current_buckets = new unsigned int **[2];
-  for (unsigned int p1 = 0; p1 <= 1; ++p1) {
-    current_buckets[p1] = new unsigned int *[max_street + 1];
-    for (unsigned int st = 0; st <= max_street; ++st) {
-      current_buckets[p1][st] = new unsigned int[1];
+  if (debug_) fprintf(stderr, "P%u\n", p);
+  if (hand_index != last_hand_index_) {
+    path_->clear();
+    path_->push_back(betting_trees_[p]->Root());
+    action_index_ = 0;
+    st_ = 0;
+    player_acting_ = Game::FirstToAct(0);
+    num_remaining_ = num_players;
+    num_to_act_on_street_ = num_players;
+    for (unsigned int p = 0; p < num_players; ++p) {
+      folded_[p] = false;
+    }
+    all_in_ = false;
+    delete endgame_sumprobs_;
+    endgame_sumprobs_ = nullptr;
+    delete endgame_subtree_;
+    endgame_subtree_ = nullptr;
+    last_hand_index_ = hand_index;
+    if (fixed_seed_) {
+      // Have a separate seed for each player.  Makes it easier to
+      // match results from those of play.  May also prevent synchronization
+      // which can lead to subtle biases.
+      srand48_r(hand_index * num_players + p, &rand_bufs_[p]);
     }
   }
-  UpdateCards((int)board_street, our_hi, our_lo, board, current_buckets);
+  if (debug_) {
+    fprintf(stderr, "action_index_ %u\n", action_index_);
+    fprintf(stderr, "st_ %u\n", st_);
+  }
+
+  unsigned int max_street = Game::MaxStreet();
+  unique_ptr<unsigned int[]> current_buckets(new unsigned int[max_street + 1]);
+  unsigned int bd;
+  UpdateCards((int)board_street, our_hi, our_lo, board, current_buckets.get(),
+	      &bd);
   if (debug_) {
     fprintf(stderr, "Action str: %s\n", action_str.c_str());
   }
   vector<Action> actions;
   ParseActions(action_str, false, exit_on_error_, &actions);
 
-  if (AreWeAllIn(&actions)) {
-    if (debug_) {
-      fprintf(stderr, "We are all-in; returning no-action\n");
-    }
-    *we_bet_to = 0;
-    for (unsigned int p1 = 0; p1 <= 1; ++p1) {
-      for (unsigned int st = 0; st <= max_street; ++st) {
-	delete [] current_buckets[p1][st];
-      }
-      delete [] current_buckets[p1];
-    }
-    delete [] current_buckets;
-    return BA_NONE;
-  }
+  unsigned int player_to_act = WhoseAction(&actions);
+  if (debug_) fprintf(stderr, "player_to_act %u p %u\n", player_to_act, p);
+  if (player_to_act == kMaxUInt) return BA_NONE;
+  if (p != player_to_act) return BA_NONE;
 
-  bool p1_to_act, p2_to_act;
-  WhoseAction(&actions, &p1_to_act, &p2_to_act);
-  if (! p1_to_act && ! p2_to_act) {
-    for (unsigned int p1 = 0; p1 <= 1; ++p1) {
-      for (unsigned int st = 0; st <= max_street; ++st) {
-	delete [] current_buckets[p1][st];
-      }
-      delete [] current_buckets[p1];
-    }
-    delete [] current_buckets;
-    return BA_NONE;
-  }
-  if (p1 != p1_to_act) {
-    for (unsigned int p1 = 0; p1 <= 1; ++p1) {
-      for (unsigned int st = 0; st <= max_street; ++st) {
-	delete [] current_buckets[p1][st];
-      }
-      delete [] current_buckets[p1];
-    }
-    delete [] current_buckets;
-    return BA_NONE;
-  }
-
-  bool terminate;
-  unsigned int last_bet_to;
-  vector<Node *> path;
   Node *sob_node;
-  ProcessActions(&actions, p1, hand_index, &path, &sob_node, &terminate,
-		 &last_bet_to);
+  bool endgame = endgame_sumprobs_ != nullptr;
+  unsigned int last_actual_bet_to = GetLastActualBetTo(&actions);
+  if (debug_) fprintf(stderr, "ProcessActions1\n");
+  ProcessActions(&actions, p, endgame, &last_actual_bet_to, &sob_node);
+  if (debug_) fprintf(stderr, "Back from ProcessActions1\n");
   if (debug_ && sob_node) {
     fprintf(stderr, "ProcessActions returned with sob node\n");
   }
-  if (terminate) {
-    for (unsigned int p1 = 0; p1 <= 1; ++p1) {
-      for (unsigned int st = 0; st <= max_street; ++st) {
-	delete [] current_buckets[p1][st];
-      }
-      delete [] current_buckets[p1];
-    }
-    delete [] current_buckets;
+
+  if (all_in_) {
+    if (debug_) fprintf(stderr, "We are all-in; returning no-action\n");
+    *we_bet_to = 0;
     return BA_NONE;
   }
+  
+  Node *current_node = (*path_)[path_->size() - 1];
+  // This can happen when a not-all-in bet gets translated up to an all-in
+  // bet.  We get to the terminal node, but we are not really all-in.
+  // Should I return BA_NONE?
+  if (current_node->Terminal()) {
+    fprintf(stderr, "At terminal node in abstract game; returning call\n");
+    return BA_CALL;
+  }
 
+  if (board_street >= endgame_st_ && endgame_sumprobs_ == nullptr) {
+    // Don't resolve if current_node->NumSuccs() == 1.  This would be a case
+    // where we are already all-in.  But we will still want to call
+    // ProcessActions() a second time to process any remaining actions on
+    // the river.
+    if (current_node->NumSuccs() > 1) {
+      if (debug_) fprintf(stderr, "Calling GetReachProbs()\n");
+      double **reach_probs = GetReachProbs(bd, p);
+      if (debug_) fprintf(stderr, "ResolveSubgame\n");
+      ResolveSubgame(p, bd, reach_probs);
+      if (debug_) fprintf(stderr, "Back from ResolveSubgame\n");
+      for (unsigned int p = 0; p < num_players; ++p) {
+	delete [] reach_probs[p];
+      }
+      delete [] reach_probs;
+    }
+
+    if (action_index_ != actions.size()) {
+      // More actions by opponent to translate in the endgame.
+      if (sob_node != nullptr) {
+	fprintf(stderr, "sob_node already set pre-endgame?!?\n");
+	exit(-1);
+      }
+      ProcessActions(&actions, p, true, &last_actual_bet_to, &sob_node);
+    }
+  }
+  
   // Default
   BotAction bot_action = BA_NONE;
+  Node *next_node = nullptr;
 
-  bool force_all_in;
-  unsigned int opp_bet_amount;
-  double *probs = NULL;
-  bool probs_set = false;
+  current_node = (*path_)[path_->size() - 1];
+  if (current_node->Street() != st_ || current_node->Terminal()) {
+    // I have seen this in both heads-up and six-player.
+    // In heads-up, we translated a large bet preflop to 19000 to an all-in.
+    // On the turn, the action went cr19500c.  We translate the r19500 to
+    // a check so after the "cr19500" the abstract betting state is already
+    // on the river.  But the real-game action is still on the turn.
 
-  if (hard_coded_root_strategy_ && path.size() == 1 && p1) {
-    // A hack we may want to employ to enforce a certain strategy at the root.
-    probs = new double[2];
-    unsigned int b = current_buckets[1][0][0];
-    opp_bet_amount = 0;
-    force_all_in = false;
-    probs_set = true;
-
-    // Folds below were those hands that lose -50 or more when Slumbot 2015
-    //   plays itself:
-    //     32o (2), 42o (5), 62o (17), 82o (37), 83o (39), 72o (26).
-    // Old:
-    //   if (b == 2 || b == 5 || b == 17 || b == 26 || b == 37 || b == 39) {
-
-    // New
-    // Try also open folding 52o (10), 73o (28), 74o (30), 92o (50), 93o (52).
-    if (b == 2 || b == 5 || b == 17 || b == 26 || b == 37 || b == 39 ||
-	b == 10 || b == 28 || b == 30 || b == 50 || b == 52) {
-      probs[0] = 1.0;
-      probs[1] = 0;
-    } else {
-      probs[0] = 0;
-      probs[1] = 1.0;
-    }
-  }
-
-  bool force_call = false;
-  if (! probs_set) {
-    probs = GetActionProbs(actions, &path, sob_node, hand_index,
-			   current_buckets, p1, &opp_bet_amount,
-			   &force_all_in, &force_call);
-  }
-
-  Node *current_node = path[path.size() - 1];
-  unsigned int num_succs = current_node->NumSuccs();
-  unsigned int csi = current_node->CallSuccIndex();
-  unsigned int fsi = current_node->FoldSuccIndex();
-
-  if (hard_coded_r200_strategy_ && path.size() == 2 && ! p1 &&
-      current_node == p0_tree_->Root()->IthSucc(2)) {
-
-    unsigned int b = current_buckets[0][0][0];
-
-    // Try r200 folding only 62o (17), 72o (26), 73o (28), 82o (37), 83o (39),
-    //   92o (50).
-    if (b == 17 || b == 26 || b == 28 || b == 37 || b == 39 || b == 50) {
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	if (s == fsi) probs[s] = 1.0;
-	else          probs[s] = 0;
-      }
-    } else {
-      // Force no-fold
-      double fold_prob = probs[fsi];
-      if (fold_prob == 1.0) {
-	for (unsigned int s = 0; s < num_succs; ++s) {
-	  if (s == csi) probs[s] = 1.0;
-	  else          probs[s] = 0;
-	}
-      } else if (fold_prob == 0) {
-	// Nothing to do
-      } else {
-	// Set fold prob to zero; scale up all other probs
-	double scale_up = 1.0 / (1.0 - fold_prob);
-	for (unsigned int s = 0; s < num_succs; ++s) {
-	  if (s == fsi) probs[s] = 0;
-	  else          probs[s] *= scale_up;
-	}
-      }
-    }
-  }
-
-  if (hard_coded_r250_strategy_ && path.size() == 2 && ! p1 &&
-      current_node == p0_tree_->Root()->IthSucc(3)) {
-
-    unsigned int b = current_buckets[0][0][0];
-
-    // Try r250 folding only 32o (2), 42o (5), 52o (10), 62o (17), 63o (19),
-    // 72o (26), 73o (28), 74o (30), 82o (37), 83o (39), 84o (41), 92o (50),
-    // 93o (52), T2o (65), T3o (67), J2o (82)
-    if (b == 2 || b == 5 || b == 10 || b == 17 || b == 19 || b == 26 ||
-	b == 28 || b == 30 || b == 37 || b == 39 || b == 41 || b == 50 ||
-	b == 52 || b == 65 || b == 67 || b == 82) {
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	if (s == fsi) probs[s] = 1.0;
-	else          probs[s] = 0;
-      }
-    } else {
-      // Force no-fold
-      double fold_prob = probs[fsi];
-      if (fold_prob == 1.0) {
-	for (unsigned int s = 0; s < num_succs; ++s) {
-	  if (s == csi) probs[s] = 1.0;
-	  else          probs[s] = 0;
-	}
-      } else if (fold_prob == 0) {
-	// Nothing to do
-      } else {
-	// Set fold prob to zero; scale up all other probs
-	double scale_up = 1.0 / (1.0 - fold_prob);
-	for (unsigned int s = 0; s < num_succs; ++s) {
-	  if (s == fsi) probs[s] = 0;
-	  else          probs[s] *= scale_up;
-	}
-      }
-    }
-  }
-
-  if (hard_coded_r200r600_strategy_ && path.size() == 3 && p1 &&
-      current_node == p1_tree_->Root()->IthSucc(1)->IthSucc(2)) {
-
-    unsigned int b = current_buckets[0][0][0];
-    // Try r200r600 folding only 42 hands:
-    // 32o (2), 42o (5), 43o (7), 52o (10), 53o (12), 62o (17), 63o (19),
-    // 64o (21), 72o (26), 73o (28), 74o (30), 75o (32), 82o (37), 83o (39),
-    // 84o (41), 85o (43), 86o (45), 92o (50), 93o (52), 94o (54), 95o (56),
-    // 96o (58), T2o (65), T3o (67), T4o (69), T5o (71), T6o (73), J2o (82),
-    // J3o (84), J4o (86), J5o (88), Q2o (101), Q3o (103), Q4o (105),
-    // Q5o (107), K2o (122); 32s (1), 62s (16), 72s (25), 73s (27), 82s (36),
-    // 83s (38).
-    // After final testing, adding 15 hands to make 57:
-    //   84s (40), 92s-95s (49, 51, 53, 55), 97o (60), T2s-T3s (64, 66),
-    //   T7o (75), J6o-J8o (90, 92, 94), Q6o-Q8o (109, 111, 113)
-    if (b == 2 || b == 5 || b == 7 || b == 10 || b == 12 || b == 17 ||
-	b == 19 || b == 21 || b == 26 || b == 28 || b == 30 || b == 32 ||
-	b == 37 || b == 39 || b == 41 || b == 43 || b == 45 || b == 50 ||
-	b == 52 || b == 54 || b == 56 || b == 58 || b == 65 || b == 67 ||
-	b == 69 || b == 71 || b == 73 || b == 82 || b == 84 || b == 86 ||
-	b == 88 || b == 101 || b == 103 || b == 105 || b == 107 || b == 122 ||
-	b == 1 || b == 16 || b == 25 || b == 27 || b == 36 || b == 38 ||
-	// New additions
-	b == 40 || b == 49 || b == 51 || b == 53 || b == 55 || b == 60 ||
-	b == 64 || b == 66 || b == 75 || b == 90 || b == 92 || b == 94 ||
-	b == 109 || b == 111 || b == 113) {
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	if (s == fsi) probs[s] = 1.0;
-	else          probs[s] = 0;
-      }
-    } else {
-      // Force no-fold
-      double fold_prob = probs[fsi];
-      if (fold_prob == 1.0) {
-	for (unsigned int s = 0; s < num_succs; ++s) {
-	  if (s == csi) probs[s] = 1.0;
-	  else          probs[s] = 0;
-	}
-      } else if (fold_prob == 0) {
-	// Nothing to do
-      } else {
-	// Set fold prob to zero; scale up all other probs
-	double scale_up = 1.0 / (1.0 - fold_prob);
-	for (unsigned int s = 0; s < num_succs; ++s) {
-	  if (s == fsi) probs[s] = 0;
-	  else          probs[s] *= scale_up;
-	}
-      }
-    }
-  }
-
-  if (hard_coded_r200r800_strategy_ && path.size() == 3 && p1 &&
-      current_node == p1_tree_->Root()->IthSucc(1)->IthSucc(3)) {
-
-    unsigned int b = current_buckets[0][0][0];
-    // Try r200r800 folding only 62 hands:
-    // The 42 hands we fold at r200r600:
-    // 32o (2), 42o (5), 43o (7), 52o (10), 53o (12), 62o (17), 63o (19),
-    // 64o (21), 72o (26), 73o (28), 74o (30), 75o (32), 82o (37), 83o (39),
-    // 84o (41), 85o (43), 86o (45), 92o (50), 93o (52), 94o (54), 95o (56),
-    // 96o (58), T2o (65), T3o (67), T4o (69), T5o (71), T6o (73), J2o (82),
-    // J3o (84), J4o (86), J5o (88), Q2o (101), Q3o (103), Q4o (105),
-    // Q5o (107), K2o (122); 32s (1), 62s (16), 72s (25), 73s (27), 82s (36),
-    // 83s (38).
-    // Plus eleven more suited hands:
-    // 74s (29), 84s (40), 92s (49), 93s (51), 94s (53), T2s (64), T3s (66),
-    // T4s (68), T5s (70), T6s (72), J2s (81)
-    // Plus nine more unsuited hands:
-    // J6o (90), J7o (92), Q6o (109), Q7o (111), K3o (124), K4o (126),
-    // K5o (128), K6o (130), K7o (132)
-    // The five new hands we added to r200r600 that weren't already here:
-    // 95s (55), 97o (60), T7o (75), J8o (94), Q8o (113)
-    // The 6 additional hands that were losing to Tartanian8, and which we
-    // fold in the base:
-    // 52s (9), T8o (77), J3s (83), Q2s-Q4s (100, 102, 104)
-    // Note: base does not fold 63s-64s, 75s, 85s-86s, T7s
-    if (b == 2 || b == 5 || b == 7 || b == 10 || b == 12 || b == 17 ||
-	b == 19 || b == 21 || b == 26 || b == 28 || b == 30 || b == 32 ||
-	b == 37 || b == 39 || b == 41 || b == 43 || b == 45 || b == 50 ||
-	b == 52 || b == 54 || b == 56 || b == 58 || b == 65 || b == 67 ||
-	b == 69 || b == 71 || b == 73 || b == 82 || b == 84 || b == 86 ||
-	b == 88 || b == 101 || b == 103 || b == 105 || b == 107 || b == 122 ||
-	b == 1 || b == 16 || b == 25 || b == 27 || b == 36 || b == 38 ||
-	b == 29 || b == 40 || b == 49 || b == 51 || b == 53 || b == 64 ||
-	b == 66 || b == 68 || b == 70 || b == 72 || b == 81 ||
-	b == 90 || b == 92 || b == 109 || b == 111 || b == 124 || b == 126 ||
-	b == 128 || b == 130 || b == 132 ||
-	b == 55 || b == 60 || b == 75 || b == 94 || b == 113 ||
-	b == 9 || b == 77 || b == 83 || b == 100 || b == 102 || b == 104) {
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	if (s == fsi) probs[s] = 1.0;
-	else          probs[s] = 0;
-      }
-    } else {
-      // Force no-fold
-      double fold_prob = probs[fsi];
-      if (fold_prob == 1.0) {
-	for (unsigned int s = 0; s < num_succs; ++s) {
-	  if (s == csi) probs[s] = 1.0;
-	  else          probs[s] = 0;
-	}
-      } else if (fold_prob == 0) {
-	// Nothing to do
-      } else {
-	// Set fold prob to zero; scale up all other probs
-	double scale_up = 1.0 / (1.0 - fold_prob);
-	for (unsigned int s = 0; s < num_succs; ++s) {
-	  if (s == fsi) probs[s] = 0;
-	  else          probs[s] *= scale_up;
-	}
-      }
-    }
-  }
-
-  if (force_call) {
-    bot_action = BA_CALL;
-  } else {
-    // I better reseed to make sure I don't get the seed used in translation.
-    // I seed the RNG to something based on the hand index and the action index.
-    // So behaviour should be replicable, but only for the same hand and same
-    // action.
-    unsigned int seed = hand_index * 971 + (p1 ? 23 : 0) + path.size() * 7;
-    SeedRand(seed);
-    double r = RandZeroToOne();
     if (debug_) {
-      fprintf(stderr, "r %f\n", r);
+      fprintf(stderr, "Forcing call because abstract street is ahead of "
+	      "actual street\n");
     }
-    double cum = 0;
-    if (num_succs == 0) {
-      fprintf(stderr, "Can't handle zero succs\n");
-      if (exit_on_error_) exit(-1);
-    }
-    unsigned int s;
-    for (s = 0; s < num_succs - 1; ++s) {
-      cum += probs[s];
-      if (debug_) {
-	fprintf(stderr, "s %u prob %f cum %f\n", s, probs[s], cum);
-      }
-      if (r < cum) break;
-    }
-    delete [] probs;
+    bot_action = BA_CALL;
+    // I think I do not want to advance the abstract betting state.
+    // unsigned int csi = current_node->CallSuccIndex();
+    // next_node = current_node->IthSucc(csi);
+    next_node = current_node;
+  } else {
+    unsigned int opp_bet_amount;
+    double *probs = NULL;
 
-    if (s == csi) {
-      if (force_all_in) {
-	bot_action = BA_BET;
-	*we_bet_to = stack_size_;
-      } else {
-	bot_action = BA_CALL;
-      }
-    } else if (s == fsi) {
-      bot_action = BA_FOLD;
+    bool force_call = false;
+    probs = GetActionProbs(actions, sob_node, current_buckets.get(), p,
+			   &opp_bet_amount, &force_call);
+    // current_node can change inside GetActionProbs() because there is a
+    // small bet that we originally mapped to call, but now, because we choose
+    // to raise, we instead map to the smallest bet.
+    current_node = (*path_)[path_->size() - 1];
+
+    unsigned int num_succs = current_node->NumSuccs();
+    unsigned int csi = current_node->CallSuccIndex();
+    unsigned int fsi = current_node->FoldSuccIndex();
+
+    if (force_call) {
+      bot_action = BA_CALL;
+      next_node = current_node->IthSucc(csi);
     } else {
-      bot_action = BA_BET;
-      
-      Node *b = current_node->IthSucc(s);
-      *we_bet_to = b->LastBetTo() * small_blind_;
-      // Note that our_bet_size can be negative
-      int our_bet_size = (int)*we_bet_to - (int)last_bet_to;
-      if (debug_) {
-	fprintf(stderr, "s %i lbt %i wbt %u our_bet_size %i\n", s, last_bet_to,
-		*we_bet_to, our_bet_size);
+      if (hard_coded_r200_strategy_ && path_->size() == 2 && p == 0 &&
+	  current_node == betting_trees_[0]->Root()->IthSucc(2)) {
+	unsigned int b = current_buckets[0];
+	// Try r200 folding only 62o (17), 72o (26), 73o (28), 82o (37),
+	// 83o (39), 92o (50).
+	if (b == 17 || b == 26 || b == 28 || b == 37 || b == 39 || b == 50) {
+	  bot_action = BA_FOLD;
+	  next_node = current_node->IthSucc(fsi);
+	  for (unsigned int s = 0; s < num_succs; ++s) {
+	    probs[s] = (s == fsi ? 1.0 : 0);
+	  }
+	} else {
+	  double fold_prob = probs[fsi];
+	  if (fold_prob > 0) {
+	    double scale = 1.0 / (1.0 - fold_prob);
+	    for (unsigned int s = 0; s < num_succs; ++s) {
+	      probs[s] = (s == fsi ? 0 : probs[s] * scale);
+	    }
+	  }
+	}
       }
       
-      // Make sure we bet at least one big blind.  (Note: in case that's more
-      // than all-in, bet will be lowered below.)
-      if (our_bet_size < (int)(2 * small_blind_)) {
-	our_bet_size = (int)(2 * small_blind_);
-	*we_bet_to = last_bet_to + our_bet_size;
+      double r;
+      r = RandZeroToOne();
+      drand48_r(&rand_bufs_[p], &r);
+      if (debug_) fprintf(stderr, "r %f\n", r);
+      double cum = 0;
+      if (num_succs == 0) {
+	fprintf(stderr, "Can't handle zero succs\n");
+	if (exit_on_error_) exit(-1);
       }
+      unsigned int s;
+      for (s = 0; s < num_succs - 1; ++s) {
+	cum += probs[s];
+	if (debug_) {
+	  fprintf(stderr, "s %u prob %f cum %f\n", s, probs[s], cum);
+	}
+	if (r < cum) break;
+      }
+      delete [] probs;
+      next_node = current_node->IthSucc(s);
       
-      // Make sure our raise is at least size of opponent's bet.  (Note: in case
-      // that's more than all-in, bet will be lowered below.)
-      if (our_bet_size < (int)opp_bet_amount) {
-	our_bet_size = opp_bet_amount;
-	*we_bet_to = last_bet_to + our_bet_size;
-      }
-
-      // Make sure we are not betting more than all-in.
-      if (*we_bet_to > stack_size_) {
-	*we_bet_to = stack_size_;
-	// Could be zero, in which case we should turn this bet into a call
-	our_bet_size = (int)*we_bet_to - (int)last_bet_to;
-      }
-
-      // If bet size is zero, change action to a call.
-      if (our_bet_size == 0) {
+      if (s == csi) {
 	bot_action = BA_CALL;
-	*we_bet_to = 0;
-      }
-
-      if (debug_) {
-	fprintf(stderr, "selected succ %u bet_to %u bet amount %u\n", s,
-		*we_bet_to, our_bet_size);
+      } else if (s == fsi) {
+	bot_action = BA_FOLD;
+      } else {
+	bot_action = BA_BET;
+	
+	Node *b = current_node->IthSucc(s);
+	*we_bet_to = b->LastBetTo() * small_blind_;
+	// Note that our_bet_size can be negative
+	int our_bet_size = (int)*we_bet_to - (int)last_actual_bet_to;
+	if (debug_) {
+	  fprintf(stderr, "s %i lbt %i wbt %u our_bet_size %i\n", s,
+		  last_actual_bet_to, *we_bet_to, our_bet_size);
+	}
+	  
+	// Make sure we bet at least one big blind.  (Note: in case that's
+	// more than all-in, bet will be lowered below.)
+	if (our_bet_size < (int)(2 * small_blind_)) {
+	  our_bet_size = (int)(2 * small_blind_);
+	  *we_bet_to = last_actual_bet_to + our_bet_size;
+	}
+	  
+	// Make sure our raise is at least size of opponent's bet.  (Note: in
+	// case that's more than all-in, bet will be lowered below.)
+	if (our_bet_size < (int)opp_bet_amount) {
+	  our_bet_size = opp_bet_amount;
+	  *we_bet_to = last_actual_bet_to + our_bet_size;
+	}
+	
+	// Make sure we are not betting more than all-in.
+	if (*we_bet_to > stack_size_) {
+	  *we_bet_to = stack_size_;
+	  // Could be zero, in which case we should turn this bet into a call
+	  our_bet_size = (int)*we_bet_to - (int)last_actual_bet_to;
+	}
+	
+	// If bet size is zero, change action to a call.
+	if (our_bet_size == 0) {
+	  bot_action = BA_CALL;
+	  *we_bet_to = 0;
+	}
+	  
+	if (debug_) {
+	  fprintf(stderr, "selected succ %u bet_to %u bet amount %u\n", s,
+		  *we_bet_to, our_bet_size);
+	}
       }
     }
   }
-
-  for (unsigned int p1 = 0; p1 <= 1; ++p1) {
-    for (unsigned int st = 0; st <= max_street; ++st) {
-      delete [] current_buckets[p1][st];
-    }
-    delete [] current_buckets[p1];
+  ++action_index_;
+  if (debug_) {
+    fprintf(stderr, "Adding node st %u pa %u nt %u t %u\n",
+	    next_node->Street(), next_node->PlayerActing(),
+	    next_node->NonterminalID(), next_node->TerminalID());
   }
-  delete [] current_buckets;
-
+  path_->push_back(next_node);
+  if (bot_action == BA_CALL) {
+    --num_to_act_on_street_;
+    if (num_to_act_on_street_ == 0) {
+      if (st_ < Game::MaxStreet()) {
+	num_to_act_on_street_ = num_remaining_;
+	++st_;
+	player_acting_ = NextPlayer(Game::FirstToAct(st_), num_players,
+				    folded_.get());
+      }
+    } else {
+      player_acting_ = NextPlayer(player_acting_ + 1, num_players,
+				  folded_.get());
+    }
+  } else if (bot_action == BA_BET) {
+    num_to_act_on_street_ = num_remaining_ - 1;
+    player_acting_ = NextPlayer(player_acting_ + 1, num_players,
+				folded_.get());
+  } else if (bot_action == BA_FOLD) {
+    folded_[player_acting_] = true;
+    --num_to_act_on_street_;
+    --num_remaining_;
+    if (num_to_act_on_street_ == 0) {
+      num_to_act_on_street_ = num_remaining_;
+      ++st_;
+      player_acting_ = NextPlayer(Game::FirstToAct(st_), num_players,
+				  folded_.get());
+    } else {
+      player_acting_ = NextPlayer(player_acting_ + 1, num_players,
+				  folded_.get());
+    }
+  }
   return bot_action;
 }

@@ -500,18 +500,117 @@ of opponent probs.
   exploitability.  Cause for concern?  Try on mb2b2.  Can't load two resolved
   games into memory.  Access probs and or buckets from disk?  Quantize
   probs in memory?  Convert ints to chars.
-* Any time to build, test and use HVB table?
-* Start training.  Submit code to github.  Are we satisfied with big6asym?
-  Are we satisfied with hsfive/rk100kbc1s1?  Are we satisfied with endgame
-  solving based on a one-byte quantized river strategy?
-* How often do I want to checkpoint?  About once a day?  I think I can
-  save up to two checkpoints at most.
-  * How many iterations should I do before checkpointing?
-  * About 20m to Prepare().
-  * About 30m to write the regrets.
-  * Not sure how long to read.  Same as writing?
-  * So maybe four hours for all of the data?!?
-  * 10m its in 5m.  Implies 120m in 1h.  Implies 2.88B in 1 day.
-    But I expect it to pick up.
-  * First job started around 6:25 PM.  At 8:25 have done 300m iterations.
-    3b may take 20 hours therefore.
+* Is it weird that AJo has a negative CV at root in 6-max?  This is averaged
+  over all players.  Looks like AJo actually folds under the gun.  Could break
+  it down by position.  Average preflop bucket value is actually positive, but
+  this is probably because we don't weight by the number of hands in each
+  bucket.  Small buckets (pocket pairs and suited hands) are stronger than
+  large buckets (unsuited unpaired hands) in general.
+  AA has a value of 29.6.  Is that surprising?
+* Put sumprobs, regrets, current strategy in VCFRState.  Then VCFR object
+  is immutable.
+* Maxmargin approach to improve play off the beaten path.  Opponent learns
+  to discourage opponent from playing to path by largest margin possible.
+  Target player tries to minimize the margin.  What if we have a sequence
+  of undesirable actions?  Start with just two.  Couldn't I end up forcing
+  the player to take the second action with some bucket b that doesn't
+  take the first action?  Seems like I need to force player to play to
+  every terminal node.
+* Evaluate Pokerstars systems and approaches.  run_approx_rgbr on
+  0.001 and 0.01 systems.  Need to investigate how many unreached hands
+  there are.
+* Continue to investigate card sampling issues.  See "switch".
+  * Does external sampling start out with bad estimates for P0 and P1
+    root values?
+* Evaluate solving endgames with only pure current strategy along the path
+  to the subgame.  Try using sumprobs for us and pure current strategy for
+  opponent, and try using pure current strategy for both us and opponent.
+  Reach probs will be 1 or 0.  May be very few hands that reach subgame.
+  Also use pure current strategy for the base subgame strategy.  Use a
+  rich betting abstraction.
+* Test agent and bot some more.  Test action translation.  Implement
+  min prob and fold-round-up.  Get rid of rarely taken branches.
+  Implement endgame solving.  Evaluate with ACPC scripts.  Start with
+  mb1b1 system locally, later mb3b3 system, eventually our in-progress
+  final system.  Compare with last year's bot.
+  * CFRValuesFile::Probs() should not assume FTL.  For quantized preflop,
+    flop and turn probs I will want to use regret matching.
+  * Wait, I am only saving sumprobs for target player in asymmetric system!
+    How can I compute the reach probs for the opponent which are needed for
+    endgame solving?  Well, I have the current strategy.  Is that good
+    enough?  Did I experiment with that?
+* Compare external sampling and targeted CFR.
+  * Do a test on mb2b2 and a 100k bucket card abstraction.
+  * Try deal twice?
+  * Write a test program to compare CVs to strategy.  Alert if best CV
+    action does not have highest probability.
+* Do we have a bias towards folding in our certain CFR systems?  Run Gibson's
+  original code.  Is it only preflop or on all streets?  Perhaps it doesn't
+  show up in exploitability tests because it is *good* for exploitability
+  to fold a ton.
+  * Why would preflop fold too much, but not river?  Is that in fact what
+    we see?
+Pokerstars to do
+  * Measure convergence on small PS game.  Incorporate rarely reached test.
+  * sumprob discrepancy on 43o hand.
+  * Improve "rarely reached" test.  Shouldn't need to rescale threshold
+    every time.  Go down the path from root to current node and if the
+    probability for any action is less than 0.01 * the best action,
+    then we are rarely reached?
+1/5
+  * Li's e-mail
+  * How many machines do I have left?
+    * 1) With 6-player loaded on it.
+         r4.xlarge: ec2-34-228-187-103.compute-1.amazonaws.com
+    * 2) With new heads-up and Slumbot 2016 being loaded on it.
+         r4.large: ec2-35-153-168-224.compute-1.amazonaws.com
+Before 1/8
+* Run 2016uinhc against 2017 with endgame solving.  Do we do better on the
+  river?
+* Is there a bug that explains why 2017 loses so badly to 2016?
+* Should I hard-code preflop strategies?  I think that got me in trouble
+  last year.  But I see weird EV discrepancies after r200/r250.
+* Should I try to use the current strategy preflop?
+* Do heads-up experiments
+  * 2016 beats 2017
+  * 2016ui beats 2016
+  * Does 2016ui beat 2017?
+  * How much does 2016ui beat 2016 by?  Is it as much as intermission beat
+      us by?
+  * Can I identify bugs or problems using analyze_log_files?
+  * Can I check if version used for ACPC matches what I expect?
+  * Would hacking the preflop make any difference?
+  * MinProb
+  * FoldRoundUp
+  * Prune rarely reached betting sequences.  (Do in restructure?)
+* If we are P1 and we see river bet before resolving, should use a betting
+  abstraction that includes the actual bet size that P0 made.
+  * Need to be able to construct a betting abstraction dynamically.
+  * May also want different bet sizes depending on the pot.
+  * Need to set BetSizes, MaxBets.  May want to rely on BettingAbstractionName,
+    Limit, StackSize, Asymmetric, NoLimitTreeType, MinBet, AlwaysAllIn from
+    template.
+* Three remaining PokerStars problems.
+* Write program that efficiently computes bot-vs-bot EV.  Computes range
+  vs. range EV using Johanson O(n) algorithm.  Solve endgames only once.
+  Just need API that takes input range and new opponent actions and updates
+  the range.
+* Writing sumprobs out up to 4b.  Was reading in as ints.  Can fix that.
+  But CFRValue code will read them in as ints.
+* Implement and evaluate minprob, foldroundup.  Do in play as well as
+  bot?
+* We had to use pa, not p, in accessing probs in CurrentProbs() for
+  reentrant trees.  Are there other places we need to make the same change?
+* MSHCPIndex() ugly and inefficient.  Any way around?  Requires that we
+  create HandValueTree.  But I don't have space to store all sorted
+  hole card pair indices like I do in play, do I?  That would be about
+  10 gigs.
+* In CurrentProbs() we don't use endgame probs on endgame street if num_succs
+  is 1.  On the theory that we don't resolve if we are already all-in.  But
+  what if we got all-in during the endgame?  I guess CFRValuesFile::Probs()
+  does the right thing, but the code we have now is fragile.
+* In 6-player, why do we raise so much with AA at r300?  We essentially only
+  have AA there.  Probability is not going down.  P4 essentially never calls.
+  Need to look into this more, but I think later players will call some,
+  especially P2 who is kind of priced in.  This is what I see in my
+  local experiment.

@@ -453,4 +453,3 @@ BettingTreeBuilder::CreateMPTree(unsigned int target_player,
 			 player_acting, Game::NumPlayers(), folded.get(),
 			 target_player, &key, terminal_id);
 }
-

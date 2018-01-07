@@ -21,6 +21,7 @@ unsigned int *****HandValueTree::tree5_ = NULL;
 unsigned int ******HandValueTree::tree6_ = NULL;
 unsigned int *******HandValueTree::tree7_ = NULL;
 
+// Should make thread-safe
 void HandValueTree::Create(void) {
   // Check if already created
   if (num_cards_ != 0) return;

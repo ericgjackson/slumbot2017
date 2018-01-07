@@ -64,7 +64,7 @@ CFRP::CFRP(const CardAbstraction &ca, const BettingAbstraction &ba,
     }
   }  
   regrets_.reset(new CFRValues(nullptr, false, streets, betting_tree_, 0,
-			       0, card_abstraction_, buckets_,
+			       0, card_abstraction_, buckets_.NumBuckets(),
 			       compressed_streets_));
   
   // Should honor sumprobs_streets_
@@ -74,11 +74,12 @@ CFRP::CFRP(const CardAbstraction &ca, const BettingAbstraction &ba,
     for (unsigned int p = 0; p < num_players; ++p) players[p] = false;
     players[target_p_] = true;
     sumprobs_.reset(new CFRValues(players.get(), true, streets, betting_tree_,
-				  0, 0, card_abstraction_, buckets_,
+				  0, 0, card_abstraction_,
+				  buckets_.NumBuckets(),
 				  compressed_streets_));
   } else {
     sumprobs_.reset(new CFRValues(nullptr, true, streets, betting_tree_, 0,
-				  0, card_abstraction_, buckets_,
+				  0, card_abstraction_, buckets_.NumBuckets(),
 				  compressed_streets_));
   }
 
@@ -93,7 +94,8 @@ CFRP::CFRP(const CardAbstraction &ca, const BettingAbstraction &ba,
     current_strategy_.reset(new CFRValues(nullptr, false,
 					  bucketed_streets.get(),
 					  betting_tree_, 0, 0,
-					  card_abstraction_, buckets_,
+					  card_abstraction_,
+					  buckets_.NumBuckets(),
 					  compressed_streets_));
   } else {
     current_strategy_.reset(nullptr);
@@ -154,7 +156,7 @@ void CFRP::FloorRegrets(Node *node, unsigned int p) {
 void CFRP::HalfIteration(unsigned int p) {
   fprintf(stderr, "%s half iteration\n", p ? "P1" : "P2");
   if (current_strategy_.get() != nullptr) {
-    SetCurrentStrategy(betting_tree_->Root());
+    SetCurrentStrategy(betting_tree_->Root(), regrets_.get(), sumprobs_.get());
   }
 
   if (subgame_street_ <= Game::MaxStreet()) {
@@ -172,7 +174,8 @@ void CFRP::HalfIteration(unsigned int p) {
   if (subgame_street_ <= Game::MaxStreet()) pre_phase_ = true;
   double *opp_probs = AllocateOppProbs(true);
   unsigned int **street_buckets = AllocateStreetBuckets();
-  VCFRState state(opp_probs, street_buckets, hand_tree_, p);
+  VCFRState state(opp_probs, street_buckets, hand_tree_, p, regrets_.get(),
+		  sumprobs_.get());
   SetStreetBuckets(0, 0, state);
   double *vals = Process(betting_tree_->Root(), 0, state, 0);
   if (subgame_street_ <= Game::MaxStreet()) {

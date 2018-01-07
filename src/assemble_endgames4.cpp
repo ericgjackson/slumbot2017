@@ -116,7 +116,8 @@ Assembler::Assembler(BettingTree *base_betting_tree,
   }
 
   CFRValues base_sumprobs(nullptr, true, base_streets.get(),
-			  base_betting_tree_, 0, 0, base_ca_, base_buckets,
+			  base_betting_tree_, 0, 0, base_ca_,
+			  base_buckets.NumBuckets(),
 			  base_compressed_streets.get());
   
   char read_dir[500], write_dir[500];
@@ -156,7 +157,7 @@ Assembler::Assembler(BettingTree *base_betting_tree,
 
   merged_sumprobs_.reset(new CFRValues(nullptr, true, endgame_streets.get(),
 				       endgame_betting_tree_, 0, 0,
-				       merged_ca_, merged_buckets,
+				       merged_ca_, merged_buckets.NumBuckets(),
 				       merged_compressed_streets.get()));
 }
 

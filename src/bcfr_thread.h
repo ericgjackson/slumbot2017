@@ -10,6 +10,7 @@ using namespace std;
 class BettingTree;
 class Buckets;
 class CFRConfig;
+class CFRValues;
 class HandTree;
 class Node;
 
@@ -40,6 +41,7 @@ private:
   BCFRThread **threads_;
   Node *split_node_;
   unsigned int split_bd_;
+  unique_ptr<CFRValues> sumprobs_;
 };
 
 #endif

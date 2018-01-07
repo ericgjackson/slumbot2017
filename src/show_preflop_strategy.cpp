@@ -1,5 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+#include <memory>
+#include <string>
 
 #include "betting_abstraction.h"
 #include "betting_abstraction_params.h"
@@ -21,22 +25,28 @@
 #include "io.h"
 #include "params.h"
 
-void Show(Node *node, const string &action_sequence,
-	  const Buckets &buckets, const CFRValues &sumprobs) {
+using namespace std;
+
+void Show(Node *node, const string &action_sequence, unsigned int target_p,
+	  const Buckets &buckets, const CFRValues &values, bool ***seen) {
   if (node->Street() == 1) return;
   if (node->Terminal()) return;
+  unsigned int pa = node->PlayerActing();
   unsigned int num_succs = node->NumSuccs();
+  // Have both player's strategies and want to show them.
+  // if (num_succs > 1 && (target_p == kMaxUInt || pa == target_p)) {
   if (num_succs > 1) {
     unsigned int nt = node->NonterminalID();
-    unsigned int pa = node->PlayerActing();
     unsigned int st = node->Street();
+    if (seen[st][pa][nt]) return;
+    seen[st][pa][nt] = true;
     unsigned int dsi = node->DefaultSuccIndex();
     int *i_values = nullptr;
     double *d_values = nullptr;
-    if (sumprobs.Ints(pa, st)) {
-      sumprobs.Values(pa, st, nt, &i_values);
+    if (values.Ints(pa, st)) {
+      values.Values(pa, st, nt, &i_values);
     } else {
-      sumprobs.Values(pa, st, nt, &d_values);
+      values.Values(pa, st, nt, &d_values);
     }
     unsigned int max_card = Game::MaxCard();
     unsigned int hcp = 0;
@@ -48,11 +58,11 @@ void Show(Node *node, const string &action_sequence,
 	  printf("%s ", action_sequence.c_str());
 	}
 	OutputTwoCards(hi, lo);
-	unsigned int offset;
+	unsigned int offset, b = kMaxUInt;
 	if (buckets.None(st)) {
 	  offset = hcp * num_succs;
 	} else {
-	  unsigned int b = buckets.Bucket(st, hcp);
+	  b = buckets.Bucket(st, hcp);
 	  offset = b * num_succs;
 	}
 	double sum = 0;
@@ -84,7 +94,11 @@ void Show(Node *node, const string &action_sequence,
 	    }
 	  }
 	}
-	printf("\n");
+	if (! buckets.None(st)) {
+	  printf(" (b %u)", b);
+	}
+	printf(" (pa %u nt %u)\n", node->PlayerActing(),
+	       node->NonterminalID());
 	fflush(stdout);
 	++hcp;
       }
@@ -92,18 +106,19 @@ void Show(Node *node, const string &action_sequence,
   }
   for (unsigned int s = 0; s < num_succs; ++s) {
     string action = node->ActionName(s);
-    Show(node->IthSucc(s), action_sequence + action, buckets, sumprobs);
+    Show(node->IthSucc(s), action_sequence + action, target_p, buckets,
+	 values, seen);
   }
 }
 
 static void Usage(const char *prog_name) {
   fprintf(stderr, "USAGE: %s <game params> <card params> <betting params> "
-	  "<CFR params> <it> [current|cum]\n", prog_name);
+	  "<CFR params> <it> [current|cum] ([p0|p1])\n", prog_name);
   exit(-1);
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 7) Usage(argv[0]);
+  if (argc != 7 && argc != 8) Usage(argv[0]);
   Files::Init();
   unique_ptr<Params> game_params = CreateGameParams();
   game_params->ReadFromFile(argv[1]);
@@ -127,22 +142,53 @@ int main(int argc, char *argv[]) {
   if (c == "current")  current = true;
   else if (c == "cum") current = false;
   else                 Usage(argv[0]);
-
-  if (current) {
-    fprintf(stderr, "Current not supported yet\n");
-    exit(-1);
+  unsigned int target_p = kMaxUInt;
+  if (betting_abstraction->Asymmetric()) {
+    if (argc == 7) {
+      fprintf(stderr, "Expect p0/p1 argument for asymmetric systems\n");
+      exit(-1);
+    }
+    string p_arg = argv[7];
+    if (p_arg == "p0")      target_p = 0;
+    else if (p_arg == "p1") target_p = 1;
+    else                    Usage(argv[0]);
+  } else {
+    if (argc == 8) {
+      fprintf(stderr, "Don't expect p0/p1 argument for symmetric systems\n");
+      exit(-1);
+    }
   }
+
   // Excessive to load all buckets.  Only need buckets for the preflop.
   Buckets buckets(*card_abstraction, false);
-  unique_ptr<BettingTree>
-    betting_tree(BettingTree::BuildTree(*betting_abstraction));
+  unique_ptr<BettingTree> betting_tree;
+  if (betting_abstraction->Asymmetric()) {
+    betting_tree.reset(BettingTree::BuildAsymmetricTree(*betting_abstraction,
+							target_p));
+  } else {
+    betting_tree.reset(BettingTree::BuildTree(*betting_abstraction));
+  }
+  unsigned int num_players = Game::NumPlayers();
+  unique_ptr<bool []> players(new bool[num_players]);
+  if (betting_abstraction->Asymmetric()) {
+    for (unsigned int p = 0; p < num_players; ++p) {
+      // Have both player's strategies and want to show them.
+      // players[p] = (p == target_p);
+      players[p] = true;
+    }
+  } else {
+    for (unsigned int p = 0; p < num_players; ++p) {
+      players[p] = true;
+    }
+  }
   unsigned int max_street = Game::MaxStreet();
   unique_ptr<bool []> streets(new bool[max_street + 1]);
   for (unsigned int st = 0; st <= max_street; ++st) {
     streets[st] = (st == 0);
   }
-  CFRValues sumprobs(nullptr, ! current, streets.get(), betting_tree.get(), 0,
-		     0, *card_abstraction, buckets, nullptr);
+  CFRValues values(players.get(), ! current, streets.get(),
+		   betting_tree.get(), 0, 0, *card_abstraction,
+		   buckets.NumBuckets(), nullptr);
   char dir[500];
   sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
 	  Game::GameName().c_str(), Game::NumPlayers(),
@@ -150,6 +196,29 @@ int main(int argc, char *argv[]) {
 	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
 	  betting_abstraction->BettingAbstractionName().c_str(),
 	  cfr_config->CFRConfigName().c_str());
-  sumprobs.Read(dir, it, betting_tree->Root(), "x", kMaxUInt);
-  Show(betting_tree->Root(), "", buckets, sumprobs);
+  if (betting_abstraction->Asymmetric()) {
+    char buf[20];
+    sprintf(buf, ".p%u", target_p);
+    strcat(dir, buf);
+  }
+  values.Read(dir, it, betting_tree->Root(), "x", kMaxUInt);
+  bool ***seen = new bool **[max_street + 1];
+  for (unsigned int st = 0; st <= max_street; ++st) {
+    seen[st] = new bool *[num_players];
+    for (unsigned int p = 0; p < num_players; ++p) {
+      unsigned int num_nt = betting_tree->NumNonterminals(p, st);
+      seen[st][p] = new bool[num_nt];
+      for (unsigned int i = 0; i < num_nt; ++i) {
+	seen[st][p][i] = false;
+      }
+    }
+  }
+  Show(betting_tree->Root(), "", target_p, buckets, values, seen);
+  for (unsigned int st = 0; st <= max_street; ++st) {
+    for (unsigned int p = 0; p < num_players; ++p) {
+      delete [] seen[st][p];
+    }
+    delete [] seen[st];
+  }
+  delete [] seen;
 }

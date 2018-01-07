@@ -157,7 +157,7 @@ Could make sense that it is worse, but why isn't it faster?
 
 Sampling canonical boards; weighting by board count
 River close threshold of 10k (other streets 2k)
-tcfrrct10kscb_params
+tcfrrct10scb_params
 Batch 0 (51m): Est. expl: 345.468531 mbb/g
   Process count: 134535045161
 Batch 24:      Est. expl: 308.104776 mbb/g

@@ -87,13 +87,12 @@ EndgameSolver::EndgameSolver(unsigned int solve_street,
 
   sumprobs_.reset(new CFRValues(nullptr, true, streets.get(),
 				betting_tree_, 0, 0, card_abstraction_,
-				buckets_, compressed_streets_));
+				buckets_.NumBuckets(), compressed_streets_));
   sumprobs_->Read(dir, base_it_, betting_tree_->Root(), "x", kMaxUInt);
 
   if (endgame_cc.Algorithm() == "cfrp") {
-    eg_cfr_ = new EGCFR(endgame_ca, base_ca, endgame_ba, base_ba, endgame_cc,
-			base_cc, endgame_buckets, solve_street_, method,
-			cfrs, zero_sum, num_threads);
+    eg_cfr_ = new EGCFR(endgame_ca, endgame_ba, endgame_cc, endgame_buckets,
+			solve_street_, method, cfrs, zero_sum, num_threads);
 #if 0
   } else if (endgame_cc.Algorithm() == "pcs") {
     eg_cfr_ = new EGPCSCFR(endgame_ca, base_ca, endgame_ba, base_ba,
@@ -165,41 +164,13 @@ EndgameSolver::~EndgameSolver(void) {
 void EndgameSolver::BRGo(double *p0_br, double *p1_br) {
   value_calculation_ = true;
 
-  unsigned int max_street = Game::MaxStreet();
-  unique_ptr<bool []> bucketed_streets(new bool[max_street + 1]);
-  bool bucketed = false;
-  for (unsigned int st = 0; st < solve_street_; ++st) {
-    bucketed_streets[st] = ! buckets_.None(st);
-    if (bucketed_streets[st]) bucketed = true;
-  }
-  for (unsigned int st = solve_street_; st <= max_street; ++st) {
-    bucketed_streets[st] = false;
-  }
-  if (bucketed) {
-    // Would be more memory efficient to calculate current strategy probs
-    // on the fly.
-    current_strategy_.reset(new CFRValues(nullptr, false,
-					  bucketed_streets.get(),
-					  betting_tree_, 0, 0,
-					  card_abstraction_, buckets_,
-					  compressed_streets_));
-    current_strategy_->AllocateAndClearDoubles(betting_tree_->Root(),
-					       kMaxUInt);
-  } else {
-    current_strategy_.reset(nullptr);
-  }
-  if (current_strategy_.get() != nullptr) {
-    SetCurrentStrategy(betting_tree_->Root());
-  }
-
-  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
-
   // Unfortunate that we need to pass in solve_street_, not solve_street_-1.
   // In StreetInitial() we need the hands for the next street.
   hand_tree_ = new HandTree(0, 0, solve_street_);
   double *opp_probs = AllocateOppProbs(true);
   unsigned int **street_buckets = AllocateStreetBuckets();
-  VCFRState state(opp_probs, street_buckets, hand_tree_, 0);
+  VCFRState state(opp_probs, street_buckets, hand_tree_, 0, nullptr,
+		  sumprobs_.get());
   SetStreetBuckets(0, 0, state);
 
   state.SetP(0);
@@ -212,6 +183,7 @@ void EndgameSolver::BRGo(double *p0_br, double *p1_br) {
   delete [] opp_probs;
   delete hand_tree_;
 
+  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
   unsigned int num_remaining = Game::NumCardsInDeck() - num_hole_cards;
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(0);
   unsigned int num_opp_hole_card_pairs =
@@ -279,6 +251,7 @@ void EndgameSolver::GetReachProbs(const vector<Node *> *base_path,
 	      "EndgameSolver::Solver: node doesn't connect to next?!?\n");
       exit(-1);
     }
+    unique_ptr<double []> probs(new double[num_succs]);
     unsigned int bd = prior_bds[st];
     for (unsigned int hi = 1; hi <= max_card; ++hi) {
       if (InCards(hi, board, num_board_cards)) continue;
@@ -297,7 +270,8 @@ void EndgameSolver::GetReachProbs(const vector<Node *> *base_path,
 	  unsigned int b = buckets_.Bucket(st, h);
 	  offset = b * num_succs;
 	}
-	double prob = sumprobs_->Prob(p, st, nt, offset, s, num_succs, dsi);
+	sumprobs_->Probs(p, st, nt, offset, num_succs, dsi, probs.get());
+	double prob = probs[s];
 	if (prob > 1.0) {
 	  fprintf(stderr, "Base prob > 1\n");
 	  exit(-1);
@@ -358,21 +332,33 @@ void EndgameSolver::SolveSafe(Node *solve_root, Node *target_root,
   if (p0) {
     double *opp_cvs = eg_cfr_->LoadOppCVs(solve_root, action_sequence,
 					  solve_bd, 0, base_it_, reach_probs,
-					  hands, card_level_);
+					  hands, card_level_,
+					  card_abstraction_,
+					  betting_abstraction_,
+					  cfr_config_);
+    fprintf(stderr, "When do I want to initialize sumprobs?\n");
+    exit(-1);
     eg_cfr_->SolveSubgame(subtree, solve_bd, reach_probs, action_sequence,
-			  hand_tree, opp_cvs, 0, false, num_its);
-    eg_cfr_->Write(subtree, solve_root, target_root, action_sequence, num_its,
-		   target_bd);
+			  hand_tree, opp_cvs, 0, false, num_its,
+			  sumprobs_.get());
+    eg_cfr_->Write(subtree, solve_root, target_root, action_sequence,
+		   card_abstraction_, betting_abstraction_, cfr_config_,
+		   num_its, target_bd, sumprobs_.get());
     delete [] opp_cvs;
   }
   if (p1) {
     double *opp_cvs = eg_cfr_->LoadOppCVs(solve_root, action_sequence,
 					  solve_bd, 1, base_it_, reach_probs,
-					  hands, card_level_);
+					  hands, card_level_,
+					  card_abstraction_,
+					  betting_abstraction_,
+					  cfr_config_);
     eg_cfr_->SolveSubgame(subtree, solve_bd, reach_probs, action_sequence,
-			  hand_tree, opp_cvs, 1, false, num_its);
-    eg_cfr_->Write(subtree, solve_root, target_root, action_sequence, num_its,
-		   target_bd);
+			  hand_tree, opp_cvs, 1, false, num_its,
+			  sumprobs_.get());
+    eg_cfr_->Write(subtree, solve_root, target_root, action_sequence,
+		   card_abstraction_, betting_abstraction_, cfr_config_,
+		   num_its, target_bd, sumprobs_.get());
     delete [] opp_cvs;
   }
   delete subtree;
@@ -422,22 +408,27 @@ void EndgameSolver::SolveUnsafe(Node *solve_root, Node *target_root,
 
   HandTree *hand_tree = new HandTree(solve_street_, solve_bd, max_street);
   BettingTree *subtree = BettingTree::BuildSubtree(solve_root);
+  fprintf(stderr, "When do I want to initialize sumprobs?\n");
+  exit(-1);
   eg_cfr_->SolveSubgame(subtree, solve_bd, reach_probs, action_sequence,
-			hand_tree, nullptr, 1, false, num_its);
+			hand_tree, nullptr, 1, false, num_its,
+			sumprobs_.get());
 
-  eg_cfr_->Write(subtree, solve_root, target_root, action_sequence, num_its,
-		 target_bd);
+  eg_cfr_->Write(subtree, solve_root, target_root, action_sequence,
+		 card_abstraction_, betting_abstraction_, cfr_config_,
+		 num_its, target_bd, sumprobs_.get());
   
   // Two calls for P1 and P0?
-  eg_cfr_->Read(subtree, action_sequence, solve_bd, target_root->Street(),
-		true, num_its);
+  eg_cfr_->Read(subtree, action_sequence, card_abstraction_,
+		betting_abstraction_, cfr_config_, solve_bd,
+		target_root->Street(), true, num_its, sumprobs_.get());
   unsigned int pa = solve_root->PlayerActing();
   br_vals_[0][pa][base_target_nt][solve_bd] =
     eg_cfr_->BRGo(subtree, solve_bd, 0, reach_probs, hand_tree,
-		  action_sequence);
+		  action_sequence, sumprobs_.get());
   br_vals_[1][pa][base_target_nt][solve_bd] =
     eg_cfr_->BRGo(subtree, solve_bd, 1, reach_probs, hand_tree,
-		  action_sequence);
+		  action_sequence, sumprobs_.get());
   delete subtree;
 
 #if 0

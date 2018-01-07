@@ -27,8 +27,8 @@ public:
   unsigned int HardWarmup(void) const {return hard_warmup_;}
   unsigned int SubgameStreet(void) const {return subgame_street_;}
   unsigned int SamplingRate(void) const {return sampling_rate_;}
-  const vector<unsigned int> &SumprobStreets(void) const {
-    return sumprob_streets_;
+  bool SumprobStreet(unsigned int p, unsigned int st) const {
+    return sumprob_streets_[p][st];
   }
   const vector<unsigned int> &PruningThresholds(void) const {
     return pruning_thresholds_;
@@ -87,7 +87,7 @@ public:
   unsigned int hard_warmup_;
   unsigned int subgame_street_;
   unsigned int sampling_rate_;
-  vector<unsigned int> sumprob_streets_;
+  bool **sumprob_streets_;
   vector<unsigned int> pruning_thresholds_;
   vector<double> full_probs_;
   bool hvb_table_;

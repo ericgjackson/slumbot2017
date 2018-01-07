@@ -1,0 +1,36 @@
+Start 16g instance in us-east-1 (m5.xlarge?)
+Copy code over; make restructure
+Create 1 TB volume in same availability zone for raw trunk sumprobs data and
+  raw river regrets for P1 system.
+  Need all data for both players, right?
+  Only needed 700 GB?  That's just for the source data.
+  Need betting trees, num buckets files
+Copy raw data from S3.  About one hour?
+Create 200 GB volume for restructured data
+  (Allow space for P0 and P1 asym systems.)
+  One byte for preflop and flop sumprobs (divide by 4)
+  Half byte for turn sumprobs (divide by 2)
+  Two bits for river regrets (divide by 8)
+  Better be less than 125 GB
+  (34933829216 / 4) * 2 + (208558643592 / 8) * 2 + (100213288637 / 16) * 2 =
+    82133236584 (82 gigs)
+  Allocate 100 GB to be safe (times two for each system)
+Mount into /data2; create links so that restructured data will be written
+  into /data2
+Make sure we have all the parameter files
+Copy the static data
+Run restructure (two hours?)
+Save results to S3.
+Do same for P0
+Get rid of volume on /data
+
+---------------------
+
+Setting up test machine
+Copy source, Makefile; build run_bot
+Create 250 GB volume, attach, format, download restructured data there
+scp ACPC code over, unpack in /data, make all
+Copy parameter files to ACPC directory
+  holdem_params, final_card_params, none_params, final_betting_params,
+  mb1b1_params (?), tcfrq3p0_params, cfrps_params, runtime_params
+Create go.slumbot script

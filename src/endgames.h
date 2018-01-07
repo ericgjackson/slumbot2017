@@ -65,6 +65,7 @@ private:
   bool card_level_;
   unsigned int **num_nonterminals_;
   const HandTree *hand_tree_;
+  unique_ptr<CFRValues> sumprobs_;
 };
 
 #endif

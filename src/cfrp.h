@@ -32,6 +32,8 @@ public:
   void ReadFromCheckpoint(unsigned int it);
 
   const HandTree *hand_tree_;
+  unique_ptr<CFRValues> regrets_;
+  unique_ptr<CFRValues> sumprobs_;
 };
 
 #endif

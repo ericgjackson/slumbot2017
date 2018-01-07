@@ -1,6 +1,7 @@
 # Note that if any header files are missing when you try to build, things fail
 # in mysterious ways.  You get told there is "No rule to make target obj/foo.o".
-HEADS =	src/constants.h src/rand.h src/split.h src/files.h \
+HEADS =	src/cv_calc_thread.h \
+	src/constants.h src/rand.h src/split.h src/files.h \
 	src/cards.h src/io.h src/params.h src/game_params.h src/game.h \
 	src/canonical_cards.h src/board_tree.h src/hand_evaluator.h \
 	src/hand_value_tree.h src/hand_tree.h \
@@ -20,7 +21,7 @@ HEADS =	src/constants.h src/rand.h src/split.h src/files.h \
 	src/pcs_cfr.h src/canonical.h src/mp_vcfr.h src/mp_rgbr.h \
 	src/sampled_bcfr_builder.h src/runtime_params.h src/runtime_config.h \
 	src/acpc_protocol.h src/agent.h src/nearest_neighbors.h \
-	src/nl_agent.h src/dynamic_cbr2.h
+	src/nl_agent.h src/dynamic_cbr2.h src/cfr_values_file.h src/bot.h
 
 # -Wl,--no-as-needed fixes my problem of undefined reference to
 # pthread_create (and pthread_join).  Comments I found on the web indicate
@@ -37,7 +38,8 @@ CFLAGS = -std=c++11 -Wall -O3 -march=native -ffast-math -flto
 obj/%.o:	src/%.cpp $(HEADS)
 		gcc $(CFLAGS) -c -o $@ $<
 
-OBJS =	obj/rand.o obj/split.o obj/files.o obj/cards.o obj/io.o \
+OBJS =	obj/cv_calc_thread.o \
+	obj/rand.o obj/split.o obj/files.o obj/cards.o obj/io.o \
 	obj/params.o obj/game_params.o obj/game.o obj/canonical_cards.o \
 	obj/board_tree.o obj/hand_evaluator.o obj/hand_value_tree.o \
 	obj/hand_tree.o obj/card_abstraction_params.o obj/card_abstraction.o \
@@ -45,19 +47,19 @@ OBJS =	obj/rand.o obj/split.o obj/files.o obj/cards.o obj/io.o \
 	obj/cfr_params.o obj/cfr_config.o obj/betting_tree.o \
 	obj/betting_tree_builder.o obj/limit_tree.o obj/no_limit_tree.o \
 	obj/reentrant_tree.o obj/mp_betting_tree.o obj/nonterminal_ids.o \
-	obj/cfr_values.o obj/cfr_utils.o obj/vcfr_state.o \
-	obj/vcfr.o obj/cfrp.o obj/rgbr.o obj/resolving_method.o obj/eg_cfr.o \
-	obj/endgames.o obj/cbr_thread.o obj/cbr_builder.o obj/path.o \
-	obj/sorting.o obj/rollout.o obj/univariate_kmeans.o obj/buckets.o \
-	obj/fast_hash.o obj/sparse_and_dense.o obj/bcbr_thread.o \
-	obj/bcfr_thread.o obj/bcbr_builder.o obj/vcfr_subgame.o obj/kmeans.o \
-	obj/pkmeans.o obj/endgame_utils.o \
-	obj/compression_utils.o obj/regret_compression.o obj/tcfr.o \
-	obj/ols.o obj/ej_compress.o obj/pcs_cfr.o obj/canonical.o \
+	obj/cfr_value_type.o obj/cfr_values.o obj/cfr_utils.o \
+	obj/vcfr_state.o obj/vcfr.o obj/cfrp.o obj/rgbr.o \
+	obj/resolving_method.o obj/eg_cfr.o obj/endgames.o obj/cbr_thread.o \
+	obj/cbr_builder.o obj/path.o obj/sorting.o obj/rollout.o \
+	obj/univariate_kmeans.o obj/buckets.o obj/fast_hash.o \
+	obj/sparse_and_dense.o obj/bcbr_thread.o obj/bcfr_thread.o \
+	obj/bcbr_builder.o obj/vcfr_subgame.o obj/kmeans.o obj/pkmeans.o \
+	obj/endgame_utils.o obj/compression_utils.o obj/regret_compression.o \
+	obj/tcfr.o obj/ols.o obj/ej_compress.o obj/pcs_cfr.o obj/canonical.o \
 	obj/mp_vcfr.o obj/mp_rgbr.o obj/sampled_bcfr_builder.o \
 	obj/runtime_params.o obj/runtime_config.o \
 	obj/acpc_protocol.o obj/nearest_neighbors.o obj/nl_agent.o \
-	obj/dynamic_cbr2.o
+	obj/dynamic_cbr2.o obj/cfr_values_file.o obj/bot.o
 
 bin/test:	obj/test.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/test obj/test.o $(OBJS) \
@@ -90,6 +92,10 @@ bin/build_betting_tree:	obj/build_betting_tree.o $(OBJS) $(HEADS)
 bin/show_betting_tree:	obj/show_betting_tree.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/show_betting_tree \
 	obj/show_betting_tree.o $(OBJS) $(LIBRARIES)
+
+bin/show_node:	obj/show_node.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/show_node \
+	obj/show_node.o $(OBJS) $(LIBRARIES)
 
 bin/run_cfrp:	obj/run_cfrp.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/run_cfrp obj/run_cfrp.o \
@@ -130,6 +136,10 @@ bin/solve_all_endgames3:	obj/solve_all_endgames3.o $(OBJS) $(HEADS)
 bin/solve_all_endgames4:	obj/solve_all_endgames4.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/solve_all_endgames4 \
 	obj/solve_all_endgames4.o $(OBJS) $(LIBRARIES)
+
+bin/solve_all_endgames5:	obj/solve_all_endgames5.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/solve_all_endgames5 \
+	obj/solve_all_endgames5.o $(OBJS) $(LIBRARIES)
 
 bin/assemble_endgames:	obj/assemble_endgames.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/assemble_endgames \
@@ -322,6 +332,46 @@ bin/show_nuts:	obj/show_nuts.o $(OBJS) $(HEADS)
 bin/check_the_nuts:	obj/check_the_nuts.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/check_the_nuts obj/check_the_nuts.o \
 	$(OBJS) $(LIBRARIES)
+
+bin/test_agent:	obj/test_agent.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/test_agent obj/test_agent.o \
+	$(OBJS) $(LIBRARIES)
+
+bin/test_ms1f1_agent:	obj/test_ms1f1_agent.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/test_ms1f1_agent \
+	obj/test_ms1f1_agent.o $(OBJS) $(LIBRARIES)
+
+bin/test_mp_agent:	obj/test_mp_agent.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/test_mp_agent obj/test_mp_agent.o \
+	$(OBJS) $(LIBRARIES)
+
+bin/run_bot:	obj/run_bot.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/run_bot obj/run_bot.o \
+	$(OBJS) $(LIBRARIES)
+
+bin/restructure:	obj/restructure.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/restructure obj/restructure.o \
+	$(OBJS) $(LIBRARIES)
+
+bin/test_cfr_values_file:	obj/test_cfr_values_file.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/test_cfr_values_file \
+	obj/test_cfr_values_file.o $(OBJS) $(LIBRARIES)
+
+bin/play_agents:	obj/play_agents.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/play_agents obj/play_agents.o \
+	$(OBJS) $(LIBRARIES)
+
+bin/sampled_play_agents:	obj/sampled_play_agents.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/sampled_play_agents \
+	obj/sampled_play_agents.o $(OBJS) $(LIBRARIES)
+
+bin/calc_cv:	obj/calc_cv.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/calc_cv obj/calc_cv.o \
+	$(OBJS) $(LIBRARIES)
+
+bin/measure_convergence:	obj/measure_convergence.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/measure_convergence \
+	obj/measure_convergence.o $(OBJS) $(LIBRARIES)
 
 bin/x:	obj/x.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/x obj/x.o \

@@ -1,3 +1,5 @@
+// I don't think we use this code any more.
+//
 // BCFR values are "bucketed counterfactual values".  The code here generates
 // *sampled* bucket-level CFR values whereas bcfr_thread.cpp generates exact
 // values.

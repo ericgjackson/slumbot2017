@@ -29,7 +29,7 @@ public:
 	     unsigned int num_threads, unsigned char *data,
 	     unsigned int target_player, float *rngs, unsigned int *uncompress,
 	     unsigned int *short_uncompress, unsigned int *pruning_thresholds,
-	     bool *sumprob_streets, unsigned char *hvb_table,
+	     bool **sumprob_streets, unsigned char *hvb_table,
 	     unsigned char ***cards_to_indices, unsigned int num_raw_boards,
 	     const unsigned int *board_table_, unsigned int batch_size,
 	     unsigned long long int *total_its);
@@ -89,7 +89,7 @@ public:
   unsigned int *uncompress_;
   unsigned int *short_uncompress_;
   unsigned int *pruning_thresholds_;
-  bool *sumprob_streets_;
+  bool **sumprob_streets_;
   unsigned char *hvb_table_;
   unsigned long long int bytes_per_hand_;
   unsigned char ***cards_to_indices_;
@@ -113,6 +113,7 @@ public:
   // Keep this as a signed int so we can use it in winnings calculation
   // without casting.
   int board_count_;
+  bool second_half_;
 };
 
 class TCFR : public CFR {
@@ -162,7 +163,7 @@ private:
   unsigned int *short_uncompress_;
   unsigned int max_street_;
   unsigned int *pruning_thresholds_;
-  bool *sumprob_streets_;
+  bool **sumprob_streets_;
   unique_ptr<bool []> char_quantized_streets_;
   unique_ptr<bool []> short_quantized_streets_;
   unsigned char *hvb_table_;

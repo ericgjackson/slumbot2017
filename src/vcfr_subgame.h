@@ -11,6 +11,7 @@ class BettingAbstraction;
 class BettingTree;
 class Buckets;
 class CardAbstraction;
+class CFRValues;
 class Node;
 
 class VCFRSubgame : public VCFR {
@@ -42,6 +43,8 @@ private:
   const HandTree *hand_tree_;
   unsigned int thread_index_;
   double *final_vals_;
+  unique_ptr<CFRValues> regrets_;
+  unique_ptr<CFRValues> sumprobs_;
 };
 
 #endif

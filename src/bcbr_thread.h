@@ -55,6 +55,7 @@ private:
   unsigned char ***best_succs_;
   bool first_pass_;
   unsigned int target_st_;
+  unique_ptr<CFRValues> sumprobs_;
 };
 
 #endif

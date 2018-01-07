@@ -59,7 +59,8 @@ CFRValues *ReadBaseEndgameStrategy(const CardAbstraction &
   CFRValues *strategy = new CFRValues(nullptr, ! current,
 				      subgame_streets.get(), base_betting_tree,
 				      gbd, base_node->Street(),
-				      base_card_abstraction, base_buckets,
+				      base_card_abstraction,
+				      base_buckets.NumBuckets(),
 				      nullptr);
 
   char dir[500];
@@ -126,31 +127,30 @@ double ***GetSuccReachProbs(Node *node, unsigned int gbd, HandTree *hand_tree,
     Card hi = cards[0];
     Card lo = cards[1];
     unsigned int enc = hi * max_card1 + lo;
-    unsigned int offset;
+    unsigned int b = kMaxUInt, offset;
     if (buckets.None(st)) {
       offset = lbd * num_hole_card_pairs * num_succs + i * num_succs;
     } else {
+      // Isn't it wrong to use lbd here rather than gbd?
       unsigned int h = lbd * num_hole_card_pairs + i;
-      unsigned int b = buckets.Bucket(st, h);
+      b = buckets.Bucket(st, h);
       offset = b * num_succs;
     }
     if (purify) {
       if (sumprobs->Ints(pa, st)) {
 	int *i_values;
 	sumprobs->Values(pa, st, nt, &i_values);
-	PureProbs(i_values, num_succs, probs.get());
+	PureProbs(i_values + offset, num_succs, probs.get());
       } else if (sumprobs->Doubles(pa, st)) {
 	double *d_values;
 	sumprobs->Values(pa, st, nt, &d_values);
-	PureProbs(d_values, num_succs, probs.get());
+	PureProbs(d_values + offset, num_succs, probs.get());
       } else {
 	fprintf(stderr, "Expected int or double sumprobs\n");
 	exit(-1);
       }
     } else {
-      for (unsigned int s = 0; s < num_succs; ++s) {
-	probs[s] = sumprobs->Prob(pa, st, nt, offset, s, num_succs, dsi);
-      }
+      sumprobs->Probs(pa, st, nt, offset, num_succs, dsi, probs.get());
     }
     for (unsigned int s = 0; s < num_succs; ++s) {
       double prob = probs[s];
@@ -405,7 +405,7 @@ CFRValues *ReadEndgame(const string &action_sequence,
 				      subgame_streets.get(),
 				      subtree, gbd, subtree->Root()->Street(),
 				      endgame_card_abstraction,
-				      endgame_buckets, nullptr);
+				      endgame_buckets.NumBuckets(), nullptr);
 
   for (unsigned int target_pa = 0; target_pa <= 1; ++target_pa) {
     ReadEndgame(subtree->Root(), action_sequence, gbd, base_card_abstraction,

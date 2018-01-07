@@ -63,7 +63,6 @@ CBRThread::CBRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
   p_ = p;
   trunk_hand_tree_ = trunk_hand_tree;
   it_ = it;
-  regrets_.reset(nullptr);
 
 
   // final_hand_vals_ = nullptr;
@@ -88,7 +87,7 @@ CBRThread::CBRThread(const CardAbstraction &ca, const BettingAbstraction &ba,
   // Should handle asymmetric systems
   // Should honor sumprobs_streets_
   sumprobs_.reset(new CFRValues(players.get(), true, nullptr, betting_tree_,
-				0, 0, card_abstraction_, buckets_,
+				0, 0, card_abstraction_, buckets_.NumBuckets(),
 				compressed_streets_));
   
   char dir[500];
@@ -202,7 +201,8 @@ double CBRThread::Go(void) {
   time_t start_t = time(NULL);
   double *opp_probs = AllocateOppProbs(true);
   unsigned int **street_buckets = AllocateStreetBuckets();
-  VCFRState state(opp_probs, street_buckets, trunk_hand_tree_, p_);
+  VCFRState state(opp_probs, street_buckets, trunk_hand_tree_, p_, nullptr,
+		  sumprobs_.get());
   SetStreetBuckets(0, 0, state);
   double *vals = Process(betting_tree_->Root(), 0, state, 0);
   DeleteStreetBuckets(street_buckets);

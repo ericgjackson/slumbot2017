@@ -66,10 +66,12 @@ SampledBCFRBuilder::SampledBCFRBuilder(const CardAbstraction &ca,
     trunk_hand_tree_ = new HandTree(0, 0, sample_st - 1);
   }
 
+  regrets_.reset(nullptr);
   // Should handle asymmetric systems
   // Should honor sumprobs_streets_
   sumprobs_.reset(new CFRValues(nullptr, true, nullptr, betting_tree_, 0, 0,
-				card_abstraction_, buckets_, nullptr));
+				card_abstraction_, buckets_.NumBuckets(),
+				nullptr));
 
   char dir[500];
   sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
@@ -85,29 +87,6 @@ SampledBCFRBuilder::SampledBCFRBuilder(const CardAbstraction &ca,
   }
 #endif
   sumprobs_->Read(dir, it_, betting_tree_->Root(), "x", kMaxUInt);
-
-  unique_ptr<bool []> bucketed_streets(new bool[max_street + 1]);
-  bucketed_ = false;
-  for (unsigned int st = 0; st <= max_street; ++st) {
-    bucketed_streets[st] = ! buckets_.None(st);
-    if (bucketed_streets[st]) bucketed_ = true;
-  }
-#if 0
-  if (bucketed_) {
-    // Current strategy always uses doubles
-    // This doesn't generalize to multiplayer
-    current_strategy_.reset(new CFRValues(nullptr, false,
-					  bucketed_streets.get(),
-					  betting_tree_, 0, 0,
-					  card_abstraction_, buckets_,
-					  compressed_streets_));
-    current_strategy_->AllocateAndClearDoubles(betting_tree_->Root(),
-					       kMaxUInt);
-    SetCurrentStrategy(betting_tree_->Root());
-  } else {
-    current_strategy_.reset(nullptr);
-  }
-#endif
 
   unsigned int num_players = Game::NumPlayers();
   bucket_sum_vals_ = new float ***[max_street + 1];
@@ -680,6 +659,7 @@ public:
 	      unsigned int num_threads, Node *node,
 	      const string &action_sequence, double *opp_probs,
 	      const HandTree *hand_tree, unsigned int p,
+	      CFRValues *regrets, CFRValues *sumprobs,
 	      unsigned int *prev_canons);
   ~SBCFRThread(void);
   void Run(void);
@@ -696,6 +676,8 @@ private:
   double *opp_probs_;
   const HandTree *hand_tree_;
   unsigned int p_;
+  CFRValues *regrets_;
+  CFRValues *sumprobs_;
   unsigned int *prev_canons_;
   double *ret_vals_;
   double *ret_norms_;
@@ -706,7 +688,8 @@ SBCFRThread::SBCFRThread(SampledBCFRBuilder *builder,
 			 unsigned int thread_index, unsigned int num_threads,
 			 Node *node, const string &action_sequence,
 			 double *opp_probs, const HandTree *hand_tree,
-			 unsigned int p, unsigned int *prev_canons) :
+			 unsigned int p, CFRValues *regrets,
+			 CFRValues *sumprobs, unsigned int *prev_canons) :
   action_sequence_(action_sequence) {
   builder_ = builder;
   thread_index_ = thread_index;
@@ -715,6 +698,8 @@ SBCFRThread::SBCFRThread(SampledBCFRBuilder *builder,
   opp_probs_ = opp_probs;
   hand_tree_ = hand_tree;
   p_ = p;
+  regrets_ = regrets;
+  sumprobs_ = sumprobs;
   prev_canons_ = prev_canons;
 }
 
@@ -752,7 +737,7 @@ void SBCFRThread::Go(void) {
   for (unsigned int bd = thread_index_; bd < num_boards; bd += num_threads_) {
     unsigned int **street_buckets = AllocateStreetBuckets();
     VCFRState state(opp_probs_, hand_tree_, bd, action_sequence_, 0, 0,
-		    street_buckets, p_);
+		    street_buckets, p_, regrets_, sumprobs_);
     // Initialize buckets for this street
     builder_->SetStreetBuckets(st, bd, state);
     double *bd_norms;
@@ -794,7 +779,8 @@ void SampledBCFRBuilder::Split(Node *node, double *opp_probs,
   unique_ptr<SBCFRThread * []> threads(new SBCFRThread *[num_threads_]);
   for (unsigned int t = 0; t < num_threads_; ++t) {
     threads[t] = new SBCFRThread(this, t, num_threads_, node, action_sequence,
-				 opp_probs, hand_tree, p_, prev_canons);
+				 opp_probs, hand_tree, p_, regrets_.get(),
+				 sumprobs_.get(), prev_canons);
   }
   for (unsigned int t = 1; t < num_threads_; ++t) {
     threads[t]->Run();
@@ -919,7 +905,7 @@ double *SampledBCFRBuilder::StreetInitial(Node *node, unsigned int plbd,
       unsigned int **street_buckets = AllocateStreetBuckets();
       VCFRState new_state(state.OppProbs(), &hand_tree, 0,
 			  state.ActionSequence(), ngbd, nst, street_buckets,
-			  p_);
+			  p_, regrets_.get(), sumprobs_.get());
       SetStreetBuckets(nst, ngbd, new_state);
       double *next_norms;
       double *next_vals = Process(node, 0, new_state, nst, &next_norms);
@@ -1034,7 +1020,8 @@ void SampledBCFRBuilder::Go(void) {
 
   double *opp_probs = AllocateOppProbs(true);
   unsigned int **street_buckets = AllocateStreetBuckets();
-  VCFRState state(opp_probs, street_buckets, trunk_hand_tree_, p_);
+  VCFRState state(opp_probs, street_buckets, trunk_hand_tree_, p_,
+		  regrets_.get(), sumprobs_.get());
   SetStreetBuckets(0, 0, state);
   double *norms;
   double *vals = Process(betting_tree_->Root(), 0, state, 0, &norms);

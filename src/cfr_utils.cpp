@@ -247,6 +247,74 @@ void ProcessOppProbsBucketed(Node *node, unsigned int **street_buckets,
   }
 }
 
+// Unabstracted, unsigned char cs_vals, no sumprobs
+void ProcessOppProbs(Node *node, const CanonicalCards *hands, bool bucketed,
+		     unsigned int **street_buckets, bool nonneg, bool uniform,
+		     double explore, ProbMethod prob_method, unsigned int it,
+		     double *opp_probs, double **succ_opp_probs,
+		     unsigned char *cs_vals) {
+  unsigned int st = node->Street();
+  unsigned int num_succs = node->NumSuccs();
+  unsigned int num_hole_cards = Game::NumCardsForStreet(0);
+  unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
+  unsigned int default_succ_index = node->DefaultSuccIndex();
+  unsigned int max_card1 = Game::MaxCard() + 1;
+  double *current_probs = new double[num_succs];
+  unsigned int num_nonterminal_succs = 0;
+  bool *nonterminal_succs = new bool[num_succs];
+  for (unsigned int s = 0; s < num_succs; ++s) {
+    if (node->IthSucc(s)->Terminal()) {
+      nonterminal_succs[s] = false;
+    } else {
+      nonterminal_succs[s] = true;
+      ++num_nonterminal_succs;
+    }
+  }
+  for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
+    const Card *cards = hands->Cards(i);
+    Card lo, hi = cards[0];
+    unsigned int enc;
+    if (num_hole_cards == 1) {
+      enc = hi;
+    } else {
+      lo = cards[1];
+      enc = hi * max_card1 + lo;
+    }
+    double opp_prob = opp_probs[enc];
+    if (opp_prob == 0) {
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	succ_opp_probs[s][enc] = 0;
+      }
+    } else {
+      unsigned char *my_cs_vals;
+      unsigned int b;
+      if (bucketed) {
+	b = street_buckets[st][i];
+	my_cs_vals = cs_vals + b * num_succs;
+      } else {
+	my_cs_vals = cs_vals + i * num_succs;
+      }
+      if (prob_method == ProbMethod::FTL) {
+	FTLPureProbs(my_cs_vals, num_succs, current_probs);
+      } else if (prob_method == ProbMethod::REGRET_MATCHING) {
+	RegretsToProbs(my_cs_vals, num_succs, nonneg, uniform,
+		       default_succ_index, explore, num_nonterminal_succs,
+		       nonterminal_succs, current_probs);
+      } else {
+	fprintf(stderr, "Unexpected prob method: %i\n",
+		(int)prob_method);
+	exit(-1);
+      }
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	double succ_opp_prob = opp_prob * current_probs[s];
+	succ_opp_probs[s][enc] = succ_opp_prob;
+      }
+    }
+  }
+  delete [] current_probs;
+  delete [] nonterminal_succs;
+}
+
 // Unabstracted, int cs_vals, int sumprobs
 void ProcessOppProbs(Node *node, const CanonicalCards *hands, bool bucketed,
 		     unsigned int **street_buckets, bool nonneg, bool uniform,
@@ -289,17 +357,17 @@ void ProcessOppProbs(Node *node, const CanonicalCards *hands, bool bucketed,
       }
     } else {
       int *my_cs_vals;
+      unsigned int b;
       if (bucketed) {
-	unsigned int b = street_buckets[st][i];
+	b = street_buckets[st][i];
 	my_cs_vals = cs_vals + b * num_succs;
       } else {
 	my_cs_vals = cs_vals + i * num_succs;
       }
       int *my_sumprobs = nullptr;
-      unsigned int b;
       if (update_sumprobs) {
 	if (bucketed) {
-	  b = street_buckets[st][i];
+	  unsigned int b = street_buckets[st][i];
 	  my_sumprobs = sumprobs + b * num_succs;
 	} else {
 	  my_sumprobs = sumprobs + i * num_succs;

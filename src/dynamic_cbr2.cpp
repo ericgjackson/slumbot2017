@@ -1,10 +1,5 @@
 // This class performs the same function as DynamicCBR, but is much simpler
 // because we leverage the code in VCFR.
-//
-// VCFR class has a sumprobs member.  But that makes things tricky to deal
-// with.  Can I set it?
-//
-// Should take current argument and set br_current_.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,10 +37,10 @@ DynamicCBR2::~DynamicCBR2(void) {
 // If so, they will be for the subgame rooted at root_bd_st and root_bd.
 // So we must map our global board index gbd into a local board index lbd
 // whenever we access hand_tree or the probabilities inside sumprobs.
-double *DynamicCBR2::Compute(Node *node, unsigned int p,
-			     double *opp_probs, unsigned int gbd,
-			     HandTree *hand_tree, 
-			     unsigned int root_bd_st, unsigned int root_bd) {
+double *DynamicCBR2::Compute(Node *node, unsigned int p, double *opp_probs,
+			     unsigned int gbd, HandTree *hand_tree, 
+			     unsigned int root_bd_st, unsigned int root_bd,
+			     CFRValues *regrets, CFRValues *sumprobs) {
   unsigned int st = node->Street();
   // time_t start_t = time(NULL);
   unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
@@ -56,7 +51,7 @@ double *DynamicCBR2::Compute(Node *node, unsigned int p,
   // Should set this appropriately
   string action_sequence = "x";
   VCFRState state(opp_probs, hand_tree, 0, action_sequence, root_bd,
-		  root_bd_st, street_buckets, p);
+		  root_bd_st, street_buckets, p, regrets, sumprobs);
   SetStreetBuckets(st, gbd, state);
   double *vals = Process(node, lbd, state, st);
   DeleteStreetBuckets(street_buckets);
@@ -98,7 +93,8 @@ double *DynamicCBR2::Compute(Node *node, double **reach_probs,
 			     unsigned int gbd, HandTree *hand_tree,
 			     unsigned int root_bd_st, unsigned int root_bd,
 			     unsigned int target_p, bool cfrs, bool zero_sum,
-			     bool current, bool purify_opp) {
+			     bool current, bool purify_opp,
+			     CFRValues *regrets, CFRValues *sumprobs) {
   cfrs_ = cfrs;
   br_current_ = current;
   if (purify_opp) {
@@ -112,9 +108,9 @@ double *DynamicCBR2::Compute(Node *node, double **reach_probs,
   }
   if (zero_sum) {
     double *p0_cvs = Compute(node, 0, reach_probs[1], gbd, hand_tree,
-			     root_bd_st, root_bd);
+			     root_bd_st, root_bd, regrets, sumprobs);
     double *p1_cvs = Compute(node, 1, reach_probs[0], gbd, hand_tree,
-			     root_bd_st, root_bd);
+			     root_bd_st, root_bd, regrets, sumprobs);
     unsigned int st = node->Street();
     unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
     // Don't pass in bd.  This is a local hand tree specific to the current
@@ -131,7 +127,7 @@ double *DynamicCBR2::Compute(Node *node, double **reach_probs,
     }
   } else {
     return Compute(node, target_p, reach_probs[target_p^1], gbd,
-		   hand_tree, root_bd_st, root_bd);
+		   hand_tree, root_bd_st, root_bd, regrets, sumprobs);
   }
 }
 

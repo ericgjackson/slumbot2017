@@ -80,10 +80,10 @@ class BettingTree {
  public:
   ~BettingTree(void);
   void Display(void);
-  void GetStreetInitialNodes(unsigned int street, vector<Node *> *nodes);
+  bool PrintNode(unsigned int target_st, unsigned int target_pa,
+		 unsigned int target_nt);
   Node *Root(void) const {return root_.get();}
   unsigned int NumTerminals(void) const {return num_terminals_;}
-  Node *Terminal(unsigned int i) const {return terminals_[i];}
   unsigned int NumNonterminals(unsigned int p, unsigned int st) const {
     return num_nonterminals_[p][st];
   }
@@ -94,14 +94,11 @@ class BettingTree {
   static BettingTree *BuildAsymmetricTree(const BettingAbstraction &ba,
 					  unsigned int target_player);
   static BettingTree *BuildSubtree(Node *subtree_root);
+  Node *FindNode(unsigned int st, unsigned int pa, unsigned int nt);
 
  private:
   BettingTree(void);
 
-  void FillTerminalArray(void);
-  void FillTerminalArray(Node *node);
-  void GetStreetInitialNodes(Node *node, unsigned int street,
-			     vector<Node *> *nodes);
   shared_ptr<Node> Clone(Node *old_n, unsigned int *num_terminals);
   void Initialize(unsigned int target_player, const BettingAbstraction &ba);
   shared_ptr<Node>
@@ -111,11 +108,12 @@ class BettingTree {
   shared_ptr<Node> root_;
   unsigned int initial_street_;
   unsigned int num_terminals_;
-  Node **terminals_;
   unsigned int **num_nonterminals_;
-  // Pool *pool_;
 };
 
+bool PrintNode(Node *node, unsigned int target_st, unsigned int target_pa,
+	       unsigned int target_nt, const string &action_sequence,
+	       bool ***seen);
 bool TwoSuccsCorrespond(Node *node1, unsigned int s1, Node *node2,
 			unsigned int s2);
 

@@ -22,6 +22,8 @@ public:
 
  protected:
   const HandTree *hand_tree_;
+  unique_ptr<CFRValues> regrets_;
+  unique_ptr<CFRValues> sumprobs_;
 };
 
 #endif

@@ -97,14 +97,14 @@ double MPRGBR::Go(unsigned int it, unsigned int p) {
   }
   if (br_current_) {
     regrets_.reset(new CFRValues(players.get(), false, streets, betting_tree_,
-				 0, 0, card_abstraction_, buckets_,
-				 compressed_streets_));
+				 0, 0, card_abstraction_,
+				 buckets_.NumBuckets(), compressed_streets_));
     regrets_->Read(dir, it_, betting_tree_->Root(), "x", kMaxUInt);
     sumprobs_.reset(nullptr);
   } else {
     sumprobs_.reset(new CFRValues(players.get(), true, streets, betting_tree_,
-				  0, 0, card_abstraction_, buckets_,
-				  compressed_streets_));
+				  0, 0, card_abstraction_,
+				  buckets_.NumBuckets(), compressed_streets_));
     sumprobs_->Read(dir, it_, betting_tree_->Root(), "x", kMaxUInt);
     regrets_.reset(nullptr);
   }
@@ -122,7 +122,8 @@ double MPRGBR::Go(unsigned int it, unsigned int p) {
     current_strategy_.reset(new CFRValues(players.get(), false,
 					  bucketed_streets.get(),
 					  betting_tree_, 0, 0,
-					  card_abstraction_, buckets_,
+					  card_abstraction_,
+					  buckets_.NumBuckets(),
 					  compressed_streets_));
     current_strategy_->AllocateAndClearDoubles(betting_tree_->Root(),
 					       kMaxUInt);
