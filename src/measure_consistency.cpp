@@ -20,20 +20,30 @@
 #include "game_params.h"
 #include "hand_tree.h"
 #include "io.h"
+#include "joint_reach_probs.h"
 #include "params.h"
 
 class Walker {
 public:
   Walker(const CardAbstraction &card_abstraction,
 	 const BettingAbstraction &betting_abstraction,
-	 const CFRConfig &cfr_config, const Buckets &buckets, unsigned int it);
-  void Walk(Node *node, string *action_sequences, unsigned int final_st);
+	 const CFRConfig &cfr_config, const Buckets &buckets, unsigned int it,
+	 unsigned int final_st);
+  void Go(void);
 private:
+  void Walk(Node *node, string *action_sequences);
+  
   const Buckets &buckets_;
   unsigned int it_;
+  unsigned int final_st_;
+  unique_ptr<BettingTree> betting_tree_;
   char dir_[500];
   Reader ***strategy_readers_;
   CFRValueType **value_types_;
+  unique_ptr<JointReachProbs> joint_reach_probs_;
+  unsigned int num_consistent_;
+  unsigned int num_inconsistent_;
+  unsigned int num_skipped_;
 };
 
 Reader *InitializeReader(const char *dir, unsigned int p, unsigned int st,
@@ -70,10 +80,22 @@ Reader *InitializeReader(const char *dir, unsigned int p, unsigned int st,
 Walker::Walker(const CardAbstraction &card_abstraction,
 	       const BettingAbstraction &betting_abstraction,
 	       const CFRConfig &cfr_config, const Buckets &buckets,
-	       unsigned int it) :
+	       unsigned int it, unsigned int final_st) :
   buckets_(buckets) {
   it_ = it;
+  final_st_ = final_st;
   
+  if (betting_abstraction.Asymmetric()) {
+    fprintf(stderr, "Asymmetric not supported yet\n");
+    exit(-1);
+#if 0
+    betting_tree_.reset(
+		 BettingTree::BuildAsymmetricTree(betting_abstraction, p));
+#endif
+  } else {
+    betting_tree_.reset(BettingTree::BuildTree(betting_abstraction));
+  }
+
   sprintf(dir_, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
 	  Game::GameName().c_str(), Game::NumPlayers(),
 	  card_abstraction.CardAbstractionName().c_str(),
@@ -93,6 +115,14 @@ Walker::Walker(const CardAbstraction &card_abstraction,
 	InitializeReader(dir_, p, st, it, &value_types_[p][st]);
     }
   }
+
+  joint_reach_probs_.reset(new JointReachProbs(card_abstraction,
+					       betting_abstraction, cfr_config,
+					       buckets.NumBuckets(), it,
+					       final_st));
+  num_consistent_ = 0;
+  num_inconsistent_ = 0;
+  num_skipped_ = 0;
 }
 
 Reader *InitializeCVReader(const char *dir, string *action_sequences,
@@ -111,10 +141,10 @@ Reader *InitializeCVReader(const char *dir, string *action_sequences,
   return reader;
 }
 
-void Walker::Walk(Node *node, string *action_sequences, unsigned int final_st) {
+void Walker::Walk(Node *node, string *action_sequences) {
   if (node->Terminal()) return;
   unsigned int st = node->Street();
-  if (st > final_st) return;
+  if (st > final_st_) return;
   unsigned int pa = node->PlayerActing();
   unsigned int num_succs = node->NumSuccs();
   if (num_succs > 1) {
@@ -125,9 +155,10 @@ void Walker::Walk(Node *node, string *action_sequences, unsigned int final_st) {
     unique_ptr<double []> probs(new double[num_succs]);
     unique_ptr<unsigned int []> uisps(new unsigned int[num_succs]);
     unique_ptr<float []> cvs(new float[num_succs]);
+    unsigned int nt = node->NonterminalID();
     for (unsigned int b = 0; b < num_buckets; ++b) {
+      unsigned long long int sum = 0ULL;
       if (value_types_[pa][st] == CFR_INT) {
-	unsigned long long int sum = 0ULL;
 	for (unsigned int s = 0; s < num_succs; ++s) {
 	  unsigned int sp = strategy_readers_[pa][st]->ReadUnsignedIntOrDie();
 	  uisps[s] = sp;
@@ -142,6 +173,9 @@ void Walker::Walk(Node *node, string *action_sequences, unsigned int final_st) {
 	    probs[s] = ((double)uisps[s]) / (double)sum;
 	  }
 	}
+      } else {
+	fprintf(stderr, "Expected int sumprobs\n");
+	exit(-1);
       }
       unsigned int max_cv_s = 0;
       float max_cv = 0;
@@ -161,22 +195,61 @@ void Walker::Walk(Node *node, string *action_sequences, unsigned int final_st) {
 	  max_prob = probs[s];
 	}
       }
-      if (max_s != max_cv_s) {
-	if (max_cv > cvs[max_s] + 0.02) {
+      // double jrp = joint_reach_probs_->JointReachProb(pa, st, nt, b);
+      float our_rp = joint_reach_probs_->OurReachProb(pa, st, nt, b);
+      float opp_rp = joint_reach_probs_->OppReachProb(pa, st, nt, b);
+#if 0
+      double jrp = our_rp * opp_rp;
+      if (jrp > 0.001) {}
+#endif
+      if (our_rp > 0.01 && opp_rp > 0.01) {
+	bool consistent = true;
+	if (b == 0) {
+	  fprintf(stderr, "Evaluating (b 0) ");
+	  for (unsigned int st1 = 0; st1 <= st; ++st1) {
+	    fprintf(stderr, "%s", action_sequences[st1].c_str());
+	    if (st1 < st) {
+	      fprintf(stderr, "/");
+	    }
+	  }
+	  fprintf(stderr, "\n");
+	}
+	// Was 0.02
+	if (max_s != max_cv_s && max_cv > cvs[max_s] + 0.1) {
 	  double ratio = max_cv / cvs[max_s];
 	  if (ratio < 0) ratio = -ratio;
-	  if (ratio < 0.9 || ratio > 1.1) {
-	    for (unsigned int st1 = 0; st1 <= st; ++st1) {
-	      fprintf(stderr, "%s", action_sequences[st1].c_str());
-	      if (st1 < st) {
-		fprintf(stderr, "/");
-	      }
-	    }
-	    fprintf(stderr, " b %u max_s %u max_cv_s %u max_prob %f max_cv %f "
-		    "cv[max_s] %f prob[max_cv_s] %f\n",
-		    b, max_s, max_cv_s,
-		    max_prob, max_cv, cvs[max_s], probs[max_cv_s]);
+	  // Was 0.9/1.1
+	  if (ratio < 0.8 || ratio > 1.2) {
+	    consistent = false;
 	  }
+	}
+	if (consistent) {
+	  ++num_consistent_;
+	} else {
+	  ++num_inconsistent_;
+	  for (unsigned int st1 = 0; st1 <= st; ++st1) {
+	    printf("%s", action_sequences[st1].c_str());
+	    if (st1 < st) {
+	      printf("/");
+	    }
+	  }
+	  printf(" b %u max_s %u max_cv_s %u max_prob %f max_cv %f "
+		 "cv[max_s] %f prob[max_cv_s] %f sum %llu our_rp %f "
+		 "opp_rp %f\n",
+		 b, max_s, max_cv_s, max_prob, max_cv, cvs[max_s],
+		 probs[max_cv_s], sum, our_rp, opp_rp);
+	}
+      } else {
+	++num_skipped_;
+	if (b == 0) {
+	  fprintf(stderr, "Skipping (b 0) ");
+	  for (unsigned int st1 = 0; st1 <= st; ++st1) {
+	    fprintf(stderr, "%s", action_sequences[st1].c_str());
+	    if (st1 < st) {
+	      fprintf(stderr, "/");
+	    }
+	  }
+	  fprintf(stderr, "\n");
 	}
       }
     }
@@ -185,9 +258,26 @@ void Walker::Walk(Node *node, string *action_sequences, unsigned int final_st) {
   for (unsigned int s = 0; s < num_succs; ++s) {
     string old_as = action_sequences[st];
     action_sequences[st] += node->ActionName(s);
-    Walk(node->IthSucc(s), action_sequences, final_st);
+    Walk(node->IthSucc(s), action_sequences);
     action_sequences[st] = old_as;
   }
+}
+
+void Walker::Go(void) {
+  string *action_sequences = new string[final_st_ + 1];
+  for (unsigned int st = 0; st <= final_st_; ++st) {
+    action_sequences[st] = "x";
+  }
+  Walk(betting_tree_->Root(), action_sequences);
+  double num_eval = num_consistent_ + num_inconsistent_;
+  double pct_eval = 100.0 * num_eval / (num_eval + num_skipped_);
+  double pct_consistent = 100.0 * ((double)num_consistent_) / num_eval;
+  fprintf(stderr, "%u consistent; %u inconsistent; %u skipped\n",
+	  num_consistent_, num_inconsistent_, num_skipped_);
+  fprintf(stderr, "%.2f%% evaluated\n", pct_eval);
+  fprintf(stderr, "%.4f%% consistent (%u inconsistent)\n", pct_consistent,
+	  num_inconsistent_);
+  delete [] action_sequences;
 }
 
 static void Usage(const char *prog_name) {
@@ -219,24 +309,9 @@ int main(int argc, char *argv[]) {
   if (sscanf(argv[6], "%u", &final_st) != 1) Usage(argv[0]);
 
   BoardTree::Create();
-  unique_ptr<BettingTree> betting_tree;
-  if (betting_abstraction->Asymmetric()) {
-    fprintf(stderr, "Asymmetric not supported yet\n");
-    exit(-1);
-#if 0
-    betting_tree.reset(
-		 BettingTree::BuildAsymmetricTree(*betting_abstraction, p));
-#endif
-  } else {
-    betting_tree.reset(BettingTree::BuildTree(*betting_abstraction));
-  }
 
   Buckets buckets(*card_abstraction, true);
   Walker walker(*card_abstraction, *betting_abstraction, *cfr_config, buckets,
-		it);
-  string *action_sequences = new string[final_st + 1];
-  for (unsigned int st = 0; st <= final_st; ++st) {
-    action_sequences[st] = "x";
-  }
-  walker.Walk(betting_tree->Root(), action_sequences, final_st);
+		it, final_st);
+  walker.Go();
 }

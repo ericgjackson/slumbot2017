@@ -42,7 +42,7 @@ static void Show(const Buckets &buckets, unsigned int street,
 	    OutputNCards(board, num_board_cards);
 	    printf(" / ");
 	    OutputTwoCards(hi, lo);
-	    printf(" (bd %u h %u)\n", bd, h);
+	    printf(" (bd %u h %u hcp %u)\n", bd, h, hcp);
 	    fflush(stdout);
 	  }
 	  ++hcp;

@@ -27,8 +27,8 @@ void Show(Node *node, const string &action_sequence,
 	  const BettingTree *betting_tree,
 	  const CardAbstraction &card_abstraction,
 	  const BettingAbstraction &betting_abstraction,
-	  const CFRConfig &cfr_config, unsigned int it, unsigned int st,
-	  unsigned int p, bool ***seen) {
+	  const CFRConfig &cfr_config, bool current, unsigned int it,
+	  unsigned int st, unsigned int p, bool ***seen) {
   if (node->Terminal()) return;
   unsigned int st1 = node->Street();
   if (st1 > st) return;
@@ -55,8 +55,8 @@ void Show(Node *node, const string &action_sequence,
     for (unsigned int st2 = 0; st2 <= max_street; ++st2) {
       streets[st2] = (st2 == st1);
     }
-    CFRValues sumprobs(players.get(), true, streets.get(), betting_tree,
-		       0, 0, card_abstraction, buckets.NumBuckets(), nullptr);
+    CFRValues values(players.get(), ! current, streets.get(), betting_tree,
+		     0, 0, card_abstraction, buckets.NumBuckets(), nullptr);
     char dir[500];
     sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
 	    Game::GameName().c_str(), Game::NumPlayers(),
@@ -69,18 +69,18 @@ void Show(Node *node, const string &action_sequence,
       sprintf(buf, ".p%u", p);
       strcat(dir, buf);
     }
-    fprintf(stderr, "Reading sumprobs\n");
-    sumprobs.Read(dir, it, betting_tree->Root(), "x", kMaxUInt);
-    fprintf(stderr, "Read sumprobs\n");
+    fprintf(stderr, "Reading values\n");
+    values.Read(dir, it, betting_tree->Root(), "x", kMaxUInt);
+    fprintf(stderr, "Read values\n");
     int *i_values = nullptr;
     double *d_values = nullptr;
     unsigned char *c_values = nullptr;
-    if (sumprobs.Ints(pa, st1)) {
-      sumprobs.Values(pa, st1, nt, &i_values);
-    } else if (sumprobs.Doubles(pa, st1)) {
-      sumprobs.Values(pa, st1, nt, &d_values);
-    } else if (sumprobs.Chars(pa, st1)) {
-      sumprobs.Values(pa, st1, nt, &c_values);
+    if (values.Ints(pa, st1)) {
+      values.Values(pa, st1, nt, &i_values);
+    } else if (values.Doubles(pa, st1)) {
+      values.Values(pa, st1, nt, &d_values);
+    } else if (values.Chars(pa, st1)) {
+      values.Values(pa, st1, nt, &c_values);
     }
     unsigned int num_boards = BoardTree::NumBoards(st1);
     unsigned int num_board_cards = Game::NumBoardCards(st1);
@@ -109,15 +109,18 @@ void Show(Node *node, const string &action_sequence,
 	  double sum = 0;
 	  if (i_values) {
 	    for (unsigned int s = 0; s < num_succs; ++s) {
-	      sum += i_values[offset + s];
+	      int iv = i_values[offset + s];
+	      if (iv > 0) sum += iv;
 	    }
 	  } else if (d_values) {
 	    for (unsigned int s = 0; s < num_succs; ++s) {
-	      sum += d_values[offset + s];
+	      double dv = d_values[offset + s];
+	      if (dv > 0) sum += dv;
 	    }
 	  } else if (c_values) {
 	    for (unsigned int s = 0; s < num_succs; ++s) {
-	      sum += c_values[offset + s];
+	      unsigned char cv = c_values[offset + s];
+	      if (cv > 0) sum += cv;
 	    }
 	  }
 	  if (sum == 0) {
@@ -127,11 +130,17 @@ void Show(Node *node, const string &action_sequence,
 	  } else {
 	    for (unsigned int s = 0; s < num_succs; ++s) {
 	      if (i_values) {
-		printf(" %f", i_values[offset + s] / sum);
+		int iv = i_values[offset + s];
+		if (iv > 0) printf(" %f", iv / sum);
+		else        printf(" 0");
 	      } else if (d_values) {
-		printf(" %f", d_values[offset + s] / sum);
+		double dv = d_values[offset + s];
+		if (dv > 0) printf(" %f", dv / sum);
+		else        printf(" 0");
 	      } else {
-		printf(" %f", c_values[offset + s] / sum);
+		unsigned char cv = c_values[offset + s];
+		if (cv > 0) printf(" %f", cv / sum);
+		else        printf(" 0");
 	      }
 	    }
 	  }
@@ -146,19 +155,20 @@ void Show(Node *node, const string &action_sequence,
   for (unsigned int s = 0; s < num_succs; ++s) {
     string action = node->ActionName(s);
     Show(node->IthSucc(s), action_sequence + action, target_action_sequence,
-	 betting_tree, card_abstraction, betting_abstraction,
-	 cfr_config, it, st, p, seen);
+	 betting_tree, card_abstraction, betting_abstraction, cfr_config,
+	 current, it, st, p, seen);
   }
 }
 
 static void Usage(const char *prog_name) {
   fprintf(stderr, "USAGE: %s <game params> <card params> <betting params> "
-	  "<CFR params> <it> <action> <street> (player)\n", prog_name);
+	  "<CFR params> <it> <action> <street> [avg|current] (player)\n",
+	  prog_name);
   exit(-1);
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 8 && argc != 9) Usage(argv[0]);
+  if (argc != 9 && argc != 10) Usage(argv[0]);
   Files::Init();
   unique_ptr<Params> game_params = CreateGameParams();
   game_params->ReadFromFile(argv[1]);
@@ -179,15 +189,20 @@ int main(int argc, char *argv[]) {
   if (sscanf(argv[5], "%u", &it) != 1) Usage(argv[0]);
   string target_action_sequence = argv[6];
   if (sscanf(argv[7], "%u", &st) != 1) Usage(argv[0]);
+  bool current;
+  string c_arg = argv[8];
+  if (c_arg == "avg")          current = false;
+  else if (c_arg == "current") current = true;
+  else                         Usage(argv[0]);
   unsigned int p = kMaxUInt;
   if (betting_abstraction->Asymmetric()) {
-    if (argc == 8) {
+    if (argc == 9) {
       fprintf(stderr, "Expect player arg for asymmetric systems\n");
       exit(-1);
     }
-    if (sscanf(argv[8] + 1, "%u", &p) != 1) Usage(argv[0]);
+    if (sscanf(argv[9] + 1, "%u", &p) != 1) Usage(argv[0]);
   } else {
-    if (argc == 9) {
+    if (argc == 10) {
       fprintf(stderr, "Do not expect player arg for symmetric systems\n");
       exit(-1);
     }
@@ -216,7 +231,7 @@ int main(int argc, char *argv[]) {
   }
   Show(betting_tree->Root(), "x", target_action_sequence, 
        betting_tree.get(), *card_abstraction, *betting_abstraction,
-       *cfr_config, it, st, p, seen);
+       *cfr_config, current, it, st, p, seen);
   for (unsigned int st1 = 0; st1 <= st; ++st1) {
     for (unsigned int p = 0; p < num_players; ++p) {
       delete [] seen[st1][p];

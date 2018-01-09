@@ -1,7 +1,6 @@
 # Note that if any header files are missing when you try to build, things fail
 # in mysterious ways.  You get told there is "No rule to make target obj/foo.o".
-HEADS =	src/cv_calc_thread.h \
-	src/constants.h src/rand.h src/split.h src/files.h \
+HEADS =	src/constants.h src/rand.h src/split.h src/files.h \
 	src/cards.h src/io.h src/params.h src/game_params.h src/game.h \
 	src/canonical_cards.h src/board_tree.h src/hand_evaluator.h \
 	src/hand_value_tree.h src/hand_tree.h \
@@ -21,7 +20,8 @@ HEADS =	src/cv_calc_thread.h \
 	src/pcs_cfr.h src/canonical.h src/mp_vcfr.h src/mp_rgbr.h \
 	src/sampled_bcfr_builder.h src/runtime_params.h src/runtime_config.h \
 	src/acpc_protocol.h src/agent.h src/nearest_neighbors.h \
-	src/nl_agent.h src/dynamic_cbr2.h src/cfr_values_file.h src/bot.h
+	src/nl_agent.h src/dynamic_cbr2.h src/cfr_values_file.h src/bot.h \
+	src/cv_calc_thread.h src/joint_reach_probs.h
 
 # -Wl,--no-as-needed fixes my problem of undefined reference to
 # pthread_create (and pthread_join).  Comments I found on the web indicate
@@ -38,8 +38,7 @@ CFLAGS = -std=c++11 -Wall -O3 -march=native -ffast-math -flto
 obj/%.o:	src/%.cpp $(HEADS)
 		gcc $(CFLAGS) -c -o $@ $<
 
-OBJS =	obj/cv_calc_thread.o \
-	obj/rand.o obj/split.o obj/files.o obj/cards.o obj/io.o \
+OBJS =	obj/rand.o obj/split.o obj/files.o obj/cards.o obj/io.o \
 	obj/params.o obj/game_params.o obj/game.o obj/canonical_cards.o \
 	obj/board_tree.o obj/hand_evaluator.o obj/hand_value_tree.o \
 	obj/hand_tree.o obj/card_abstraction_params.o obj/card_abstraction.o \
@@ -59,7 +58,8 @@ OBJS =	obj/cv_calc_thread.o \
 	obj/mp_vcfr.o obj/mp_rgbr.o obj/sampled_bcfr_builder.o \
 	obj/runtime_params.o obj/runtime_config.o \
 	obj/acpc_protocol.o obj/nearest_neighbors.o obj/nl_agent.o \
-	obj/dynamic_cbr2.o obj/cfr_values_file.o obj/bot.o
+	obj/dynamic_cbr2.o obj/cfr_values_file.o obj/bot.o \
+	obj/cv_calc_thread.o obj/joint_reach_probs.o
 
 bin/test:	obj/test.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/test obj/test.o $(OBJS) \
@@ -369,9 +369,13 @@ bin/calc_cv:	obj/calc_cv.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/calc_cv obj/calc_cv.o \
 	$(OBJS) $(LIBRARIES)
 
-bin/measure_convergence:	obj/measure_convergence.o $(OBJS) $(HEADS)
-	g++ $(LDFLAGS) $(CFLAGS) -o bin/measure_convergence \
-	obj/measure_convergence.o $(OBJS) $(LIBRARIES)
+bin/measure_consistency:	obj/measure_consistency.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/measure_consistency \
+	obj/measure_consistency.o $(OBJS) $(LIBRARIES)
+
+bin/compute_joint_reach_probs:	obj/compute_joint_reach_probs.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/compute_joint_reach_probs \
+	obj/compute_joint_reach_probs.o $(OBJS) $(LIBRARIES)
 
 bin/x:	obj/x.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/x obj/x.o \
