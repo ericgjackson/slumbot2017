@@ -239,6 +239,10 @@ void Walker::Walk(Node *node, unsigned int bd, double *p0_probs,
     unsigned int nbd_begin = BoardTree::SuccBoardBegin(last_st, bd, st);
     unsigned int nbd_end = BoardTree::SuccBoardEnd(last_st, bd, st);
     for (unsigned int nbd = nbd_begin; nbd < nbd_end; ++nbd) {
+      if (st == 1) {
+	fprintf(stderr, "Flop initial NT %u bd %u\n", node->NonterminalID(),
+		nbd);
+      }
       Walk(node, nbd, p0_probs, p1_probs, st);
     }
     return;
