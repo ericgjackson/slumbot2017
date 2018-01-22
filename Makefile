@@ -377,6 +377,15 @@ bin/compute_joint_reach_probs:	obj/compute_joint_reach_probs.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/compute_joint_reach_probs \
 	obj/compute_joint_reach_probs.o $(OBJS) $(LIBRARIES)
 
+bin/compute_sampled_joint_reach_probs:	\
+	obj/compute_sampled_joint_reach_probs.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/compute_sampled_joint_reach_probs \
+	obj/compute_sampled_joint_reach_probs.o $(OBJS) $(LIBRARIES)
+
+bin/compare_joint_reach_probs:	obj/compare_joint_reach_probs.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/compare_joint_reach_probs \
+	obj/compare_joint_reach_probs.o $(OBJS) $(LIBRARIES)
+
 bin/x:	obj/x.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/x obj/x.o \
 	$(OBJS) $(LIBRARIES)
