@@ -114,13 +114,16 @@ CFRValues::CFRValues(const bool *players, bool sumprobs, bool *streets,
 #ifdef EJC
     new_distributions_[st] =
       new long long int[COMPRESSOR_DISTRIBUTION_SIZE];
+    for (unsigned int i = 0; i < COMPRESSOR_DISTRIBUTION_SIZE; ++i) {
+      new_distributions_[st][i] = g_ej_defaultDistribution[i];
+    }
 #else
     new_distributions_[st] =
       new int64_t[COMPRESSOR_DISTRIBUTION_SIZE];
-#endif
     for (unsigned int i = 0; i < COMPRESSOR_DISTRIBUTION_SIZE; ++i) {
       new_distributions_[st][i] = g_defaultDistribution[i];
     }
+#endif
   }
   
   c_values_ = nullptr;
@@ -411,14 +414,17 @@ void CFRValues::WriteNode(Node *node, Writer *writer,
     unsigned int num_bd_actions = num_hole_card_pairs * num_succs;
     for (unsigned int lbd = 0; lbd < num_local_boards; ++lbd) {
 #ifdef EJC
-      EJCompressor *compressor = (EJCompressor *)compressor;
-      compressor->Compress((int *)&i_values_[p][st][nt][lbd * num_bd_actions +
-							offset],
-			   lbd ?
-			   (int *)&i_values_[p][st][nt][(lbd - 1) *
-							num_bd_actions +
-							offset] : NULL,
-			   num_bd_actions, num_succs);
+      if (! (i_values_ && i_values_[p] && i_values_[p][st] &&
+	     i_values_[p][st][nt])) {
+	fprintf(stderr, "Compression expects i_values\n");
+	exit(-1);
+      }
+      EJCompressor *ej_compressor = (EJCompressor *)compressor;
+      ej_compressor->Compress(
+      (int *)&i_values_[p][st][nt][lbd * num_bd_actions + offset],
+      lbd ? (int *)&i_values_[p][st][nt][(lbd - 1) * num_bd_actions + offset] :
+      NULL,
+      num_bd_actions, num_succs);
 #else
       Compress(compressor,
 	       (int *)&i_values_[p][st][nt][lbd * num_bd_actions + offset],
@@ -848,7 +854,7 @@ bool CFRValues::ReadNode(Node *node, Reader *reader, void *decompressor,
   } else if (value_type == CFR_INT) {
     if (compressed_streets_[st]) {
 #ifdef EJC
-      EJDecompressor *decompressor = (EJDecompressor *)decompressor;
+      EJDecompressor *ej_decompressor = (EJDecompressor *)decompressor;
 #endif
       unsigned int num_local_boards =
 	BoardTree::NumLocalBoards(root_bd_st_, root_bd_, st);
@@ -856,7 +862,7 @@ bool CFRValues::ReadNode(Node *node, Reader *reader, void *decompressor,
       unsigned int num_bd_actions = num_hole_card_pairs * num_succs;
       for (unsigned int lbd = 0; lbd < num_local_boards; ++lbd) {
 #ifdef EJC
-	decompressor->Decompress(&i_values_[p][st][nt][lbd * num_bd_actions],
+	ej_decompressor->Decompress(&i_values_[p][st][nt][lbd * num_bd_actions],
 				 lbd ?
 				 &i_values_[p][st][nt][(lbd-1) *
 						       num_bd_actions +

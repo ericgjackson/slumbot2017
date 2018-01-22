@@ -38,7 +38,7 @@ private:
   VCFR *cfr_;
   bool *subtree_streets_;
   unsigned int p_;
-  const string &action_sequence_;
+  string action_sequence_;
   double *opp_probs_;
   const HandTree *hand_tree_;
   unsigned int thread_index_;

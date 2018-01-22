@@ -1,13 +1,6 @@
 // For each bucket in each betting state, compute the joint reach probability.
 // Can be viewed as the probability that the next hand we play will reach
 // that betting state.
-//
-// How do I want to multithread?  Multithread by betting state?  A little
-// complicated.  Can only spawn one thread at a time.  Probably need
-// semaphore.
-//
-// Split at every flop node?  Need mutex when we update bucket stats.  Maybe
-// OK.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,7 +22,6 @@
 #include "files.h"
 #include "game.h"
 #include "game_params.h"
-// #include "hand_tree.h"
 #include "io.h"
 #include "params.h"
 
@@ -38,7 +30,7 @@ public:
   Walker(const CardAbstraction &card_abstraction,
 	 const BettingAbstraction &betting_abstraction,
 	 const CFRConfig &cfr_config, const Buckets &buckets, unsigned int it,
-	 unsigned int final_st, unsigned int num_threads);
+	 unsigned int final_st, unsigned int mod, unsigned int num_threads);
   ~Walker(void);
   void Go(unsigned int p);
   void Walk(Node *node, unsigned int bd, const CanonicalCards *hands,
@@ -54,6 +46,7 @@ private:
   const Buckets &buckets_;
   unsigned int it_;
   unsigned int final_st_;
+  unsigned int mod_;
   unsigned int num_threads_;
   unique_ptr<BettingTree> betting_tree_;
   unique_ptr<CFRValues> sumprobs_;
@@ -117,6 +110,8 @@ void WalkerThread::Go(void) {
   // Assume flop so there is no prior board that we are extending; can
   // iterate through all boards here.
   for (unsigned int bd = thread_index_; bd < num_boards; bd += num_threads_) {
+    // For now assume final_st_ is not 1
+    // if (st == final_st_ && bd % mod_ != 0) continue;
     if (thread_index_ == 0) {
       fprintf(stderr, "Flop initial NT %u bd %u\n", node_->NonterminalID(),
 	      bd);
@@ -131,7 +126,7 @@ void WalkerThread::Go(void) {
 Walker::Walker(const CardAbstraction &card_abstraction,
 	       const BettingAbstraction &betting_abstraction,
 	       const CFRConfig &cfr_config, const Buckets &buckets,
-	       unsigned int it, unsigned int final_st,
+	       unsigned int it, unsigned int final_st, unsigned int mod,
 	       unsigned int num_threads) :
   card_abstraction_(card_abstraction),
   betting_abstraction_(betting_abstraction), cfr_config_(cfr_config),
@@ -140,6 +135,11 @@ Walker::Walker(const CardAbstraction &card_abstraction,
   unsigned int max_street = Game::MaxStreet();
   final_st_ = final_st;
   if (final_st_> max_street) final_st_ = max_street;
+  if (final_st_ == 1) {
+    fprintf(stderr, "final_st of 1 not supported currently\n");
+    exit(-1);
+  }
+  mod_ = mod;
   num_threads_ = num_threads;
   
   if (betting_abstraction.Asymmetric()) {
@@ -188,6 +188,7 @@ Walker::Walker(const CardAbstraction &card_abstraction,
     unsigned int num_boards = BoardTree::NumBoards(st);
     unsigned int num_hole_card_pairs = Game::NumHoleCardPairs(st);
     for (unsigned int bd = 0; bd < num_boards; ++bd) {
+      if (st == final_st_ && bd % mod_ != 0) continue;
       unsigned int board_count = BoardTree::BoardCount(st, bd);
       for (unsigned int i = 0; i < num_hole_card_pairs; ++i) {
 	unsigned int h = bd * num_hole_card_pairs + i;
@@ -249,21 +250,30 @@ void Walker::Write(Node *node, Writer **writers) {
     unsigned int num_opp_hole_card_pairs = num_rem * (num_rem - 1) / 2;
     unsigned int num_buckets = buckets_.NumBuckets(st);
     for (unsigned int b = 0; b < num_buckets; ++b) {
-      double norm_our = our_probs_[st][nt][b] / bucket_counts_[st][b];
-      // Be careful to avoid int overflow
-      double opp_denom = ((double)bucket_counts_[st][b]) *
-	(double)num_opp_hole_card_pairs;
-      double norm_opp = opp_probs_[st][nt][b] / opp_denom;
-      // No values should be greater than 1.0, right?  Add sanity check.
-      if (norm_our > 1.0) {
-	fprintf(stderr, "Norm our: %f\n", norm_our);
-	exit(-1);
-      }
-      if (norm_opp > 1.0) {
-	fprintf(stderr, "Norm opp: %f raw %f bc %u nohcp %u st %u nt %u "
-		"b %u\n", norm_opp, opp_probs_[st][nt][b],
-		bucket_counts_[st][b], num_opp_hole_card_pairs, st, nt, b);
-	exit(-1);
+      double norm_our, norm_opp;
+      if (bucket_counts_[st][b] == 0) {
+	norm_our = 999.9;
+	norm_opp = 999.9;
+      } else {
+	norm_our = our_probs_[st][nt][b] / bucket_counts_[st][b];
+	// Be careful to avoid int overflow
+	double opp_denom = ((double)bucket_counts_[st][b]) *
+	  (double)num_opp_hole_card_pairs;
+	norm_opp = opp_probs_[st][nt][b] / opp_denom;
+	// No values should be greater than 1.0, right?  Add sanity check.
+	if (norm_our > 1.0) {
+	  fprintf(stderr, "Norm our: %f\n", norm_our);
+	  fprintf(stderr, "Raw %f bc %u st %u pa %u nt %u b %u\n",
+		  our_probs_[st][nt][b], bucket_counts_[st][b],
+		  st, pa, nt, b);
+	  exit(-1);
+	}
+	if (norm_opp > 1.0) {
+	  fprintf(stderr, "Norm opp: %f raw %f bc %u nohcp %u st %u nt %u "
+		  "b %u\n", norm_opp, opp_probs_[st][nt][b],
+		  bucket_counts_[st][b], num_opp_hole_card_pairs, st, nt, b);
+	  exit(-1);
+	}
       }
       writer->WriteFloat(norm_our);
       writer->WriteFloat(norm_opp);
@@ -279,7 +289,7 @@ void Walker::Write(void) {
   char buf[500];
   Writer **writers = new Writer *[final_st_ + 1];
   for (unsigned int st = 0; st <= final_st_; ++st) {
-    sprintf(buf, "%s/joint_reach_probs.%u.%u.p%u", dir_, st, it_, p_);
+    sprintf(buf, "%s/joint_reach_probs2.%u.%u.p%u", dir_, st, it_, p_);
     writers[st] = new Writer(buf);
   }
   Write(betting_tree_->Root(), writers);
@@ -325,6 +335,10 @@ void Walker::Walk(Node *node, unsigned int bd, const CanonicalCards *hands,
       unsigned int nbd_begin = BoardTree::SuccBoardBegin(last_st, bd, st);
       unsigned int nbd_end = BoardTree::SuccBoardEnd(last_st, bd, st);
       for (unsigned int nbd = nbd_begin; nbd < nbd_end; ++nbd) {
+	// Sample on final street
+	if (st == final_st_) {
+	  if (nbd % mod_ != 0) continue;
+	}
 	const Card *board = BoardTree::Board(st, nbd);
 	unsigned int sg = BoardTree::SuitGroups(st, nbd);
 	CanonicalCards next_hands(2, board, num_board_cards, sg, false);
@@ -483,12 +497,12 @@ void Walker::Go(unsigned int p) {
 
 static void Usage(const char *prog_name) {
   fprintf(stderr, "USAGE: %s <game params> <card params> <betting params> "
-	  "<CFR params> <it> <final st> <num threads>\n", prog_name);
+	  "<CFR params> <it> <final st> <mod> <num threads>\n", prog_name);
   exit(-1);
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 8) Usage(argv[0]);
+  if (argc != 9) Usage(argv[0]);
   Files::Init();
   unique_ptr<Params> game_params = CreateGameParams();
   game_params->ReadFromFile(argv[1]);
@@ -505,17 +519,18 @@ int main(int argc, char *argv[]) {
   cfr_params->ReadFromFile(argv[4]);
   unique_ptr<CFRConfig>
     cfr_config(new CFRConfig(*cfr_params));
-  unsigned int it, final_st, num_threads;
+  unsigned int it, final_st, mod, num_threads;
   if (sscanf(argv[5], "%u", &it) != 1)          Usage(argv[0]);
   if (sscanf(argv[6], "%u", &final_st) != 1)    Usage(argv[0]);
-  if (sscanf(argv[7], "%u", &num_threads) != 1) Usage(argv[0]);
+  if (sscanf(argv[7], "%u", &mod) != 1)         Usage(argv[0]);
+  if (sscanf(argv[8], "%u", &num_threads) != 1) Usage(argv[0]);
 
   BoardTree::Create();
   BoardTree::BuildBoardCounts();
 
   Buckets buckets(*card_abstraction, false);
   Walker walker(*card_abstraction, *betting_abstraction, *cfr_config,
-		buckets, it, final_st, num_threads);
+		buckets, it, final_st, mod, num_threads);
   unsigned int num_players = Game::NumPlayers();
   for (unsigned int p = 0; p < num_players; ++p) {
     walker.Go(p);
