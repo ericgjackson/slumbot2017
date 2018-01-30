@@ -289,7 +289,7 @@ void Walker::Write(void) {
   char buf[500];
   Writer **writers = new Writer *[final_st_ + 1];
   for (unsigned int st = 0; st <= final_st_; ++st) {
-    sprintf(buf, "%s/joint_reach_probs2.%u.%u.p%u", dir_, st, it_, p_);
+    sprintf(buf, "%s/joint_reach_probs.%u.%u.p%u", dir_, st, it_, p_);
     writers[st] = new Writer(buf);
   }
   Write(betting_tree_->Root(), writers);

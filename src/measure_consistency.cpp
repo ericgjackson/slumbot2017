@@ -1,3 +1,6 @@
+// Another test: any action taken with probability greater than threshold
+// should have EV that is within threshold of best action.
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,6 +47,8 @@ private:
   unsigned int num_consistent_;
   unsigned int num_inconsistent_;
   unsigned int num_skipped_;
+  unsigned int num_consistent2_;
+  unsigned int num_inconsistent2_;
 };
 
 Reader *InitializeReader(const char *dir, unsigned int p, unsigned int st,
@@ -123,6 +128,8 @@ Walker::Walker(const CardAbstraction &card_abstraction,
   num_consistent_ = 0;
   num_inconsistent_ = 0;
   num_skipped_ = 0;
+  num_consistent2_ = 0;
+  num_inconsistent2_ = 0;
 }
 
 Reader *InitializeCVReader(const char *dir, string *action_sequences,
@@ -198,28 +205,25 @@ void Walker::Walk(Node *node, string *action_sequences) {
       // double jrp = joint_reach_probs_->JointReachProb(pa, st, nt, b);
       float our_rp = joint_reach_probs_->OurReachProb(pa, st, nt, b);
       float opp_rp = joint_reach_probs_->OppReachProb(pa, st, nt, b);
-#if 0
-      double jrp = our_rp * opp_rp;
-      if (jrp > 0.001) {}
-#endif
-      if (our_rp > 0.01 && opp_rp > 0.01) {
-	bool consistent = true;
+      if (our_rp > 0.001 && opp_rp > 0.001) {
 	if (b == 0) {
-	  fprintf(stderr, "Evaluating (b 0) ");
+	  printf("Evaluating (b 0) ");
 	  for (unsigned int st1 = 0; st1 <= st; ++st1) {
-	    fprintf(stderr, "%s", action_sequences[st1].c_str());
+	    printf("%s", action_sequences[st1].c_str());
 	    if (st1 < st) {
-	      fprintf(stderr, "/");
+	      printf("/");
 	    }
 	  }
-	  fprintf(stderr, "\n");
+	  printf("\n");
+	  fflush(stdout);
 	}
+	bool consistent = true;
 	// Was 0.02
-	if (max_s != max_cv_s && max_cv > cvs[max_s] + 0.1) {
+	if (max_s != max_cv_s && max_cv > cvs[max_s] + 0.025) {
 	  double ratio = max_cv / cvs[max_s];
 	  if (ratio < 0) ratio = -ratio;
 	  // Was 0.9/1.1
-	  if (ratio < 0.8 || ratio > 1.2) {
+	  if (ratio < 0.95 || ratio > 1.05) {
 	    consistent = false;
 	  }
 	}
@@ -238,18 +242,56 @@ void Walker::Walk(Node *node, string *action_sequences) {
 		 "opp_rp %f\n",
 		 b, max_s, max_cv_s, max_prob, max_cv, cvs[max_s],
 		 probs[max_cv_s], sum, our_rp, opp_rp);
+	  fflush(stdout);
 	}
+
+	// Every action with non-trivial probability should have CV close
+	// to max CV.
+	bool consistent2 = true;
+	unsigned int bad_s = kMaxUInt;
+	for (unsigned int s = 0; s < num_succs; ++s) {
+	  if (s == max_cv_s) continue;
+	  if (probs[s] >= 0.1) {
+	    double my_cv = cvs[s];
+	    if (max_cv > my_cv + 0.025) {
+	      double ratio = max_cv / my_cv;
+	      if (ratio > 1.05) {
+		consistent2 = false;
+		bad_s = s;
+		break;
+	      }
+	    }
+	  }
+	}
+	if (consistent2) {
+	  ++num_consistent2_;
+	} else {
+	  ++num_inconsistent2_;
+	  for (unsigned int st1 = 0; st1 <= st; ++st1) {
+	    printf("%s", action_sequences[st1].c_str());
+	    if (st1 < st) {
+	      printf("/");
+	    }
+	  }
+	  printf(" b %u bad_s %u max_cv_s %u bad_prob %f max_cv %f "
+		 "cv[bad_s] %f sum %llu our_rp %f opp_rp %f TWO\n",
+		 b, bad_s, max_cv_s, probs[bad_s], max_cv, cvs[bad_s],
+		 sum, our_rp, opp_rp);
+	  fflush(stdout);
+	}
+	
       } else {
 	++num_skipped_;
 	if (b == 0) {
-	  fprintf(stderr, "Skipping (b 0) ");
+	  printf("Skipping (b 0) ");
 	  for (unsigned int st1 = 0; st1 <= st; ++st1) {
-	    fprintf(stderr, "%s", action_sequences[st1].c_str());
+	    printf("%s", action_sequences[st1].c_str());
 	    if (st1 < st) {
-	      fprintf(stderr, "/");
+	      printf("/");
 	    }
 	  }
-	  fprintf(stderr, "\n");
+	  printf("\n");
+	  fflush(stdout);
 	}
       }
     }
@@ -277,6 +319,12 @@ void Walker::Go(void) {
   fprintf(stderr, "%.2f%% evaluated\n", pct_eval);
   fprintf(stderr, "%.4f%% consistent (%u inconsistent)\n", pct_consistent,
 	  num_inconsistent_);
+
+  double num_eval2 = num_consistent2_ + num_inconsistent2_;
+  double pct_consistent2 = 100.0 * ((double)num_consistent2_) / num_eval2;
+  fprintf(stderr, "%.4f%% consistent2 (%u inconsistent2)\n", pct_consistent2,
+	  num_inconsistent2_);
+  
   delete [] action_sequences;
 }
 
