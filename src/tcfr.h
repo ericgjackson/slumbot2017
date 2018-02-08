@@ -47,7 +47,7 @@ public:
   static const unsigned int kMaxSuccs = 50;
 
   virtual T_VALUE Process(unsigned char *ptr, unsigned int last_player_acting,
-			  int last_st);
+			  int last_st, bool adjust);
   void HVBDealHand(void);
   void NoHVBDealHand(void);
   int Round(double d);
@@ -59,6 +59,7 @@ public:
   unsigned int num_threads_;
   unsigned char *data_;
   bool asymmetric_;
+  bool boost_;
   unsigned int num_players_;
   unsigned int target_player_;
   unsigned int p_;
@@ -113,7 +114,8 @@ public:
   // Keep this as a signed int so we can use it in winnings calculation
   // without casting.
   int board_count_;
-  bool second_half_;
+  bool deal_twice_;
+  int **force_regrets_;
 };
 
 class TCFR : public CFR {
@@ -152,6 +154,7 @@ private:
   const Buckets &buckets_;
   unique_ptr<BettingTree> betting_tree_;
   bool asymmetric_;
+  bool boost_;
   unsigned int num_players_;
   unsigned int target_player_;
   unsigned char *data_;

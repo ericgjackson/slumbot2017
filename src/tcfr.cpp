@@ -33,10 +33,7 @@
 using namespace std;
 
 // #define BC 1
-#define DEALONCE 1
-// #define DEALTWICE 1
 #define SWITCH 1
-// #define SECONDHALF 1
 
 #define SUCCPTR(ptr) (ptr + 8)
 
@@ -58,6 +55,7 @@ TCFRThread::TCFRThread(const BettingAbstraction &ba, const CFRConfig &cc,
   num_threads_ = num_threads;
   data_ = data;
   asymmetric_ = betting_abstraction_.Asymmetric();
+  boost_ = cfr_config_.Boost();
   num_players_ = Game::NumPlayers();
   target_player_ = target_player;
   rngs_ = rngs;
@@ -88,6 +86,7 @@ TCFRThread::TCFRThread(const BettingAbstraction &ba, const CFRConfig &cc,
   }
   explore_ = cfr_config_.Explore();
   full_only_avg_update_ = true; // cfr_config_.FullOnlyAvgUpdate();
+  deal_twice_ = cfr_config_.DealTwice();
   canon_bds_ = new unsigned int[max_street_ + 1];
   canon_bds_[0] = 0;
   hi_cards_ = new unsigned int[num_players_];
@@ -372,10 +371,10 @@ void TCFRThread::Run(void) {
       break;
     }
 
-#ifdef DEALONCE
-    if (hvb_table_) HVBDealHand();
-    else            NoHVBDealHand();
-#endif
+    if (! deal_twice_) {
+      if (hvb_table_) HVBDealHand();
+      else            NoHVBDealHand();
+    }
 
     if (it_ % 10000000 == 1 && batch_index_ % num_threads_ == 0) {
       fprintf(stderr, "Batch %i it %llu\n", batch_index_, it_);
@@ -424,12 +423,16 @@ void TCFRThread::Run(void) {
     end = num_players_;
     incr = 1;
 #endif
+    // Only start after iteration 10m.  Assume any previous batches would
+    // have at least ten million iterations.
+    bool adjust = boost_ && (batch_index_ % num_threads_ == 0) &&
+      (batch_index_ > 0 || it_ > 10000000);
     for (int p = start; p != end; p += incr) {
       p_ = p;
-#ifdef DEALTWICE
-      if (hvb_table_) HVBDealHand();
-      else            NoHVBDealHand();
-#endif
+      if (deal_twice_) {
+	if (hvb_table_) HVBDealHand();
+	else            NoHVBDealHand();
+      }
       stack_index_ = 0;
       // Assume the big blind is last to act preflop
       // Assume the small blind is prior to the big blind
@@ -445,9 +448,7 @@ void TCFRThread::Run(void) {
 	  contributions_[p] = 0;
 	}
       }
-      // Not sure what to do for multiplayer
-      second_half_ = (p != start);
-      T_VALUE val = Process(data_, 1000, -1);
+      T_VALUE val = Process(data_, 1000, -1, adjust);
       sum_values[p_] += val;
 #ifdef BC
       denoms[p_] += board_count_;
@@ -527,8 +528,8 @@ int TCFRThread::Round(double d) {
 }
 
 T_VALUE TCFRThread::Process(unsigned char *ptr,
-			    unsigned int last_player_acting,
-			    int last_st) {
+			    unsigned int last_player_acting, int last_st,
+			    bool adjust) {
   ++process_count_;
   if (all_full_) {
     ++full_process_count_;
@@ -624,7 +625,7 @@ T_VALUE TCFRThread::Process(unsigned char *ptr,
     if (num_succs == 1) {
       unsigned long long int succ_offset =
 	*((unsigned long long int *)(SUCCPTR(ptr)));
-      return Process(data_ + succ_offset, player_acting, st);
+      return Process(data_ + succ_offset, player_acting, st, adjust);
     }
     unsigned int default_succ_index = 0;
     unsigned int fold_succ_index = ptr[3];
@@ -741,7 +742,7 @@ T_VALUE TCFRThread::Process(unsigned char *ptr,
 	    int bet_to = (int)*(unsigned short *)(succ_ptr + 6);
 	    contributions_[p_] = bet_to;
 	  }
-	  val = Process(data_ + succ_offset, player_acting, st);
+	  val = Process(data_ + succ_offset, player_acting, st, adjust);
 	  contributions_[p_] = old_contribution;
 	}
       } else { // Recursing on all succs
@@ -773,7 +774,8 @@ T_VALUE TCFRThread::Process(unsigned char *ptr,
 		contributions_[p_] = bet_to;
 	      }
 	      ++stack_index_;
-	      succ_values[s] = Process(data_ + succ_offset, player_acting, st);
+	      succ_values[s] = Process(data_ + succ_offset, player_acting, st,
+				       adjust);
 	      --stack_index_;
 	      contributions_[p_] = old_contribution;
 	    }
@@ -916,14 +918,8 @@ T_VALUE TCFRThread::Process(unsigned char *ptr,
       }
 
       // Update sum-probs
-#ifdef SECONDHALF
-      if (sumprob_streets_[player_acting][st] &&
-	  (all_full_ || ! full_only_avg_update_) && second_half_) {
-#else
       if (sumprob_streets_[player_acting][st] &&
 	  (all_full_ || ! full_only_avg_update_)) {
-#endif
-	// if (! asymmetric_ || player_acting == target_player_) {
 	T_SUM_PROB *these_sum_probs;
 	if (char_quantized_streets_[st]) {
 	  these_sum_probs = (T_SUM_PROB *)(ptr1 + num_succs);
@@ -942,6 +938,49 @@ T_VALUE TCFRThread::Process(unsigned char *ptr,
 	if (sum_prob_too_extreme) {
 	  for (unsigned int s = 0; s < num_succs; ++s) {
 	    these_sum_probs[s] /= 2;
+	  }
+	}
+	T_SUM_PROB *action_sumprobs = nullptr;
+	if (boost_) {
+	  unsigned int num_buckets = buckets_.NumBuckets(st);
+	  action_sumprobs = (T_SUM_PROB *)
+	    (SUCCPTR(ptr) + num_succs * 8 + num_buckets * size_bucket_data);
+	  action_sumprobs[ss] += 1;
+	  if (action_sumprobs[ss] > 2000000000) {
+	    for (unsigned int s = 0; s < num_succs; ++s) {
+	      action_sumprobs[s] /= 2;
+	    }
+	  }
+	}
+	if (adjust) {
+	  unsigned long long int sum = 0LL;
+	  for (unsigned int s = 0; s < num_succs; ++s) {
+	    sum += action_sumprobs[s];
+	  }
+	  for (unsigned int s = 0; s < num_succs; ++s) {
+	    if (action_sumprobs[s] < 0.01 * sum) {
+	      fprintf(stderr, "Boosting st %u pa %u s %u sum %llu asp %u "
+		      "offset %llu",
+		      st, player_acting, s, sum, action_sumprobs[s],
+		      (unsigned long long int)(ptr - data_));
+	      if (ptr == data_) {
+		fprintf(stderr, " root");
+	      }
+	      fprintf(stderr, "\n");
+	      unsigned int num_buckets = buckets_.NumBuckets(st);
+	      for (unsigned int b = 0; b < num_buckets; ++b) {
+		T_REGRET *bucket_regrets = (T_REGRET *)
+		  (SUCCPTR(ptr) + num_succs * 8 + b * size_bucket_data);
+		// In FTL systems, positive regret is bad.  Want to *subtract*
+		// to make action more likely to be taken.
+		static const unsigned int kAdjust = 1000;
+		if (bucket_regrets[s] < kAdjust) {
+		  bucket_regrets[s] = 0;
+		} else {
+		  bucket_regrets[s] -= kAdjust;
+		}
+	      }
+	    }
 	  }
 	}
       }
@@ -965,7 +1004,7 @@ T_VALUE TCFRThread::Process(unsigned char *ptr,
 	contributions_[player_acting] = bet_to;
       }
       ++stack_index_;
-      T_VALUE ret = Process(data_ + succ_offset, player_acting, st);
+      T_VALUE ret = Process(data_ + succ_offset, player_acting, st, adjust);
       --stack_index_;
       if (ss == fold_succ_index) {
 	folded_[player_acting] = false;
@@ -1442,6 +1481,7 @@ void TCFR::Run(void) {
     fprintf(stderr, "Joined thread %i\n", i);
   }
 
+#if 0
   // Temporary?
   unsigned int max_card = Game::MaxCard();
   Card hole_cards[2];
@@ -1464,6 +1504,7 @@ void TCFR::Run(void) {
     }
   }
   fflush(stdout);
+#endif
   for (unsigned int p = 0; p < num_players; ++p) {
     delete [] g_preflop_vals[p];
     delete [] g_preflop_nums[p];
@@ -1623,6 +1664,7 @@ void TCFR::Run(unsigned int start_batch_base, unsigned int end_batch_base,
 // For each bucket
 //   num-succs * sizeof(T_REGRET) for the regrets
 //   num-succs * sizeof(T_SUM_PROB) for the sum-probs
+// If boost_: num_succs * sizeof(T_SUM_PROB) for the action-sum-probs
 unsigned char *TCFR::Prepare(unsigned char *ptr, Node *node,
 			     unsigned short last_bet_to,
 			     unsigned long long int ***offsets) {
@@ -1674,6 +1716,13 @@ unsigned char *TCFR::Prepare(unsigned char *ptr, Node *node,
 	  *((T_SUM_PROB *)ptr1) = 0;
 	  ptr1 += sizeof(T_SUM_PROB);
 	}
+      }
+    }
+    // Action sumprobs
+    if (boost_ && sumprob_streets_[pa][st]) {
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	*((T_SUM_PROB *)ptr1) = 0;
+	ptr1 += sizeof(T_SUM_PROB);
       }
     }
   }
@@ -1752,8 +1801,10 @@ void TCFR::MeasureTree(Node *node, bool ***seen,
       this_sz += nb * num_succs * sizeof(T_REGRET);
     }
     if (sumprob_streets_[pa][st]) {
-      // if (! asymmetric_ || node->PlayerActing() == target_player_) {
       this_sz += nb * num_succs * sizeof(T_SUM_PROB);
+      if (boost_) {
+	this_sz += num_succs * sizeof(T_SUM_PROB);
+      }
     }
   }
 
@@ -1856,20 +1907,17 @@ TCFR::TCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
     fprintf(stderr, " %u", cfr_config_.CloseThreshold(st));
   }
   fprintf(stderr, "\n");
-#ifdef DEALONCE
-  fprintf(stderr, "Dealing cards once for each iteration\n");
-#endif
-#ifdef DEALTWICE
-  fprintf(stderr, "Dealing cards twice for each iteration\n");
-#endif
+  if (cfr_config_.DealTwice()) {
+    fprintf(stderr, "Dealing cards twice for each iteration\n");
+  } else {
+    fprintf(stderr, "Dealing cards once for each iteration\n");
+  }
 #ifdef SWITCH
   fprintf(stderr, "Switching the order of phases each iteration\n");
 #endif
-#ifdef SECONDHALF
-  fprintf(stderr, "Only updating sumprobs on second half-iterations\n");
-#endif
   time_t start_t = time(NULL);
   asymmetric_ = betting_abstraction_.Asymmetric();
+  boost_ = cfr_config_.Boost();
   num_players_ = Game::NumPlayers();
   target_player_ = target_player;
   num_cfr_threads_ = num_threads;
@@ -1944,6 +1992,7 @@ TCFR::TCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
     fprintf(stderr, "Num raw board mismatch: %u, %u\n", i, num_raw_boards_);
     exit(-1);
   }
+
   BoardTree::DeleteBoardCounts();
 #endif
 

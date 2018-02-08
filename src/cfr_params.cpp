@@ -45,6 +45,8 @@ unique_ptr<Params> CreateCFRParams(void) {
   params->AddParam("CharQuantizedStreets", P_STRING);
   params->AddParam("ShortQuantizedStreets", P_STRING);
   params->AddParam("ScaledStreets", P_STRING);
+  params->AddParam("DealTwice", P_BOOLEAN);
+  params->AddParam("Boost", P_BOOLEAN);
 
   return params;
 }

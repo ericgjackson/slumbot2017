@@ -73,6 +73,8 @@ public:
     return compressed_streets_;
   }
   bool Uniform(void) const {return uniform_;}
+  bool DealTwice(void) const {return deal_twice_;}
+  bool Boost(void) const {return boost_;}
  private:
   string cfr_config_name_;
   string algorithm_;
@@ -109,6 +111,8 @@ public:
   bool double_sumprobs_;
   vector<unsigned int> compressed_streets_;
   bool uniform_;
+  bool deal_twice_;
+  bool boost_;
 };
 
 #endif

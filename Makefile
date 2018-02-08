@@ -21,7 +21,7 @@ HEADS =	src/constants.h src/rand.h src/split.h src/files.h \
 	src/sampled_bcfr_builder.h src/runtime_params.h src/runtime_config.h \
 	src/acpc_protocol.h src/agent.h src/nearest_neighbors.h \
 	src/nl_agent.h src/dynamic_cbr2.h src/cfr_values_file.h src/bot.h \
-	src/cv_calc_thread.h src/joint_reach_probs.h
+	src/cv_calc_thread.h src/joint_reach_probs.h src/ecfr.h
 
 # -Wl,--no-as-needed fixes my problem of undefined reference to
 # pthread_create (and pthread_join).  Comments I found on the web indicate
@@ -59,7 +59,7 @@ OBJS =	obj/rand.o obj/split.o obj/files.o obj/cards.o obj/io.o \
 	obj/runtime_params.o obj/runtime_config.o \
 	obj/acpc_protocol.o obj/nearest_neighbors.o obj/nl_agent.o \
 	obj/dynamic_cbr2.o obj/cfr_values_file.o obj/bot.o \
-	obj/cv_calc_thread.o obj/joint_reach_probs.o
+	obj/cv_calc_thread.o obj/joint_reach_probs.o obj/ecfr.o
 
 bin/test:	obj/test.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/test obj/test.o $(OBJS) \
@@ -103,6 +103,10 @@ bin/run_cfrp:	obj/run_cfrp.o $(OBJS) $(HEADS)
 
 bin/run_tcfr:	obj/run_tcfr.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/run_tcfr obj/run_tcfr.o $(OBJS) \
+	$(LIBRARIES)
+
+bin/run_ecfr:	obj/run_ecfr.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/run_ecfr obj/run_ecfr.o $(OBJS) \
 	$(LIBRARIES)
 
 bin/run_pcs:	obj/run_pcs.o $(OBJS) $(HEADS)

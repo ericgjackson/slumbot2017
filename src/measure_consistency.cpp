@@ -161,10 +161,11 @@ void Walker::Walk(Node *node, string *action_sequences) {
     unsigned int num_buckets = buckets_.NumBuckets(st);
     unique_ptr<double []> probs(new double[num_succs]);
     unique_ptr<unsigned int []> uisps(new unsigned int[num_succs]);
+    unique_ptr<double []> dsps(new double[num_succs]);
     unique_ptr<float []> cvs(new float[num_succs]);
     unsigned int nt = node->NonterminalID();
     for (unsigned int b = 0; b < num_buckets; ++b) {
-      unsigned long long int sum = 0ULL;
+      double sum = 0;
       if (value_types_[pa][st] == CFR_INT) {
 	for (unsigned int s = 0; s < num_succs; ++s) {
 	  unsigned int sp = strategy_readers_[pa][st]->ReadUnsignedIntOrDie();
@@ -177,11 +178,26 @@ void Walker::Walk(Node *node, string *action_sequences) {
 	  }
 	} else {
 	  for (unsigned int s = 0; s < num_succs; ++s) {
-	    probs[s] = ((double)uisps[s]) / (double)sum;
+	    probs[s] = ((double)uisps[s]) / sum;
+	  }
+	}
+      } else if (value_types_[pa][st] == CFR_DOUBLE) {
+	for (unsigned int s = 0; s < num_succs; ++s) {
+	  double sp = strategy_readers_[pa][st]->ReadDoubleOrDie();
+	  dsps[s] = sp;
+	  sum += sp;
+	}
+	if (sum == 0) {
+	  for (unsigned int s = 0; s < num_succs; ++s) {
+	    probs[s] = (s == dsi ? 1.0 : 0);
+	  }
+	} else {
+	  for (unsigned int s = 0; s < num_succs; ++s) {
+	    probs[s] = dsps[s] / sum;
 	  }
 	}
       } else {
-	fprintf(stderr, "Expected int sumprobs\n");
+	fprintf(stderr, "Expected int or double sumprobs\n");
 	exit(-1);
       }
       unsigned int max_cv_s = 0;
@@ -238,7 +254,7 @@ void Walker::Walk(Node *node, string *action_sequences) {
 	    }
 	  }
 	  printf(" b %u max_s %u max_cv_s %u max_prob %f max_cv %f "
-		 "cv[max_s] %f prob[max_cv_s] %f sum %llu our_rp %f "
+		 "cv[max_s] %f prob[max_cv_s] %f sum %f our_rp %f "
 		 "opp_rp %f\n",
 		 b, max_s, max_cv_s, max_prob, max_cv, cvs[max_s],
 		 probs[max_cv_s], sum, our_rp, opp_rp);
@@ -251,11 +267,11 @@ void Walker::Walk(Node *node, string *action_sequences) {
 	unsigned int bad_s = kMaxUInt;
 	for (unsigned int s = 0; s < num_succs; ++s) {
 	  if (s == max_cv_s) continue;
-	  if (probs[s] >= 0.1) {
+	  if (probs[s] >= 0.01) {
 	    double my_cv = cvs[s];
-	    if (max_cv > my_cv + 0.025) {
+	    if (max_cv > my_cv + 0.01) {
 	      double ratio = max_cv / my_cv;
-	      if (ratio > 1.05) {
+	      if (ratio > 1.01) {
 		consistent2 = false;
 		bad_s = s;
 		break;
@@ -274,7 +290,7 @@ void Walker::Walk(Node *node, string *action_sequences) {
 	    }
 	  }
 	  printf(" b %u bad_s %u max_cv_s %u bad_prob %f max_cv %f "
-		 "cv[bad_s] %f sum %llu our_rp %f opp_rp %f TWO\n",
+		 "cv[bad_s] %f sum %f our_rp %f opp_rp %f TWO\n",
 		 b, bad_s, max_cv_s, probs[bad_s], max_cv, cvs[bad_s],
 		 sum, our_rp, opp_rp);
 	  fflush(stdout);
@@ -317,12 +333,12 @@ void Walker::Go(void) {
   fprintf(stderr, "%u consistent; %u inconsistent; %u skipped\n",
 	  num_consistent_, num_inconsistent_, num_skipped_);
   fprintf(stderr, "%.2f%% evaluated\n", pct_eval);
-  fprintf(stderr, "%.4f%% consistent (%u inconsistent)\n", pct_consistent,
+  fprintf(stderr, "%.2f%% consistent (%u inconsistent)\n", pct_consistent,
 	  num_inconsistent_);
 
   double num_eval2 = num_consistent2_ + num_inconsistent2_;
   double pct_consistent2 = 100.0 * ((double)num_consistent2_) / num_eval2;
-  fprintf(stderr, "%.4f%% consistent2 (%u inconsistent2)\n", pct_consistent2,
+  fprintf(stderr, "%.2f%% consistent2 (%u inconsistent2)\n", pct_consistent2,
 	  num_inconsistent2_);
   
   delete [] action_sequences;

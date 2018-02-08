@@ -169,11 +169,11 @@ void ProcessOppProbsBucketed(Node *node, unsigned int **street_buckets,
 	    // a) There is no warmup (hard or soft), or
 	    // b) We are during the soft warmup period.
 	    my_sumprobs[s] += lrint(succ_opp_prob * sumprob_scaling[st]);
-	  } else if (hard_warmup > 0) {
+	  } else if (hard_warmup > 0 && it > hard_warmup) {
 	    // Use a weight of (it - hard_warmup)
 	    my_sumprobs[s] += lrint(succ_opp_prob * (it - hard_warmup) *
 				    sumprob_scaling[st]);
-	  } else {
+	  } else if (soft_warmup > 0) {
 	    // Use a weight of (it - soft_warmup)
 	    my_sumprobs[s] += lrint(succ_opp_prob * (it - soft_warmup) *
 				    sumprob_scaling[st]);
