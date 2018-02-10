@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <unordered_map>
+
 #include "betting_abstraction.h"
 #include "betting_abstraction_params.h"
 #include "betting_tree.h"
@@ -26,6 +28,8 @@
 #include "joint_reach_probs.h"
 #include "params.h"
 
+using namespace std;
+
 class Walker {
 public:
   Walker(const CardAbstraction &card_abstraction,
@@ -34,7 +38,7 @@ public:
 	 unsigned int final_st);
   void Go(void);
 private:
-  void Walk(Node *node, string *action_sequences);
+  void Walk(Node *node, string *action_sequences, unsigned int root_s);
   
   const Buckets &buckets_;
   unsigned int it_;
@@ -49,6 +53,11 @@ private:
   unsigned int num_skipped_;
   unsigned int num_consistent2_;
   unsigned int num_inconsistent2_;
+  unique_ptr<unsigned int []> roots_num_consistent2_;
+  unique_ptr<unsigned int []> roots_num_inconsistent2_;
+  unsigned int num_common_consistent2_;
+  unsigned int num_common_inconsistent2_;
+  unique_ptr< unordered_map<string, unsigned int> > counts_;
 };
 
 Reader *InitializeReader(const char *dir, unsigned int p, unsigned int st,
@@ -130,6 +139,19 @@ Walker::Walker(const CardAbstraction &card_abstraction,
   num_skipped_ = 0;
   num_consistent2_ = 0;
   num_inconsistent2_ = 0;
+  num_common_consistent2_ = 0;
+  num_common_inconsistent2_ = 0;
+
+  Node *root = betting_tree_->Root();
+  unsigned int num_succs = root->NumSuccs();
+  roots_num_consistent2_.reset(new unsigned int[num_succs]);
+  roots_num_inconsistent2_.reset(new unsigned int[num_succs]);
+  for (unsigned int s = 0; s < num_succs; ++s) {
+    roots_num_consistent2_[s] = 0;
+    roots_num_inconsistent2_[s] = 0;
+  }
+
+  counts_.reset(new unordered_map<string, unsigned int>);
 }
 
 Reader *InitializeCVReader(const char *dir, string *action_sequences,
@@ -148,22 +170,22 @@ Reader *InitializeCVReader(const char *dir, string *action_sequences,
   return reader;
 }
 
-void Walker::Walk(Node *node, string *action_sequences) {
+void Walker::Walk(Node *node, string *action_sequences, unsigned int root_s) {
   if (node->Terminal()) return;
   unsigned int st = node->Street();
   if (st > final_st_) return;
   unsigned int pa = node->PlayerActing();
+  unsigned int nt = node->NonterminalID();
   unsigned int num_succs = node->NumSuccs();
   if (num_succs > 1) {
     Reader *cv_reader =
       InitializeCVReader(dir_, action_sequences, pa, st, it_);
     unsigned int dsi = node->DefaultSuccIndex();
     unsigned int num_buckets = buckets_.NumBuckets(st);
-    unique_ptr<double []> probs(new double[num_succs]);
     unique_ptr<unsigned int []> uisps(new unsigned int[num_succs]);
     unique_ptr<double []> dsps(new double[num_succs]);
     unique_ptr<float []> cvs(new float[num_succs]);
-    unsigned int nt = node->NonterminalID();
+    unique_ptr<double []> bucket_probs(new double[num_buckets * num_succs]);
     for (unsigned int b = 0; b < num_buckets; ++b) {
       double sum = 0;
       if (value_types_[pa][st] == CFR_INT) {
@@ -174,11 +196,11 @@ void Walker::Walk(Node *node, string *action_sequences) {
 	}
 	if (sum == 0) {
 	  for (unsigned int s = 0; s < num_succs; ++s) {
-	    probs[s] = (s == dsi ? 1.0 : 0);
+	    bucket_probs[b * num_succs + s] = (s == dsi ? 1.0 : 0);
 	  }
 	} else {
 	  for (unsigned int s = 0; s < num_succs; ++s) {
-	    probs[s] = ((double)uisps[s]) / sum;
+	    bucket_probs[b * num_succs + s] = ((double)uisps[s]) / sum;
 	  }
 	}
       } else if (value_types_[pa][st] == CFR_DOUBLE) {
@@ -189,17 +211,42 @@ void Walker::Walk(Node *node, string *action_sequences) {
 	}
 	if (sum == 0) {
 	  for (unsigned int s = 0; s < num_succs; ++s) {
-	    probs[s] = (s == dsi ? 1.0 : 0);
+	    bucket_probs[b * num_succs + s] = (s == dsi ? 1.0 : 0);
 	  }
 	} else {
 	  for (unsigned int s = 0; s < num_succs; ++s) {
-	    probs[s] = dsps[s] / sum;
+	    bucket_probs[b * num_succs + s] = dsps[s] / sum;
 	  }
 	}
       } else {
 	fprintf(stderr, "Expected int or double sumprobs\n");
 	exit(-1);
       }
+    }
+    unique_ptr<double []> succ_sums(new double[num_succs]);
+    for (unsigned int s = 0; s < num_succs; ++s) {
+      succ_sums[s] = 0;
+    }
+    for (unsigned int b = 0; b < num_buckets; ++b) {
+      for (unsigned int s = 0; s < num_succs; ++s) {
+	succ_sums[s] += bucket_probs[b * num_succs + s];
+      }
+    }
+    double all_sum = 0;
+    for (unsigned int s = 0; s < num_succs; ++s) all_sum += succ_sums[s];
+    unique_ptr<bool []> succ_rare(new bool[num_succs]);
+    for (unsigned int s = 0; s < num_succs; ++s) {
+      succ_rare[s] = (succ_sums[s] < 0.02 * all_sum);
+      if (succ_rare[s]) {
+	string path;
+	for (unsigned int st1 = 0; st1 <= st; ++st1) {
+	  if (st1 > 0) path += "/";
+	  path += action_sequences[st1];
+	}
+	fprintf(stderr, "State %s succ %u rarely taken\n", path.c_str(), s);
+      }
+    }
+    for (unsigned int b = 0; b < num_buckets; ++b) {
       unsigned int max_cv_s = 0;
       float max_cv = 0;
       for (unsigned int s = 0; s < num_succs; ++s) {
@@ -211,14 +258,14 @@ void Walker::Walk(Node *node, string *action_sequences) {
 	}
       }
       unsigned int max_s = 0;
-      double max_prob = probs[0];
+      double max_prob = bucket_probs[b * num_succs];
       for (unsigned int s = 1; s < num_succs; ++s) {
-	if (probs[s] > max_prob) {
+	double prob = bucket_probs[b * num_succs + s];
+	if (prob > max_prob) {
 	  max_s = s;
-	  max_prob = probs[s];
+	  max_prob = prob;
 	}
       }
-      // double jrp = joint_reach_probs_->JointReachProb(pa, st, nt, b);
       float our_rp = joint_reach_probs_->OurReachProb(pa, st, nt, b);
       float opp_rp = joint_reach_probs_->OppReachProb(pa, st, nt, b);
       if (our_rp > 0.001 && opp_rp > 0.001) {
@@ -254,10 +301,10 @@ void Walker::Walk(Node *node, string *action_sequences) {
 	    }
 	  }
 	  printf(" b %u max_s %u max_cv_s %u max_prob %f max_cv %f "
-		 "cv[max_s] %f prob[max_cv_s] %f sum %f our_rp %f "
+		 "cv[max_s] %f prob[max_cv_s] %f our_rp %f "
 		 "opp_rp %f\n",
 		 b, max_s, max_cv_s, max_prob, max_cv, cvs[max_s],
-		 probs[max_cv_s], sum, our_rp, opp_rp);
+		 bucket_probs[b * num_succs + max_cv_s], our_rp, opp_rp);
 	  fflush(stdout);
 	}
 
@@ -267,7 +314,7 @@ void Walker::Walk(Node *node, string *action_sequences) {
 	unsigned int bad_s = kMaxUInt;
 	for (unsigned int s = 0; s < num_succs; ++s) {
 	  if (s == max_cv_s) continue;
-	  if (probs[s] >= 0.01) {
+	  if (bucket_probs[b * num_succs + s] >= 0.01) {
 	    double my_cv = cvs[s];
 	    if (max_cv > my_cv + 0.01) {
 	      double ratio = max_cv / my_cv;
@@ -281,8 +328,20 @@ void Walker::Walk(Node *node, string *action_sequences) {
 	}
 	if (consistent2) {
 	  ++num_consistent2_;
+	  ++num_common_consistent2_;
+	  ++roots_num_consistent2_[root_s];
 	} else {
+	  string path;
+	  for (unsigned int st1 = 0; st1 <= st; ++st1) {
+	    if (st1 > 0) path += "/";
+	    path += action_sequences[st1];
+	  }
+	  (*counts_)[path] += 1;
 	  ++num_inconsistent2_;
+	  if (! succ_rare[bad_s]) {
+	    ++num_common_inconsistent2_;
+	  }
+	  ++roots_num_inconsistent2_[root_s];
 	  for (unsigned int st1 = 0; st1 <= st; ++st1) {
 	    printf("%s", action_sequences[st1].c_str());
 	    if (st1 < st) {
@@ -290,9 +349,9 @@ void Walker::Walk(Node *node, string *action_sequences) {
 	    }
 	  }
 	  printf(" b %u bad_s %u max_cv_s %u bad_prob %f max_cv %f "
-		 "cv[bad_s] %f sum %f our_rp %f opp_rp %f TWO\n",
-		 b, bad_s, max_cv_s, probs[bad_s], max_cv, cvs[bad_s],
-		 sum, our_rp, opp_rp);
+		 "cv[bad_s] %f our_rp %f opp_rp %f TWO\n",
+		 b, bad_s, max_cv_s, bucket_probs[b * num_succs + bad_s],
+		 max_cv, cvs[bad_s], our_rp, opp_rp);
 	  fflush(stdout);
 	}
 	
@@ -316,7 +375,11 @@ void Walker::Walk(Node *node, string *action_sequences) {
   for (unsigned int s = 0; s < num_succs; ++s) {
     string old_as = action_sequences[st];
     action_sequences[st] += node->ActionName(s);
-    Walk(node->IthSucc(s), action_sequences);
+    if (st == 0 && pa == 1 && nt == 0) {
+      Walk(node->IthSucc(s), action_sequences, s);
+    } else {
+      Walk(node->IthSucc(s), action_sequences, root_s);
+    }
     action_sequences[st] = old_as;
   }
 }
@@ -326,7 +389,13 @@ void Walker::Go(void) {
   for (unsigned int st = 0; st <= final_st_; ++st) {
     action_sequences[st] = "x";
   }
-  Walk(betting_tree_->Root(), action_sequences);
+  Walk(betting_tree_->Root(), action_sequences, 0);
+
+  unordered_map<string, unsigned int>::iterator it;
+  for (it = counts_->begin(); it != counts_->end(); ++it) {
+    printf("%u %s\n", it->second, it->first.c_str());
+  }
+  fflush(stdout);
   double num_eval = num_consistent_ + num_inconsistent_;
   double pct_eval = 100.0 * num_eval / (num_eval + num_skipped_);
   double pct_consistent = 100.0 * ((double)num_consistent_) / num_eval;
@@ -340,7 +409,24 @@ void Walker::Go(void) {
   double pct_consistent2 = 100.0 * ((double)num_consistent2_) / num_eval2;
   fprintf(stderr, "%.2f%% consistent2 (%u inconsistent2)\n", pct_consistent2,
 	  num_inconsistent2_);
-  
+
+  double num_common_eval2 =
+    num_common_consistent2_ + num_common_inconsistent2_;
+  double pct_common_consistent2 = 100.0 * ((double)num_common_consistent2_) /
+    num_common_eval2;
+  fprintf(stderr, "%.2f%% common consistent2 (%u common inconsistent2)\n",
+	  pct_common_consistent2, num_common_inconsistent2_);
+
+  unsigned int num_succs = betting_tree_->Root()->NumSuccs();
+  for (unsigned int s = 0; s < num_succs; ++s) {
+    double num_eval2 = roots_num_consistent2_[s] + roots_num_inconsistent2_[s];
+    if (num_eval2 > 0) {
+      double pct_consistent2 = 100.0 * ((double)roots_num_consistent2_[s]) /
+	num_eval2;
+      fprintf(stderr, "Root s %u: %.2f%% consistent2 (%u inconsistent2)\n",
+	      s, pct_consistent2, roots_num_inconsistent2_[s]);
+    }
+  }
   delete [] action_sequences;
 }
 
