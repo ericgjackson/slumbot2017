@@ -28,7 +28,15 @@ HandTree::HandTree(unsigned int root_st, unsigned int root_bd,
   }
   BoardTree::Create();
   unsigned int max_street = Game::MaxStreet();
-  if (final_st == max_street) HandValueTree::Create();
+  if (final_st == max_street) {
+    // Used to lazily instantiate, but that doesn't currently work in
+    // multi-threaded environment because HandValueTree::Create() is not
+    // threadsafe.  (Should just fix that.)
+    if (! HandValueTree::Created()) {
+      fprintf(stderr, "Hand value tree has not been created\n");
+      exit(-1);
+    }
+  }
   for (unsigned int st = root_st_; st <= final_st_; ++st) {
     unsigned int num_local_boards =
       BoardTree::NumLocalBoards(root_st_, root_bd_, st);

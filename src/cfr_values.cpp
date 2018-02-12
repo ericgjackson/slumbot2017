@@ -560,8 +560,12 @@ Writer ***CFRValues::InitializeWriters(const char *dir, unsigned int it,
       } else if (d_values_ && d_values_[p] && d_values_[p][st]) {
 	suffix = "d";
       } else {
-	fprintf(stderr, "No values?!?\n");
-	exit(-1);
+	// This can happen in CFR+ if we don't read anything at a subtree
+	// because it is all-in.  Set writer and compressor to nullptr.
+	// Should never be needed.
+	writers[p][st] = nullptr;
+	(*compressors)[p][st] = nullptr;
+	continue;
       }
       sprintf(buf, "%s/%s.%s.%u.%u.%u.%u.p%u.%s", dir,
 	      sumprobs_ ? "sumprobs" : "regrets", action_sequence.c_str(),
@@ -663,14 +667,20 @@ Reader *CFRValues::InitializeReader(const char *dir, unsigned int p,
 	if (FileExists(buf)) {
 	  *value_type = CFR_SHORT;
 	} else {
+	  // This can happen in CFR+.  For example, for a subgame that is
+	  // entirely all-in, nothing is saved.
+	  *value_type = CFR_UNKNOWN;
+#if 0
 	  fprintf(stderr, "Couldn't find file\n");
 	  fprintf(stderr, "buf: %s\n", buf);
 	  exit(-1);
+#endif
 	}
       }
     }
   }
-  if (compressed_streets_[st] && *value_type != CFR_INT) {
+  if (compressed_streets_[st] && *value_type != CFR_INT &&
+      *value_type != CFR_UNKNOWN) {
     fprintf(stderr, "Can only use compression in combination with ints\n");
     exit(-1);
   }
@@ -708,8 +718,12 @@ Reader *CFRValues::InitializeReader(const char *dir, unsigned int p,
     }
   }
 #endif
-  Reader *reader = new Reader(buf);
-  return reader;
+  if (*value_type == CFR_UNKNOWN) {
+    return nullptr;
+  } else {
+    Reader *reader = new Reader(buf);
+    return reader;
+  }
 }
 
 void CFRValues::InitializeValuesForReading(unsigned int p, unsigned int st,
@@ -841,6 +855,10 @@ bool CFRValues::ReadNode(Node *node, Reader *reader, void *decompressor,
        d_values_[p][st] && d_values_[p][st][nt])) {
     return true;
   }
+  if (reader == nullptr) {
+    fprintf(stderr, "CFRValues::Read(): p %u st %u missing file?\n", p, st);
+    exit(-1);
+  }
   InitializeValuesForReading(p, st, nt, node, value_type);
   unsigned int num_actions = num_holdings * num_succs;
   if (value_type == CFR_CHAR) {
@@ -904,10 +922,6 @@ void CFRValues::Read(Node *node, Reader ***readers, void ***decompressors,
   if (st1 > max_street) return;
   if (streets_[st] && players_[p] && ! (only_p <= 1 && p != only_p)) {
     Reader *reader = readers[p][st];
-    if (reader == nullptr) {
-      fprintf(stderr, "CFRValues::Read(): p %u st %u missing file?\n", p, st);
-      exit(-1);
-    }
     bool bucketed = num_bucket_holdings_[p][st] > 0 &&
       node->LastBetTo() < bucket_thresholds_[st];
     unsigned int num_holdings;
@@ -965,7 +979,7 @@ void CFRValues::Read(const char *dir, unsigned int it, Node *root,
       readers[p][st] = InitializeReader(dir, p, st, it, action_sequence,
 					root_bd_st_, root_bd_,
 					&value_types[p][st]);
-      if (compressed_streets_[st]) {
+      if (readers[p][st] && compressed_streets_[st]) {
 #ifdef EJC
 	  decompressors[p][st] = new EJDecompressor(EJDecompressCallback,
 	    readers[p][st], NULL);
@@ -995,13 +1009,15 @@ void CFRValues::Read(const char *dir, unsigned int it, Node *root,
 #else
       if (decompressors[p][st]) DeleteDecompressor(decompressors[p][st]);
 #endif
-      if (! readers[p][st]->AtEnd()) {
-	fprintf(stderr, "Reader p %u st %u didn't get to end\n", p, st);
-	fprintf(stderr, "Pos: %lli\n", readers[p][st]->BytePos());
-	fprintf(stderr, "File size: %lli\n", readers[p][st]->FileSize());
-	exit(-1);
+      if (readers[p][st]) {
+	if (! readers[p][st]->AtEnd()) {
+	  fprintf(stderr, "Reader p %u st %u didn't get to end\n", p, st);
+	  fprintf(stderr, "Pos: %lli\n", readers[p][st]->BytePos());
+	  fprintf(stderr, "File size: %lli\n", readers[p][st]->FileSize());
+	  exit(-1);
+	}
+	delete readers[p][st];
       }
-      delete readers[p][st];
     }
     delete [] readers[p];
     delete [] decompressors[p];

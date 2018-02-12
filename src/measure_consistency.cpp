@@ -36,9 +36,10 @@ public:
 	 const BettingAbstraction &betting_abstraction,
 	 const CFRConfig &cfr_config, const Buckets &buckets, unsigned int it,
 	 unsigned int final_st);
-  void Go(void);
+  void Go(bool show);
 private:
-  void Walk(Node *node, string *action_sequences, unsigned int root_s);
+  void Walk(Node *node, string *action_sequences, unsigned int root_s,
+	    bool show);
   
   const Buckets &buckets_;
   unsigned int it_;
@@ -170,7 +171,8 @@ Reader *InitializeCVReader(const char *dir, string *action_sequences,
   return reader;
 }
 
-void Walker::Walk(Node *node, string *action_sequences, unsigned int root_s) {
+void Walker::Walk(Node *node, string *action_sequences, unsigned int root_s,
+		  bool show) {
   if (node->Terminal()) return;
   unsigned int st = node->Street();
   if (st > final_st_) return;
@@ -236,7 +238,7 @@ void Walker::Walk(Node *node, string *action_sequences, unsigned int root_s) {
     for (unsigned int s = 0; s < num_succs; ++s) all_sum += succ_sums[s];
     unique_ptr<bool []> succ_rare(new bool[num_succs]);
     for (unsigned int s = 0; s < num_succs; ++s) {
-      succ_rare[s] = (succ_sums[s] < 0.02 * all_sum);
+      succ_rare[s] = (succ_sums[s] < 0.1 * all_sum);
       if (succ_rare[s]) {
 	string path;
 	for (unsigned int st1 = 0; st1 <= st; ++st1) {
@@ -269,16 +271,18 @@ void Walker::Walk(Node *node, string *action_sequences, unsigned int root_s) {
       float our_rp = joint_reach_probs_->OurReachProb(pa, st, nt, b);
       float opp_rp = joint_reach_probs_->OppReachProb(pa, st, nt, b);
       if (our_rp > 0.001 && opp_rp > 0.001) {
-	if (b == 0) {
-	  printf("Evaluating (b 0) ");
-	  for (unsigned int st1 = 0; st1 <= st; ++st1) {
-	    printf("%s", action_sequences[st1].c_str());
-	    if (st1 < st) {
-	      printf("/");
+	if (show) {
+	  if (b == 0) {
+	    printf("Evaluating (b 0) ");
+	    for (unsigned int st1 = 0; st1 <= st; ++st1) {
+	      printf("%s", action_sequences[st1].c_str());
+	      if (st1 < st) {
+		printf("/");
+	      }
 	    }
+	    printf("\n");
+	    fflush(stdout);
 	  }
-	  printf("\n");
-	  fflush(stdout);
 	}
 	bool consistent = true;
 	// Was 0.02
@@ -294,18 +298,20 @@ void Walker::Walk(Node *node, string *action_sequences, unsigned int root_s) {
 	  ++num_consistent_;
 	} else {
 	  ++num_inconsistent_;
-	  for (unsigned int st1 = 0; st1 <= st; ++st1) {
-	    printf("%s", action_sequences[st1].c_str());
-	    if (st1 < st) {
-	      printf("/");
+	  if (show) {
+	    for (unsigned int st1 = 0; st1 <= st; ++st1) {
+	      printf("%s", action_sequences[st1].c_str());
+	      if (st1 < st) {
+		printf("/");
+	      }
 	    }
+	    printf(" b %u max_s %u max_cv_s %u max_prob %f max_cv %f "
+		   "cv[max_s] %f prob[max_cv_s] %f our_rp %f "
+		   "opp_rp %f\n",
+		   b, max_s, max_cv_s, max_prob, max_cv, cvs[max_s],
+		   bucket_probs[b * num_succs + max_cv_s], our_rp, opp_rp);
+	    fflush(stdout);
 	  }
-	  printf(" b %u max_s %u max_cv_s %u max_prob %f max_cv %f "
-		 "cv[max_s] %f prob[max_cv_s] %f our_rp %f "
-		 "opp_rp %f\n",
-		 b, max_s, max_cv_s, max_prob, max_cv, cvs[max_s],
-		 bucket_probs[b * num_succs + max_cv_s], our_rp, opp_rp);
-	  fflush(stdout);
 	}
 
 	// Every action with non-trivial probability should have CV close
@@ -342,31 +348,37 @@ void Walker::Walk(Node *node, string *action_sequences, unsigned int root_s) {
 	    ++num_common_inconsistent2_;
 	  }
 	  ++roots_num_inconsistent2_[root_s];
-	  for (unsigned int st1 = 0; st1 <= st; ++st1) {
-	    printf("%s", action_sequences[st1].c_str());
-	    if (st1 < st) {
-	      printf("/");
+	  if (! succ_rare[bad_s]) {
+	    if (show) {
+	      for (unsigned int st1 = 0; st1 <= st; ++st1) {
+		printf("%s", action_sequences[st1].c_str());
+		if (st1 < st) {
+		  printf("/");
+		}
+	      }
+	      printf(" b %u bad_s %u max_cv_s %u bad_prob %f max_cv %f "
+		     "cv[bad_s] %f our_rp %f opp_rp %f TWO\n",
+		     b, bad_s, max_cv_s, bucket_probs[b * num_succs + bad_s],
+		     max_cv, cvs[bad_s], our_rp, opp_rp);
+	      fflush(stdout);
 	    }
 	  }
-	  printf(" b %u bad_s %u max_cv_s %u bad_prob %f max_cv %f "
-		 "cv[bad_s] %f our_rp %f opp_rp %f TWO\n",
-		 b, bad_s, max_cv_s, bucket_probs[b * num_succs + bad_s],
-		 max_cv, cvs[bad_s], our_rp, opp_rp);
-	  fflush(stdout);
 	}
 	
       } else {
 	++num_skipped_;
-	if (b == 0) {
-	  printf("Skipping (b 0) ");
-	  for (unsigned int st1 = 0; st1 <= st; ++st1) {
-	    printf("%s", action_sequences[st1].c_str());
-	    if (st1 < st) {
-	      printf("/");
+	if (show) {
+	  if (b == 0) {
+	    printf("Skipping (b 0) ");
+	    for (unsigned int st1 = 0; st1 <= st; ++st1) {
+	      printf("%s", action_sequences[st1].c_str());
+	      if (st1 < st) {
+		printf("/");
+	      }
 	    }
+	    printf("\n");
+	    fflush(stdout);
 	  }
-	  printf("\n");
-	  fflush(stdout);
 	}
       }
     }
@@ -376,20 +388,20 @@ void Walker::Walk(Node *node, string *action_sequences, unsigned int root_s) {
     string old_as = action_sequences[st];
     action_sequences[st] += node->ActionName(s);
     if (st == 0 && pa == 1 && nt == 0) {
-      Walk(node->IthSucc(s), action_sequences, s);
+      Walk(node->IthSucc(s), action_sequences, s, show);
     } else {
-      Walk(node->IthSucc(s), action_sequences, root_s);
+      Walk(node->IthSucc(s), action_sequences, root_s, show);
     }
     action_sequences[st] = old_as;
   }
 }
 
-void Walker::Go(void) {
+void Walker::Go(bool show) {
   string *action_sequences = new string[final_st_ + 1];
   for (unsigned int st = 0; st <= final_st_; ++st) {
     action_sequences[st] = "x";
   }
-  Walk(betting_tree_->Root(), action_sequences, 0);
+  Walk(betting_tree_->Root(), action_sequences, 0, show);
 
   unordered_map<string, unsigned int>::iterator it;
   for (it = counts_->begin(); it != counts_->end(); ++it) {
@@ -432,12 +444,12 @@ void Walker::Go(void) {
 
 static void Usage(const char *prog_name) {
   fprintf(stderr, "USAGE: %s <game params> <card params> <betting params> "
-	  "<CFR params> <it> <final st>\n", prog_name);
+	  "<CFR params> <it> <final st> [show|hide]\n", prog_name);
   exit(-1);
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 7) Usage(argv[0]);
+  if (argc != 8) Usage(argv[0]);
   Files::Init();
   unique_ptr<Params> game_params = CreateGameParams();
   game_params->ReadFromFile(argv[1]);
@@ -457,11 +469,16 @@ int main(int argc, char *argv[]) {
   unsigned int it, final_st;
   if (sscanf(argv[5], "%u", &it) != 1)       Usage(argv[0]);
   if (sscanf(argv[6], "%u", &final_st) != 1) Usage(argv[0]);
+  bool show;
+  string sarg = argv[7];
+  if (sarg == "show")      show = true;
+  else if (sarg == "hide") show = false;
+  else                     Usage(argv[0]);
 
   BoardTree::Create();
 
   Buckets buckets(*card_abstraction, true);
   Walker walker(*card_abstraction, *betting_abstraction, *cfr_config, buckets,
 		it, final_st);
-  walker.Go();
+  walker.Go(show);
 }

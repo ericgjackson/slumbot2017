@@ -34,12 +34,12 @@ using namespace std;
 
 class ECFRThread {
 public:
-  ECFRThread(const Buckets &buckets, const BettingTree *betting_tree,
-	     double ****regrets, double ****sumprobs,
-	     double ****action_sumprobs, unsigned int num_raw_boards,
-	     const unsigned int *board_table, unsigned int **bucket_counts,
-	     unsigned int batch_index, unsigned int num_threads,
-	     unsigned long long int batch_size,
+  ECFRThread(const CFRConfig &cc, const Buckets &buckets,
+	     const BettingTree *betting_tree, double ****regrets,
+	     double ****sumprobs, double ****action_sumprobs,
+	     unsigned int num_raw_boards, const unsigned int *board_table,
+	     unsigned int **bucket_counts, unsigned int batch_index,
+	     unsigned int num_threads, unsigned long long int batch_size,
 	     unsigned long long int *total_its);
   ~ECFRThread(void);
   void RunThread(void);
@@ -51,6 +51,7 @@ private:
 
   const Buckets &buckets_;
   const BettingTree *betting_tree_;
+  bool boost_;
   // Indexed by st, pa and nt.
   double ****regrets_;
   double ****sumprobs_;
@@ -79,9 +80,10 @@ private:
   pthread_t pthread_id_;
 };
 
-ECFRThread::ECFRThread(const Buckets &buckets, const BettingTree *betting_tree,
-		       double ****regrets, double ****sumprobs,
-		       double ****action_sumprobs, unsigned int num_raw_boards,
+ECFRThread::ECFRThread(const CFRConfig &cc, const Buckets &buckets,
+		       const BettingTree *betting_tree, double ****regrets,
+		       double ****sumprobs, double ****action_sumprobs,
+		       unsigned int num_raw_boards,
 		       const unsigned int *board_table,
 		       unsigned int **bucket_counts, unsigned int batch_index,
 		       unsigned int num_threads,
@@ -89,6 +91,7 @@ ECFRThread::ECFRThread(const Buckets &buckets, const BettingTree *betting_tree,
 		       unsigned long long int *total_its) :
   buckets_(buckets) {
   betting_tree_ = betting_tree;
+  boost_ = cc.Boost();
   regrets_ = regrets;
   sumprobs_ = sumprobs;
   action_sumprobs_ = action_sumprobs;
@@ -260,42 +263,24 @@ double ECFRThread::Process(Node *node, bool adjust) {
 	else       current_probs[s] = 0;
       }
     }
-    double *action_sumprobs = action_sumprobs_[st][pa][nt];
+    double *action_sumprobs = nullptr;
+    if (boost_) {
+      action_sumprobs = action_sumprobs_[st][pa][nt];
+    }
     double *b_sumprobs = sumprobs_[st][pa][nt] + b * num_succs;
     for (unsigned int s = 0; s < num_succs; ++s) {
       double cp = current_probs[s];
       b_sumprobs[s] += cp;
-      action_sumprobs[s] += cp;
+      if (boost_) action_sumprobs[s] += cp;
     }
     if (adjust) {
       double sum = 0;
       for (unsigned int s = 0; s < num_succs; ++s) {
 	sum += action_sumprobs[s];
       }
-#if 0
-      if (st == 1 && pa == 0 && nt == 3) {
-	fprintf(stderr, "asps %f %f\n", action_sumprobs[0],
-		action_sumprobs[1]);
-      }
-#endif
-      bool boost_needed = false;
-      unique_ptr<bool []> to_boost(new bool[num_succs]);
       for (unsigned int s = 0; s < num_succs; ++s) {
-	if (it_ % 1000000 == 0 && st == 0 && pa == 1 && nt == 0 && s == 0) {
-	  fprintf(stderr, "Open-limp avg prob %f\n",
-		  action_sumprobs[s] / sum);
-	}
 	if (action_sumprobs[s] < 0.01 * sum) {
-	  boost_needed = true;
-	  to_boost[s] = true;
-	} else {
-	  to_boost[s] = false;
-	}
-      }
-      if (boost_needed) {
-	double *regrets = regrets_[st][pa][nt];
-	for (unsigned int s = 0; s < num_succs; ++s) {
-	  if (! to_boost[s]) continue;
+	  double *regrets = regrets_[st][pa][nt];
 	  fprintf(stderr, "Boosting st %u pa %u nt %u s %u\n", st, pa, nt, s);
 	  unsigned int num_buckets = buckets_.NumBuckets(st);
 	  for (unsigned int b = 0; b < num_buckets; ++b) {
@@ -468,7 +453,7 @@ void ECFRThread::Run(void) {
 
     // Only start after iteration 1m.  Assume any previous batches would
     // have at least one million iterations.
-    bool adjust = (batch_index_ % num_threads_ == 0) &&
+    bool adjust = boost_ && (batch_index_ % num_threads_ == 0) &&
       (batch_index_ > 0 || it_ > 10000000);
     for (int p = start; p != end; p += incr) {
       p_ = p;
@@ -533,10 +518,10 @@ void ECFR::RunBatch(unsigned int batch_size) {
   cfr_threads_ = new ECFRThread *[num_cfr_threads_];
   for (unsigned int i = 0; i < num_cfr_threads_; ++i) {
     ECFRThread *cfr_thread =
-      new ECFRThread(buckets_, betting_tree_.get(), regrets_, sumprobs_,
-		     action_sumprobs_, num_raw_boards_, board_table_.get(),
-		     bucket_counts_, batch_base_ + i, num_cfr_threads_,
-		     batch_size, &total_its_);
+      new ECFRThread(cfr_config_, buckets_, betting_tree_.get(), regrets_,
+		     sumprobs_, action_sumprobs_, num_raw_boards_,
+		     board_table_.get(), bucket_counts_, batch_base_ + i,
+		     num_cfr_threads_, batch_size, &total_its_);
     cfr_threads_[i] = cfr_thread;
   }
 

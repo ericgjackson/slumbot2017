@@ -32,6 +32,11 @@
 
 using namespace std;
 
+static Node *g_c_node = nullptr;
+static unsigned char *g_c_ptr = nullptr;
+static long long int **g_c_sum_vals = nullptr;
+static long long int **g_c_counts = nullptr;
+
 // #define BC 1
 #define SWITCH 1
 
@@ -744,6 +749,10 @@ T_VALUE TCFRThread::Process(unsigned char *ptr,
 	  }
 	  val = Process(data_ + succ_offset, player_acting, st, adjust);
 	  contributions_[p_] = old_contribution;
+	  if (ptr == g_c_ptr) {
+	    g_c_sum_vals[our_bucket][s] += val;
+	    ++g_c_counts[our_bucket][s];
+	  }
 	}
       } else { // Recursing on all succs
 	for (unsigned int s = 0; s < num_succs; ++s) {
@@ -779,6 +788,12 @@ T_VALUE TCFRThread::Process(unsigned char *ptr,
 	      --stack_index_;
 	      contributions_[p_] = old_contribution;
 	    }
+	  }
+	}
+	if (ptr == g_c_ptr) {
+	  for (unsigned int s = 0; s < num_succs; ++s) {
+	    g_c_sum_vals[our_bucket][s] += succ_values[s];
+	    ++g_c_counts[our_bucket][s];
 	  }
 	}
 	  
@@ -1181,18 +1196,59 @@ void TCFR::ReadSumprobs(unsigned char *ptr, Node *node, Reader ***readers,
 	}
       } else {
 	for (unsigned int b = 0; b < num_buckets; ++b) {
-	  T_SUM_PROB *sum_probs =
+	  T_SUM_PROB *sumprobs =
 	    (T_SUM_PROB *)(ptr1 + num_succs * sizeof(T_REGRET));
 	  for (unsigned int s = 0; s < num_succs; ++s) {
 	    // Temporary for the case where I am starting to maintain
 	    // sumprobs in the middle of running CFR.
 	    if (reader == nullptr) {
-	      sum_probs[s] = 0;
+	      sumprobs[s] = 0;
 	    } else {
-	      sum_probs[s] = reader->ReadUnsignedIntOrDie();
+	      sumprobs[s] = reader->ReadUnsignedIntOrDie();
 	    }
 	  }
 	  ptr1 += num_succs * (sizeof(T_REGRET) + sizeof(T_SUM_PROB));
+	}
+	if (boost_) {
+	  unique_ptr<unsigned long long int []>
+	    succ_total_sumprobs(new unsigned long long int[num_succs]);
+	  for (unsigned int s = 0; s < num_succs; ++s) {
+	    succ_total_sumprobs[s] = 0;
+	  }
+	  unsigned char *ptr2 = SUCCPTR(ptr) + num_succs * 8;
+	  for (unsigned int b = 0; b < num_buckets; ++b) {
+	    T_SUM_PROB *sumprobs =
+	      (T_SUM_PROB *)(ptr2 + num_succs * sizeof(T_REGRET));
+	    for (unsigned int s = 0; s < num_succs; ++s) {
+	      succ_total_sumprobs[s] += sumprobs[s];
+	    }
+	    ptr2 += num_succs * (sizeof(T_REGRET) + sizeof(T_SUM_PROB));
+	  }
+	  while (true) {
+	    bool too_high = false;
+	    for (unsigned int s = 0; s < num_succs; ++s) {
+	      if (succ_total_sumprobs[s] > 2000000000) {
+		too_high = true;
+		break;
+	      }
+	    }
+	    if (! too_high) break;
+	    for (unsigned int s = 0; s < num_succs; ++s) {
+	      succ_total_sumprobs[s] /= 2;
+	    }
+	  }
+	  unsigned int *action_sumprobs = (unsigned int *)
+	    (SUCCPTR(ptr) + num_succs * 8 + num_buckets * num_succs *
+	     (sizeof(T_REGRET) + sizeof(T_SUM_PROB)));
+	  for (unsigned int s = 0; s < num_succs; ++s) {
+	    action_sumprobs[s] = succ_total_sumprobs[s];
+#if 0
+	    if (st == 0 && pa == 1 && node->NonterminalID() == 0) {
+	      fprintf(stderr, "asp[%u] %llu\n", s,
+		      succ_total_sumprobs[s]);
+	    }
+#endif
+	  }
 	}
       }
     }
@@ -1511,6 +1567,15 @@ void TCFR::Run(void) {
   }
   delete [] g_preflop_vals;
   delete [] g_preflop_nums;
+
+  fflush(stdout);
+  for (unsigned int b = 0; b < 169; ++b) {
+    for (unsigned int s = 0; s < 3; ++s) {
+      printf("B %u s %u avg val at C %f\n", b, s,
+	     g_c_sum_vals[b][s] / (double)g_c_counts[b][s]);
+    }
+  }
+  fflush(stdout);
 }
 
 void TCFR::RunBatch(unsigned int batch_size) {
@@ -1687,6 +1752,7 @@ unsigned char *TCFR::Prepare(unsigned char *ptr, Node *node,
   ptr[5] = pa;
   *(unsigned short *)(ptr + 6) = last_bet_to;
   unsigned char *succ_ptr = ptr + 8;
+  if (node == g_c_node) g_c_ptr = ptr;
 
   unsigned char *ptr1 = succ_ptr + num_succs * 8;
   if (num_succs > 1) {
@@ -1866,6 +1932,7 @@ void TCFR::Prepare(void) {
       }
     }
   }
+  g_c_node = betting_tree_->Root()->IthSucc(0);
   unsigned char *end = Prepare(data_, betting_tree_->Root(), Game::BigBlind(),
 			       offsets);
   unsigned long long int sz = end - data_;
@@ -2070,6 +2137,17 @@ TCFR::TCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
   time_t end_t = time(NULL);
   double diff_sec = difftime(end_t, start_t);
   fprintf(stderr, "Initialization took %.1f seconds\n", diff_sec);
+
+  g_c_sum_vals = new long long int *[169];
+  g_c_counts = new long long int *[169];
+  for (unsigned int b = 0; b < 169; ++b) {
+    g_c_sum_vals[b] = new long long int[3];
+    g_c_counts[b] = new long long int[3];
+    for (unsigned int s = 0; s < 3; ++s) {
+      g_c_sum_vals[b][s] = 0;
+      g_c_counts[b][s] = 0;
+    }
+  }
 }
 
 TCFR::~TCFR(void) {

@@ -486,13 +486,21 @@ void BettingTreeBuilder::CreateNoLimitSuccs(unsigned int street,
       if (new_bet_to > all_in_bet_to) {
 	bet_to_seen[all_in_bet_to] = true;
       } else {
-	if (betting_abstraction_.AllowableBetTo(new_bet_to)) {
-	  bet_to_seen[new_bet_to] = true;
+	unsigned int new_pot_size = 2 * new_bet_to;
+	unsigned int all_in_pot_size = 2 * all_in_bet_to;
+	if (betting_abstraction_.CloseToAllInFrac() > 0 &&
+	    new_pot_size >=
+	    all_in_pot_size * betting_abstraction_.CloseToAllInFrac()) {
+	  bet_to_seen[all_in_bet_to] = true;
 	} else {
-	  unsigned int old_pot_size = 2 * bet_to;
-	  unsigned int nearest_allowable_bet_to =
-	    NearestAllowableBetTo(old_pot_size, new_bet_to, last_bet_size);
-	  bet_to_seen[nearest_allowable_bet_to] = true;
+	  if (betting_abstraction_.AllowableBetTo(new_bet_to)) {
+	    bet_to_seen[new_bet_to] = true;
+	  } else {
+	    unsigned int old_pot_size = 2 * bet_to;
+	    unsigned int nearest_allowable_bet_to =
+	      NearestAllowableBetTo(old_pot_size, new_bet_to, last_bet_size);
+	    bet_to_seen[nearest_allowable_bet_to] = true;
+	  }
 	}
       }
     }
