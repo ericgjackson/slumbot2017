@@ -7,6 +7,7 @@ class HandValueTree {
 public:
   static void Create(void);
   static void Delete(void);
+  static bool Created(void);
   // Does *not* assume cards are sorted
   static unsigned int Val(const Card *cards);
   // board and hole_cards should be sorted from high to low.

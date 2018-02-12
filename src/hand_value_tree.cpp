@@ -44,6 +44,10 @@ void HandValueTree::Create(void) {
   else if (num_cards_ == 7) ReadSeven();
 }
 
+bool HandValueTree::Created(void) {
+  return num_cards_ != 0;
+}
+
 #if 0
 HandValueTree::HandValueTree(unsigned int st) {
   tree1_ = NULL;
