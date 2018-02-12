@@ -8,7 +8,8 @@ enum CFRValueType {
   CFR_INT,
   CFR_DOUBLE,
   CFR_BITS,
-  CFR_HALF_BYTE
+  CFR_HALF_BYTE,
+  CFR_UNKNOWN
 };
 
 // unsigned int ValueSize(CFRValueType t);
