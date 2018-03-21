@@ -59,7 +59,8 @@ OBJS =	obj/rand.o obj/split.o obj/files.o obj/cards.o obj/io.o \
 	obj/runtime_params.o obj/runtime_config.o \
 	obj/acpc_protocol.o obj/nearest_neighbors.o obj/nl_agent.o \
 	obj/dynamic_cbr2.o obj/cfr_values_file.o obj/bot.o \
-	obj/cv_calc_thread.o obj/joint_reach_probs.o obj/ecfr.o
+	obj/cv_calc_thread.o obj/joint_reach_probs.o obj/ecfr.o \
+	obj/custom_tree.o
 
 bin/test:	obj/test.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/test obj/test.o $(OBJS) \
@@ -389,6 +390,10 @@ bin/compute_sampled_joint_reach_probs:	\
 bin/compare_joint_reach_probs:	obj/compare_joint_reach_probs.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/compare_joint_reach_probs \
 	obj/compare_joint_reach_probs.o $(OBJS) $(LIBRARIES)
+
+bin/extract_cvs:	obj/extract_cvs.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/extract_cvs obj/extract_cvs.o \
+	$(OBJS) $(LIBRARIES)
 
 bin/x:	obj/x.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/x obj/x.o \
