@@ -887,31 +887,6 @@ void NLAgent::AllProbs(Node *node, unsigned int s, unsigned int gbd,
   }
 }
 
-#if 0
-// Check if we are all-in based on the actions in the current match state.
-// We are all-in if the final actions are one or more calls preceded by
-// a bet whose bet-to amount is the stack size.
-bool NLAgent::AreWeAllIn(vector<Action> *actions) {
-  unsigned int num_actions = actions->size();
-  if (num_actions < 2) return false;
-  Action last_action = (*actions)[num_actions - 1];
-  if (last_action.action_type != CALL) return false;
-  int i = num_actions - 2;
-  while (i >= 0) {
-    Action a = (*actions)[i];
-    if (a.action_type == CALL) {
-      --i;
-      continue;
-    }
-    // Can't happen, but whatever
-    if (a.action_type != BET) return false;
-    if (a.bet_to == stack_size_) return true;
-    else                         return false;
-  }
-  return false;
-}
-#endif
-
 // p should be the first candidate player.  If player 3 just acted, then
 // pass in 4.  We will check if player 4 has not folded.
 static unsigned int NextPlayer(unsigned int p, unsigned int num_players,
@@ -929,7 +904,141 @@ static unsigned int NextPlayer(unsigned int p, unsigned int num_players,
   return p1;
 }
 
-// Assumes heads-up for now
+// Will this work for the blinds?
+unsigned int NLAgent::LastBetSize(vector<Action> *actions) {
+  unsigned int street = 0;
+  unsigned int num_players = Game::NumPlayers();
+  unsigned int num_remaining = num_players;
+  unsigned int num_to_act_on_street = num_players;
+  unsigned int player_to_act = Game::FirstToAct(0);
+  unique_ptr<bool []> folded(new bool[num_players]);
+  for (unsigned int p = 0; p < num_players; ++p) {
+    folded[p] = false;
+  }
+  unsigned int last_bet_to = 2 * small_blind_;
+  unsigned int last_bet_size = small_blind_;
+  unsigned int num_actions = actions->size();
+  for (unsigned int i = 0; i < num_actions; ++i) {
+    Action a = (*actions)[i];
+    if (a.action_type == BET) {
+      num_to_act_on_street = num_remaining - 1;
+      player_to_act = NextPlayer(player_to_act + 1, num_players, folded.get());
+      last_bet_size = a.bet_to - last_bet_to;
+      last_bet_to = a.bet_to;
+    } else if (a.action_type == FOLD) {
+      folded[player_to_act] = true;
+      --num_to_act_on_street;
+      --num_remaining;
+      if (num_remaining == 1) return 0;
+      if (num_to_act_on_street == 0) {
+	// Advance to next street
+	num_to_act_on_street = num_remaining;
+	++street;
+	player_to_act = NextPlayer(Game::FirstToAct(street), num_players,
+				   folded.get());
+      } else {
+	player_to_act = NextPlayer(player_to_act + 1, num_players,
+				   folded.get());
+      }
+    } else {
+      --num_to_act_on_street;
+      if (num_to_act_on_street == 0) {
+	// End of action on this street
+	if (street == Game::MaxStreet()) {
+	  // Showdown
+	  return 0;
+	} else {
+	  // Advance to next street
+	  num_to_act_on_street = num_remaining;
+	  ++street;
+	  player_to_act = NextPlayer(Game::FirstToAct(street), num_players,
+				     folded.get());
+	  last_bet_size = 0;
+	}
+      } else {
+	// Action continues on this street
+	player_to_act = NextPlayer(player_to_act + 1, num_players,
+				   folded.get());
+      }
+    }
+  }
+  return last_bet_size;
+}
+
+// All-in in the *actual* game, not the abstract game.
+bool NLAgent::AreWeAllIn(vector<Action> *actions, unsigned int p) {
+  unsigned int street = 0;
+  unsigned int num_players = Game::NumPlayers();
+  unsigned int num_remaining = num_players;
+  unsigned int num_to_act_on_street = num_players;
+  unsigned int player_to_act = Game::FirstToAct(0);
+  unique_ptr<bool []> folded(new bool[num_players]);
+  for (unsigned int p = 0; p < num_players; ++p) {
+    folded[p] = false;
+  }
+  // Set to true when we see an all-in bet, and persists afterwards
+  bool all_in_bet = false;
+  unsigned int num_actions = actions->size();
+  for (unsigned int i = 0; i < num_actions; ++i) {
+    Action a = (*actions)[i];
+    if (a.action_type == BET) {
+      num_to_act_on_street = num_remaining - 1;
+      if (debug_) {
+	fprintf(stderr, "AreWeAllIn() saw bet to %u\n", a.bet_to);
+      }
+      if (a.bet_to == stack_size_) {
+	if (debug_) fprintf(stderr, "Saw all-in bet\n");
+	all_in_bet = true;
+      }
+      if (all_in_bet && player_to_act == p) return true;
+      player_to_act = NextPlayer(player_to_act + 1, num_players, folded.get());
+    } else if (a.action_type == FOLD) {
+      folded[player_to_act] = true;
+      --num_to_act_on_street;
+      --num_remaining;
+      if (num_remaining == 1) return false;
+      if (num_to_act_on_street == 0) {
+	// Advance to next street
+	num_to_act_on_street = num_remaining;
+	++street;
+	player_to_act = NextPlayer(Game::FirstToAct(street), num_players,
+				   folded.get());
+      } else {
+	player_to_act = NextPlayer(player_to_act + 1, num_players,
+				   folded.get());
+      }
+    } else {
+      // Call
+      if (all_in_bet) {
+	if (debug_) fprintf(stderr, "Saw call of all-in-bet\n");
+	if (player_to_act == p) {
+	  if (debug_) fprintf(stderr, "We called all-in-bet\n");
+	  return true;
+	}
+      }
+      --num_to_act_on_street;
+      if (num_to_act_on_street == 0) {
+	// End of action on this street
+	if (street == Game::MaxStreet()) {
+	  // Showdown
+	  return false;
+	} else {
+	  // Advance to next street
+	  num_to_act_on_street = num_remaining;
+	  ++street;
+	  player_to_act = NextPlayer(Game::FirstToAct(street), num_players,
+				     folded.get());
+	}
+      } else {
+	// Action continues on this street
+	player_to_act = NextPlayer(player_to_act + 1, num_players,
+				   folded.get());
+      }
+    }
+  }
+  return false;
+}
+
 unsigned int NLAgent::WhoseAction(vector<Action> *actions) {
   unsigned int street = 0;
   unsigned int num_players = Game::NumPlayers();
@@ -984,35 +1093,6 @@ unsigned int NLAgent::WhoseAction(vector<Action> *actions) {
   }
   return player_to_act;
 }
-
-#if 0
-// Assumption is that if last action is a bet then it is a bet by the
-// opponent.
-bool NLAgent::AreWeFacingBet(const vector<Action> *actions,
-			     unsigned int *opp_bet_to,
-			     unsigned int *opp_bet_amount) {
-  *opp_bet_to = 0;
-  *opp_bet_amount = 0;
-  unsigned int num_actions = actions->size();
-  if (num_actions == 0) {
-    return false;
-  } else {
-    unsigned int last_bet_to = 2 * small_blind_;
-    for (unsigned int i = 0; i < num_actions - 1; ++i) {
-      Action a = (*actions)[i];
-      if (a.action_type == BET) last_bet_to = a.bet_to;
-    }
-    Action last_action = (*actions)[num_actions - 1];
-    if (last_action.action_type == BET) {
-      *opp_bet_to = last_action.bet_to;
-      *opp_bet_amount = *opp_bet_to - last_bet_to;
-      return true;
-    } else {
-      return false;
-    }
-  }
-}
-#endif
 
 double **NLAgent::GetReachProbs(unsigned int current_bd, unsigned int asym_p) {
   unsigned int num_path = path_->size();
@@ -1206,12 +1286,6 @@ void NLAgent::ProcessActions(vector<Action> *actions, unsigned int we_p,
 	++st_;
 	player_acting_ = NextPlayer(Game::FirstToAct(st_), num_players,
 				   folded_.get());
-	if (*last_actual_bet_to == stack_size_) {
-	  if (debug_) {
-	    fprintf(stderr, "No action possible; we are all-in\n");
-	  }
-	  all_in_ = true;
-	}
       } else {
 	// Action continues on this street
 	player_acting_ = NextPlayer(player_acting_ + 1, num_players,
@@ -1236,12 +1310,6 @@ void NLAgent::ProcessActions(vector<Action> *actions, unsigned int we_p,
 	++st_;
 	player_acting_ = NextPlayer(Game::FirstToAct(st_), num_players,
 				   folded_.get());
-	if (*last_actual_bet_to == stack_size_) {
-	  if (debug_) {
-	    fprintf(stderr, "No action possible; we are all-in B\n");
-	  }
-	  all_in_ = true;
-	}
       } else {
 	player_acting_ = NextPlayer(player_acting_ + 1, num_players,
 				    folded_.get());
@@ -1306,8 +1374,7 @@ bool NLAgent::HandleRaise(Node *bet_node, unsigned int *current_buckets,
 // actual_opp_bet_to can't be different from last_actual_bet_to, can it?
 double *NLAgent::GetActionProbs(const vector<Action> &actions,
 				Node *sob_node, unsigned int *current_buckets,
-				unsigned int p,	unsigned int *opp_bet_amount,
-				bool *force_call) {
+				unsigned int p,	bool *force_call) {
   bool force_raise =
     (sob_node &&
      HandleRaise(sob_node, current_buckets, p));
@@ -1326,16 +1393,6 @@ double *NLAgent::GetActionProbs(const vector<Action> &actions,
     }
     return nullptr;
   }
-
-#if 0
-  // Note that the "bet amount" is different from the "bet to" amount.
-  unsigned int actual_opp_bet_to;
-  bool facing_bet = AreWeFacingBet(&actions, &actual_opp_bet_to,
-				   opp_bet_amount);
-  if (facing_bet) {
-    if (debug_) fprintf(stderr, "Opp bet amount: %i\n", *opp_bet_amount);
-  }
-#endif
 
   unsigned int fsi = current_node->FoldSuccIndex();
   unsigned int st = current_node->Street();
@@ -1460,7 +1517,6 @@ BotAction NLAgent::HandleStateChange(const string &match_state,
     for (unsigned int p = 0; p < num_players; ++p) {
       folded_[p] = false;
     }
-    all_in_ = false;
     delete endgame_sumprobs_;
     endgame_sumprobs_ = nullptr;
     delete endgame_subtree_;
@@ -1494,6 +1550,12 @@ BotAction NLAgent::HandleStateChange(const string &match_state,
   if (player_to_act == kMaxUInt) return BA_NONE;
   if (p != player_to_act) return BA_NONE;
 
+  if (AreWeAllIn(&actions, p)) {
+    if (debug_) fprintf(stderr, "We are all-in; returning no-action\n");
+    *we_bet_to = 0;
+    return BA_NONE;
+  }
+  
   Node *sob_node;
   bool endgame = endgame_sumprobs_ != nullptr;
   unsigned int last_actual_bet_to = GetLastActualBetTo(&actions);
@@ -1504,18 +1566,14 @@ BotAction NLAgent::HandleStateChange(const string &match_state,
     fprintf(stderr, "ProcessActions returned with sob node\n");
   }
 
-  if (all_in_) {
-    if (debug_) fprintf(stderr, "We are all-in; returning no-action\n");
-    *we_bet_to = 0;
-    return BA_NONE;
-  }
-  
   Node *current_node = (*path_)[path_->size() - 1];
   // This can happen when a not-all-in bet gets translated up to an all-in
   // bet.  We get to the terminal node, but we are not really all-in.
   // Should I return BA_NONE?
   if (current_node->Terminal()) {
-    fprintf(stderr, "At terminal node in abstract game; returning call\n");
+    if (debug_) {
+      fprintf(stderr, "At terminal node in abstract game; returning call\n");
+    }
     return BA_CALL;
   }
 
@@ -1568,12 +1626,11 @@ BotAction NLAgent::HandleStateChange(const string &match_state,
     // next_node = current_node->IthSucc(csi);
     next_node = current_node;
   } else {
-    unsigned int opp_bet_amount;
     double *probs = NULL;
 
     bool force_call = false;
     probs = GetActionProbs(actions, sob_node, current_buckets.get(), p,
-			   &opp_bet_amount, &force_call);
+			   &force_call);
     // current_node can change inside GetActionProbs() because there is a
     // small bet that we originally mapped to call, but now, because we choose
     // to raise, we instead map to the smallest bet.
@@ -1592,7 +1649,11 @@ BotAction NLAgent::HandleStateChange(const string &match_state,
 	unsigned int b = current_buckets[0];
 	// Try r200 folding only 62o (17), 72o (26), 73o (28), 82o (37),
 	// 83o (39), 92o (50).
-	if (b == 17 || b == 26 || b == 28 || b == 37 || b == 39 || b == 50) {
+	// Added: 32o (2), 93o (52), T2o (65), 42o (5), 52o (10), 63o (19),
+	// T3o (67), 84o (41), J2o (82), 94o (54)
+	if (b == 17 || b == 26 || b == 28 || b == 37 || b == 39 || b == 50 ||
+	    b == 2 || b == 5 || b == 10 || b == 19 || b == 41 || b == 52 ||
+	    b == 54 || b == 65 || b == 67 || b == 82) {
 	  bot_action = BA_FOLD;
 	  next_node = current_node->IthSucc(fsi);
 	  for (unsigned int s = 0; s < num_succs; ++s) {
@@ -1601,9 +1662,15 @@ BotAction NLAgent::HandleStateChange(const string &match_state,
 	} else {
 	  double fold_prob = probs[fsi];
 	  if (fold_prob > 0) {
-	    double scale = 1.0 / (1.0 - fold_prob);
-	    for (unsigned int s = 0; s < num_succs; ++s) {
-	      probs[s] = (s == fsi ? 0 : probs[s] * scale);
+	    if (fold_prob > 0.9) {
+	      for (unsigned int s = 0; s < num_succs; ++s) {
+		probs[s] = (s == csi ? 1.0 : 0);
+	      }
+	    } else {
+	      double scale = 1.0 / (1.0 - fold_prob);
+	      for (unsigned int s = 0; s < num_succs; ++s) {
+		probs[s] = (s == fsi ? 0 : probs[s] * scale);
+	      }
 	    }
 	  }
 	}
@@ -1651,11 +1718,12 @@ BotAction NLAgent::HandleStateChange(const string &match_state,
 	  our_bet_size = (int)(2 * small_blind_);
 	  *we_bet_to = last_actual_bet_to + our_bet_size;
 	}
-	  
+
+	unsigned int last_bet_size = LastBetSize(&actions);
 	// Make sure our raise is at least size of opponent's bet.  (Note: in
 	// case that's more than all-in, bet will be lowered below.)
-	if (our_bet_size < (int)opp_bet_amount) {
-	  our_bet_size = opp_bet_amount;
+	if (our_bet_size < (int)last_bet_size) {
+	  our_bet_size = last_bet_size;
 	  *we_bet_to = last_actual_bet_to + our_bet_size;
 	}
 	

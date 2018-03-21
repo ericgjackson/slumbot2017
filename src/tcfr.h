@@ -20,6 +20,8 @@ class Writer;
 #define T_VALUE int
 #define T_SUM_PROB unsigned int
 
+#define SUCCPTR(ptr) (ptr + 8)
+
 static const unsigned int kNumPregenRNGs = 10000000;
 
 class TCFRThread {
@@ -60,6 +62,7 @@ public:
   unsigned char *data_;
   bool asymmetric_;
   bool boost_;
+  bool maintain_cvs_;
   unsigned int num_players_;
   unsigned int target_player_;
   unsigned int p_;
@@ -128,7 +131,13 @@ public:
 	   unsigned int save_interval);
   void Run(unsigned int start_batch_base, unsigned int end_batch_base,
 	   unsigned int batch_size, unsigned int save_interval);
+  // In extract_cvs
+  void Extract(unsigned int it);
 private:
+  void ReadCVs(unsigned char *ptr, Node *node, Reader ***readers,
+	       bool ***seen);
+  void WriteCVs(unsigned char *ptr, Node *node, Writer ***writers,
+		bool ***seen);
   void ReadRegrets(unsigned char *ptr, Node *node, Reader ***readers,
 		   bool ***seen);
   void WriteRegrets(unsigned char *ptr, Node *node, Writer ***writers,
@@ -147,6 +156,9 @@ private:
   void MeasureTree(Node *node, bool ***seen,
 		   unsigned long long int *allocation_size);
   void Prepare(void);
+  // In extract_cvs
+  void Walk(Node *node, unsigned char *ptr, string *action_sequences,
+	    unsigned int it);
 
   const CardAbstraction &card_abstraction_;
   const BettingAbstraction &betting_abstraction_;
@@ -155,6 +167,7 @@ private:
   unique_ptr<BettingTree> betting_tree_;
   bool asymmetric_;
   bool boost_;
+  bool maintain_cvs_;
   unsigned int num_players_;
   unsigned int target_player_;
   unsigned char *data_;

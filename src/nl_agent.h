@@ -61,6 +61,8 @@ class NLAgent : public Agent {
   void ProcessActions(vector<Action> *actions, unsigned int we_p,
 		      bool endgame, unsigned int *last_actual_bet_to,
 		      Node **sob_node);
+  unsigned int LastBetSize(vector<Action> *actions);
+  bool AreWeAllIn(vector<Action> *actions, unsigned int p);
   unsigned int WhoseAction(vector<Action> *actions);
   unsigned int MSHCPIndex(unsigned int bd, const Card *cards);
   void UpdateCards(int street, Card our_hi, Card our_lo, Card *raw_board,
@@ -69,7 +71,6 @@ class NLAgent : public Agent {
 		   unsigned int p);
   double *GetActionProbs(const vector<Action> &actions, Node *sob_node, 
 			 unsigned int *current_buckets, unsigned int p,
-			 unsigned int *opp_bet_amount,
 			 bool *force_call);
   double **GetReachProbs(unsigned int bd, unsigned int asym_p);
 
@@ -111,7 +112,6 @@ class NLAgent : public Agent {
   unsigned int num_remaining_;
   unsigned int num_to_act_on_street_;
   unique_ptr<bool []> folded_;
-  bool all_in_;
   CFRValues *endgame_sumprobs_;
   BettingTree *endgame_subtree_;
   struct drand48_data *rand_bufs_;

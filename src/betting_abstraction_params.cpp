@@ -18,6 +18,8 @@ unique_ptr<Params> CreateBettingAbstractionParams(void) {
   params->AddParam("OurMaxBets", P_STRING);
   params->AddParam("OppMaxBets", P_STRING);
   params->AddParam("BetSizes", P_STRING);
+  params->AddParam("P0BetSizes", P_STRING);
+  params->AddParam("P1BetSizes", P_STRING);
   params->AddParam("OurBetSizes", P_STRING);
   params->AddParam("OppBetSizes", P_STRING);
   params->AddParam("MinBet", P_INT);

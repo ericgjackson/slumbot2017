@@ -21,6 +21,8 @@ void BettingTreeBuilder::Build(void) {
       root_ = CreateNoLimitTree1(target_player_, &terminal_id);
     } else if (betting_abstraction_.NoLimitTreeType() == 2) {
       root_ = CreateNoLimitTree2(target_player_, &terminal_id);
+    } else if (betting_abstraction_.NoLimitTreeType() == 3) {
+      root_ = CreateCustomTree(&terminal_id);
     }
   }
   num_terminals_ = terminal_id;

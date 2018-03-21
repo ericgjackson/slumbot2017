@@ -54,8 +54,13 @@ RGBR::RGBR(const CardAbstraction &ca, const BettingAbstraction &ba,
   }
 
   BoardTree::Create();
+  HandValueTree::Create();
 
-  hand_tree_ = new HandTree(0, 0, max_street);
+  if (subgame_street_ <= max_street) {
+    hand_tree_ = new HandTree(0, 0, subgame_street_ - 1);
+  } else {
+    hand_tree_ = new HandTree(0, 0, max_street);
+  }
 }
 
 RGBR::~RGBR(void) {

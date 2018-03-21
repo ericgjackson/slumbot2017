@@ -996,6 +996,16 @@ void VCFR::SpawnSubgame(Node *node, unsigned int bd, unsigned int p,
   // Wait for thread to be available
   while (sem_wait(&available_) == EINTR) ;
 
+#if 0
+  // Temporary
+  unsigned int num_active = 0;
+  for (unsigned int t = 0; t < num_threads_; ++t) {
+    if (subgame_running_[t]) ++num_active;
+  }
+  fprintf(stderr, "SpawnSubgame nt %u bd %u: %u active\n",
+	  node->NonterminalID(), bd, num_active);
+#endif
+
   // Find a thread that is not working
   unsigned int t;
   for (t = 0; t < num_threads_; ++t) {

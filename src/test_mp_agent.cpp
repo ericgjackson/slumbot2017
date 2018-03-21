@@ -24,6 +24,77 @@
 #include "split.h"
 #include "nl_agent.h"
 
+// FROM 1 at 1515454871.768963 MATCHSTATE:0:114:cr2130cc:9c7s|||||:r2500^M
+static void IllegalRaise2(Agent *agent) {
+  printf("IllegalRaise2\n");
+  printf("-------------\n");
+  string match_state;
+  unsigned int we_bet_to;
+  BotAction ba;
+
+  match_state = "MATCHSTATE:0:114:cr2130cc:9c7s|||||";
+  ba = agent->HandleStateChange(match_state, &we_bet_to);
+  printf("97o initial action %i we_bet_to %i\n", ba, we_bet_to);
+}
+
+// MATCHSTATE:0:12:cr8246r16980c:4cAh|||||
+// MATCHSTATE:0:12:cr8246r16980ccfr20000ccc:4cAh|||||
+// P2 calls, P3 raises to 8246, P4 raises to 16980, P5 calls, P0 calls,
+// P1 folds, P2 raises to 20000, P3 calls, P4 calls, P5 calls,
+// MATCHSTATE:0:12:cr8246r16980ccfr20000cccc///:4cAh||Tc3h|4dKc|Ac3s|Qh8s/4hKd5d/Js/7d
+static void AlreadyAllIn2(Agent *agent) {
+  printf("AlreadyAllIn2\n");
+  printf("-------------\n");
+  string match_state;
+  unsigned int we_bet_to;
+  BotAction ba;
+
+  match_state = "MATCHSTATE:0:12:cr8246r16980c:4cAh|||||";
+  ba = agent->HandleStateChange(match_state, &we_bet_to);
+  printf("A4o initial action %i we_bet_to %i\n", ba, we_bet_to);
+
+  match_state = "MATCHSTATE:0:12:cr8246r16980ccfr20000ccc:4cAh|||||";
+  ba = agent->HandleStateChange(match_state, &we_bet_to);
+  printf("A4o second action %i we_bet_to %i\n", ba, we_bet_to);
+
+  match_state = "MATCHSTATE:0:12:cr8246r16980ccfr20000cccc///:4cAh||Tc3h|4dKc|Ac3s|Qh8s/4hKd5d/Js/7d";
+  ba = agent->HandleStateChange(match_state, &we_bet_to);
+  printf("A4o third action %i we_bet_to %i\n", ba, we_bet_to);
+}
+
+// FROM 1 at 1515451178.072253 MATCHSTATE:0:78:r3397r10458cr18247cr20000ccccc///:Jh7c|5hQs|5s9s|JsTh|Jc8d|Ah7d/2sAsTc/Qh/3d:c
+// WARNING: ignoring un-requested response
+static void AlreadyAllIn(Agent *agent) {
+  printf("AlreadyAllIn\n");
+  printf("------------\n");
+  string match_state;
+  unsigned int we_bet_to;
+  BotAction ba;
+
+  match_state = "MATCHSTATE:0:78:r3397r10458cr18247:Jh7c|||||";
+  ba = agent->HandleStateChange(match_state, &we_bet_to);
+  printf("J7o initial action %i we_bet_to %i\n", ba, we_bet_to);
+#if 0
+  match_state = "MATCHSTATE:0:78:r3397r10458cr18247cr20000ccccc///:Jh7c|5hQs|5s9s|JsTh|Jc8d|Ah7d/2sAsTc/Qh/3d";
+  ba = agent->HandleStateChange(match_state, &we_bet_to);
+  printf("J7o action %i we_bet_to %i\n", ba, we_bet_to);
+#endif
+}
+
+// FROM 1 at 1515448453.115852 MATCHSTATE:0:0:cr10389cc:5d5c|||||:r10489
+// WARNING: raise of 10489 increased to 20000
+static void IllegalRaise(Agent *agent) {
+  printf("IllegalRaise\n");
+  printf("------------\n");
+  string match_state;
+  unsigned int we_bet_to;
+  BotAction ba;
+
+  match_state = "MATCHSTATE:0:0:cr10389cc:5d5c|||||";
+  ba = agent->HandleStateChange(match_state, &we_bet_to);
+  printf("55 r10489 action %i we_bet_to %i\n", ba, we_bet_to);
+}
+
 static void PreflopP2(Agent *agent) {
   printf("PreflopP2\n");
   printf("---------\n");
@@ -225,11 +296,17 @@ int main(int argc, char *argv[]) {
 		iterations, betting_trees, 999, num_endgame_its, debug,
 		exit_on_error, fixed_seed, small_blind, stack_size);
 
+#if 0
   PreflopP2(&agent);
   PreflopP3(&agent);
   FlopP3(&agent);
   TurnP3(&agent);
   RiverP3(&agent);
+  IllegalRaise(&agent);
+  AlreadyAllIn(&agent);
+  AlreadyAllIn2(&agent);
+#endif
+  IllegalRaise2(&agent);
 
   if (base_betting_abstraction->Asymmetric()) {
     for (unsigned int p = 0; p < num_players; ++p) {

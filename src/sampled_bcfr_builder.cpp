@@ -837,6 +837,8 @@ double *SampledBCFRBuilder::StreetInitial(Node *node, unsigned int plbd,
   }
 
   if (nst == 1 && subgame_street_ == kMaxUInt && num_threads_ > 1) {
+    // We don't support sampling on flop if flop is max street.  Would need
+    // to create new hand tree here, I think.
     // Currently only flop supported
     Split(node, state.OppProbs(), state.GetHandTree(), state.ActionSequence(),
 	  prev_canons, vals, norms);

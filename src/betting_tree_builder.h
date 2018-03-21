@@ -293,6 +293,16 @@ private:
 		   unsigned int *terminal_id);
   shared_ptr<Node>
     CreateMPTree(unsigned int target_player, unsigned int *terminal_id);
+
+  unsigned int GetBetSize(unsigned int st, unsigned int last_bet_to,
+			  double pot_frac, unsigned int last_bet_size);
+  shared_ptr<Node>
+    CreateCustomPostflopSubtree(unsigned int st, unsigned int player_acting,
+				unsigned int last_bet_to,
+				unsigned int last_bet_size,
+				unsigned int num_previous_bets,
+				unsigned int *terminal_id);
+  shared_ptr<Node> CreateCustomTree(unsigned int *terminal_id);
   
   void Initialize(void);
   void Write(Node *node, unsigned int **num_nonterminals, Writer *writer);

@@ -41,16 +41,16 @@ using namespace std;
 
 class Player {
 public:
-  Player(BettingTree *betting_tree, const BettingAbstraction &ba,
-	 const CardAbstraction &a_ca, const CardAbstraction &b_ca,
-	 const CFRConfig &a_cc, const CFRConfig &b_cc,
-	 unsigned int a_it, unsigned int b_it, bool mem_buckets);
+  Player(const BettingAbstraction &ba, const CardAbstraction &a_ca,
+	 const CardAbstraction &b_ca, const CFRConfig &a_cc,
+	 const CFRConfig &b_cc, unsigned int a_it, unsigned int b_it,
+	 bool mem_buckets);
   ~Player(void);
   void Go(unsigned long long int num_duplicate_hands, bool deterministic);
 private:
   void DealNCards(Card *cards, unsigned int n);
   void SetHCPsAndBoards(Card **raw_hole_cards, const Card *raw_board);
-  void Play(Node *node, unsigned int b_pos, unsigned int *contributions,
+  void Play(Node **nodes, unsigned int b_pos, unsigned int *contributions,
 	    unsigned int last_bet_to, bool *folded, unsigned int num_remaining,
 	    unsigned int last_player_acting, int last_st, double *outcomes);
   void PlayDuplicateHand(unsigned long long int h, const Card *cards,
@@ -58,13 +58,14 @@ private:
 
   bool mem_buckets_;
   unsigned int num_players_;
-  BettingTree *betting_tree_;
+  bool asymmetric_;
+  BettingTree **betting_trees_;
   const Buckets *a_buckets_;
   const Buckets *b_buckets_;
   const BucketsFile *a_buckets_file_;
   const BucketsFile *b_buckets_file_;
-  CFRValues *a_probs_;
-  CFRValues *b_probs_;
+  CFRValues **a_probs_;
+  CFRValues **b_probs_;
   unsigned int *boards_;
   unsigned int **raw_hcps_;
   unique_ptr<unsigned int []> hvs_;
@@ -74,11 +75,13 @@ private:
   struct drand48_data *rand_bufs_;
 };
 
-void Player::Play(Node *node, unsigned int b_pos, unsigned int *contributions,
-		  unsigned int last_bet_to, bool *folded,
-		  unsigned int num_remaining, unsigned int last_player_acting,
-		  int last_st, double *outcomes) {
-  if (node->Terminal()) {
+void Player::Play(Node **nodes, unsigned int b_pos,
+		  unsigned int *contributions, unsigned int last_bet_to,
+		  bool *folded, unsigned int num_remaining,
+		  unsigned int last_player_acting, int last_st,
+		  double *outcomes) {
+  Node *p0_node = nodes[0];
+  if (p0_node->Terminal()) {
     if (num_remaining == 1) {
       unsigned int sum_other_contributions = 0;
       unsigned int remaining_p = kMaxUInt;
@@ -95,10 +98,10 @@ void Player::Play(Node *node, unsigned int b_pos, unsigned int *contributions,
       // Temporary?
       if (num_players_ == 2 &&
 	  (contributions[0] != contributions[1] ||
-	   contributions[0] != node->LastBetTo())) {
+	   contributions[0] != p0_node->LastBetTo())) {
 	fprintf(stderr, "Mismatch %u %u %u\n", contributions[0],
-		contributions[1], node->LastBetTo());
-	fprintf(stderr, "TID: %u\n", node->TerminalID());
+		contributions[1], p0_node->LastBetTo());
+	fprintf(stderr, "TID: %u\n", p0_node->TerminalID());
 	exit(-1);
       }
 
@@ -140,10 +143,11 @@ void Player::Play(Node *node, unsigned int b_pos, unsigned int *contributions,
     }
     return;
   } else {
+    unsigned int orig_pa = p0_node->PlayerActing();
+    Node *node = nodes[orig_pa];
     unsigned int nt = node->NonterminalID();
     unsigned int st = node->Street();
     unsigned int num_succs = node->NumSuccs();
-    unsigned int orig_pa = node->PlayerActing();
     // Find the next player to act.  Start with the first candidate and move
     // forward until we find someone who has not folded.  The first candidate
     // is either the last player plus one, or, if we are starting a new
@@ -202,14 +206,16 @@ void Player::Play(Node *node, unsigned int b_pos, unsigned int *contributions,
     double cum = 0;
     unique_ptr<double []> probs(new double[num_succs]);
     if (actual_pa == b_pos) {
-      b_probs_->Probs(orig_pa, st, nt, b_offset, num_succs, dsi, probs.get());
+      b_probs_[orig_pa]->Probs(orig_pa, st, nt, b_offset, num_succs, dsi,
+			       probs.get());
 #if 0
       fprintf(stderr, "b pa %u st %u nt %u bd %u nhcp %u hcp %u b_offset %u "
 	      "probs %f %f r %f\n", orig_pa, st, nt, bd, num_hole_card_pairs,
 	      hcp, b_offset, probs[0], probs[1], r);
 #endif
     } else {
-      a_probs_->Probs(orig_pa, st, nt, a_offset, num_succs, dsi, probs.get());
+      a_probs_[orig_pa]->Probs(orig_pa, st, nt, a_offset, num_succs, dsi,
+			       probs.get());
 #if 0
       fprintf(stderr, "a pa %u st %u nt %u bd %u nhcp %u hcp %u b_offset %u "
 	      "probs %f %f r %f\n", orig_pa, st, nt, bd, num_hole_card_pairs,
@@ -225,23 +231,50 @@ void Player::Play(Node *node, unsigned int b_pos, unsigned int *contributions,
       if (r < cum) break;
     }
     if (s == (int)node->CallSuccIndex()) {
+      unique_ptr<Node * []> succ_nodes(new Node *[num_players_]);
+      for (unsigned int p = 0; p < num_players_; ++p) {
+	unsigned int csi = nodes[p]->CallSuccIndex();
+	succ_nodes[p] = nodes[p]->IthSucc(csi);
+      }
       // fprintf(stderr, "Call\n");
       contributions[actual_pa] = last_bet_to;
-      Play(node->IthSucc(s), b_pos, contributions, last_bet_to, folded,
+      Play(succ_nodes.get(), b_pos, contributions, last_bet_to, folded,
 	   num_remaining, actual_pa, st, outcomes);
     } else if (s == (int)node->FoldSuccIndex()) {
+      unique_ptr<Node * []> succ_nodes(new Node *[num_players_]);
+      for (unsigned int p = 0; p < num_players_; ++p) {
+	unsigned int fsi = nodes[p]->FoldSuccIndex();
+	succ_nodes[p] = nodes[p]->IthSucc(fsi);
+      }
       // fprintf(stderr, "Fold\n");
       folded[actual_pa] = true;
       outcomes[actual_pa] = -(int)contributions[actual_pa];
-      Play(node->IthSucc(s), b_pos, contributions, last_bet_to, folded,
+      Play(succ_nodes.get(), b_pos, contributions, last_bet_to, folded,
 	   num_remaining - 1, actual_pa, st, outcomes);
     } else {
-      Node *succ = node->IthSucc(s);
+      Node *my_succ = node->IthSucc(s);
+      unsigned int new_bet_to = my_succ->LastBetTo();
+      unique_ptr<Node * []> succ_nodes(new Node *[num_players_]);
+      for (unsigned int p = 0; p < num_players_; ++p) {
+	unsigned int ps;
+	Node *p_node = nodes[p];
+	unsigned int p_num_succs = p_node->NumSuccs();
+	for (ps = 0; ps < p_num_succs; ++ps) {
+	  if (ps == p_node->CallSuccIndex() || ps == p_node->FoldSuccIndex()) {
+	    continue;
+	  }
+	  if (p_node->IthSucc(ps)->LastBetTo() == new_bet_to) break;
+	}
+	if (ps == p_num_succs) {
+	  fprintf(stderr, "No matching succ\n");
+	  exit(-1);
+	}
+	succ_nodes[p] = nodes[p]->IthSucc(ps);
+      }
       // fprintf(stderr, "Bet\n");
-      unsigned int new_bet_to = succ->LastBetTo();
       contributions[actual_pa] = new_bet_to;
-      Play(succ, b_pos, contributions, new_bet_to, folded, num_remaining,
-	   actual_pa, st, outcomes);
+      Play(succ_nodes.get(), b_pos, contributions, new_bet_to, folded,
+	   num_remaining, actual_pa, st, outcomes);
     }
   }
 }
@@ -294,7 +327,11 @@ void Player::PlayDuplicateHand(unsigned long long int h, const Card *cards,
 	contributions[p] = 0;
       }
     }
-    Play(betting_tree_->Root(), b_pos, contributions.get(), Game::BigBlind(),
+    unique_ptr<Node * []> nodes(new Node *[num_players_]);
+    for (unsigned int p = 0; p < num_players_; ++p) {
+      nodes[p] = betting_trees_[p]->Root();
+    }
+    Play(nodes.get(), b_pos, contributions.get(), Game::BigBlind(),
 	 folded.get(), num_players_, 1000, -1, outcomes.get());
     for (unsigned int p = 0; p < num_players_; ++p) {
       if (p == b_pos) {
@@ -463,10 +500,10 @@ void Player::Go(unsigned long long int num_duplicate_hands,
   }
 }
 
-Player::Player(BettingTree *betting_tree, const BettingAbstraction &ba,
-	       const CardAbstraction &a_ca, const CardAbstraction &b_ca,
-	       const CFRConfig &a_cc, const CFRConfig &b_cc,
-	       unsigned int a_it, unsigned int b_it, bool mem_buckets) {
+Player::Player(const BettingAbstraction &ba, const CardAbstraction &a_ca,
+	       const CardAbstraction &b_ca, const CFRConfig &a_cc,
+	       const CFRConfig &b_cc, unsigned int a_it, unsigned int b_it,
+	       bool mem_buckets) {
   mem_buckets_ = mem_buckets;
   if (mem_buckets_) {
     a_buckets_ = new Buckets(a_ca, false);
@@ -490,32 +527,65 @@ Player::Player(BettingTree *betting_tree, const BettingAbstraction &ba,
   hvs_.reset(new unsigned int[num_players_]);
   winners_.reset(new bool[num_players_]);
   sum_pos_outcomes_.reset(new double[num_players_]);
-  betting_tree_ = betting_tree;
   BoardTree::Create();
   BoardTree::CreateLookup();
-  unsigned int max_street = Game::MaxStreet();
-  a_probs_ = new CFRValues(nullptr, true, nullptr, betting_tree, 0, 0,
-			   a_ca, a_buckets_->NumBuckets(), nullptr);
-  b_probs_ = new CFRValues(nullptr, true, nullptr, betting_tree, 0, 0,
-			   b_ca, b_buckets_->NumBuckets(), nullptr);
 
-  char dir[500];
-  sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
-	  Game::GameName().c_str(), Game::NumPlayers(),
-	  a_ca.CardAbstractionName().c_str(),
-	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
-	  ba.BettingAbstractionName().c_str(),
-	  a_cc.CFRConfigName().c_str());
-  a_probs_->Read(dir, a_it, betting_tree->Root(), "x", kMaxUInt);
-  fprintf(stderr, "Read A probs\n");
-  sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
-	  Game::GameName().c_str(), Game::NumPlayers(),
-	  b_ca.CardAbstractionName().c_str(),
-	  Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
-	  ba.BettingAbstractionName().c_str(),
-	  b_cc.CFRConfigName().c_str());
-  b_probs_->Read(dir, b_it, betting_tree->Root(), "x", kMaxUInt);
-  fprintf(stderr, "Read B probs\n");
+  asymmetric_ = ba.Asymmetric();
+  betting_trees_ = new BettingTree *[num_players_];
+  if (asymmetric_) {
+    for (unsigned int asym_p = 0; asym_p < num_players_; ++asym_p) {
+      betting_trees_[asym_p] = BettingTree::BuildAsymmetricTree(ba, asym_p);
+    }
+  } else {
+    betting_trees_[0] = BettingTree::BuildTree(ba);
+    for (unsigned int asym_p = 1; asym_p < num_players_; ++asym_p) {
+      betting_trees_[asym_p] = betting_trees_[0];
+    }
+  }
+  
+  unsigned int max_street = Game::MaxStreet();
+  a_probs_ = new CFRValues *[num_players_];
+  b_probs_ = new CFRValues *[num_players_];
+  for (unsigned int p = 0; p < num_players_; ++p) {
+    unique_ptr<bool []> players(new bool[num_players_]);
+    for (unsigned int p1 = 0; p1 < num_players_; ++p1) {
+      players[p1] = (p1 == p);
+    }
+    a_probs_[p] = new CFRValues(players.get(), true, nullptr,
+				betting_trees_[p], 0, 0, a_ca,
+				a_buckets_->NumBuckets(), nullptr);
+    b_probs_[p] = new CFRValues(players.get(), true, nullptr,
+				betting_trees_[p], 0, 0, b_ca,
+				b_buckets_->NumBuckets(), nullptr);
+  }
+
+  char dir[500], buf[100];
+  for (unsigned int p = 0; p < num_players_; ++p) {
+    sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
+	    Game::GameName().c_str(), Game::NumPlayers(),
+	    a_ca.CardAbstractionName().c_str(),
+	    Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
+	    ba.BettingAbstractionName().c_str(),
+	    a_cc.CFRConfigName().c_str());
+    if (asymmetric_) {
+      sprintf(buf, ".p%u", p);
+      strcat(dir, buf);
+    }
+    a_probs_[p]->Read(dir, a_it, betting_trees_[p]->Root(), "x", kMaxUInt);
+    fprintf(stderr, "Read A P%u probs\n", p);
+    sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
+	    Game::GameName().c_str(), Game::NumPlayers(),
+	    b_ca.CardAbstractionName().c_str(),
+	    Game::NumRanks(), Game::NumSuits(), Game::MaxStreet(),
+	    ba.BettingAbstractionName().c_str(),
+	    b_cc.CFRConfigName().c_str());
+    if (asymmetric_) {
+      sprintf(buf, ".p%u", p);
+      strcat(dir, buf);
+    }
+    b_probs_[p]->Read(dir, b_it, betting_trees_[p]->Root(), "x", kMaxUInt);
+    fprintf(stderr, "Read B P%u probs\n", p);
+  }
 
   boards_ = new unsigned int[max_street + 1];
   boards_[0] = 0;
@@ -581,8 +651,20 @@ Player::~Player(void) {
   delete a_buckets_;
   delete a_buckets_file_;
   delete b_buckets_file_;
-  delete a_probs_;
-  delete b_probs_;
+  for (unsigned int p = 0; p < num_players_; ++p) {
+    delete a_probs_[p];
+    delete b_probs_[p];
+  }
+  delete [] a_probs_;
+  delete [] b_probs_;
+  if (asymmetric_) {
+    for (unsigned int asym_p = 0; asym_p < num_players_; ++asym_p) {
+      delete betting_trees_[asym_p];
+    }
+  } else {
+    delete betting_trees_[0];
+  }
+  delete [] betting_trees_;
 }
 
 static void Usage(const char *prog_name) {
@@ -641,13 +723,10 @@ int main(int argc, char *argv[]) {
 
   // Leave this in if we don't want reproducibility
   InitRand();
-  BettingTree *betting_tree = BettingTree::BuildTree(*betting_abstraction);
 
-  Player *player = new Player(betting_tree, *betting_abstraction,
-			      *a_card_abstraction, *b_card_abstraction,
-			      *a_cfr_config, *b_cfr_config, a_it, b_it,
-			      mem_buckets);
+  Player *player = new Player(*betting_abstraction, *a_card_abstraction,
+			      *b_card_abstraction, *a_cfr_config,
+			      *b_cfr_config, a_it, b_it, mem_buckets);
   player->Go(num_duplicate_hands, deterministic);
   delete player;
-  delete betting_tree;
 }

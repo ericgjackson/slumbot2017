@@ -36,10 +36,10 @@ public:
 	 const BettingAbstraction &betting_abstraction,
 	 const CFRConfig &cfr_config, const Buckets &buckets, unsigned int it,
 	 unsigned int final_st);
-  void Go(bool show);
+  void Go(bool online, bool show);
 private:
   void Walk(Node *node, string *action_sequences, unsigned int root_s,
-	    bool show);
+	    bool online, bool show);
   
   const Buckets &buckets_;
   unsigned int it_;
@@ -157,11 +157,14 @@ Walker::Walker(const CardAbstraction &card_abstraction,
 
 Reader *InitializeCVReader(const char *dir, string *action_sequences,
 			   unsigned int p, unsigned int st,
-			   unsigned int it) {
+			   unsigned int it, bool online) {
   char buf[500];
-  
-  sprintf(buf, "%s/sbcfrs.%u.p%u/%u", dir,
-	  it, p, st);
+
+  if (online) {
+    sprintf(buf, "%s/sbcfrs2.%u.p%u/%u", dir, it, p, st);
+  } else {
+    sprintf(buf, "%s/sbcfrs.%u.p%u/%u", dir, it, p, st);
+  }
   string path = buf;
   for (unsigned int st1 = 0; st1 <= st; ++st1) {
     path += "/";
@@ -172,7 +175,7 @@ Reader *InitializeCVReader(const char *dir, string *action_sequences,
 }
 
 void Walker::Walk(Node *node, string *action_sequences, unsigned int root_s,
-		  bool show) {
+		  bool online, bool show) {
   if (node->Terminal()) return;
   unsigned int st = node->Street();
   if (st > final_st_) return;
@@ -181,7 +184,7 @@ void Walker::Walk(Node *node, string *action_sequences, unsigned int root_s,
   unsigned int num_succs = node->NumSuccs();
   if (num_succs > 1) {
     Reader *cv_reader =
-      InitializeCVReader(dir_, action_sequences, pa, st, it_);
+      InitializeCVReader(dir_, action_sequences, pa, st, it_, online);
     unsigned int dsi = node->DefaultSuccIndex();
     unsigned int num_buckets = buckets_.NumBuckets(st);
     unique_ptr<unsigned int []> uisps(new unsigned int[num_succs]);
@@ -388,20 +391,20 @@ void Walker::Walk(Node *node, string *action_sequences, unsigned int root_s,
     string old_as = action_sequences[st];
     action_sequences[st] += node->ActionName(s);
     if (st == 0 && pa == 1 && nt == 0) {
-      Walk(node->IthSucc(s), action_sequences, s, show);
+      Walk(node->IthSucc(s), action_sequences, s, online, show);
     } else {
-      Walk(node->IthSucc(s), action_sequences, root_s, show);
+      Walk(node->IthSucc(s), action_sequences, root_s, online, show);
     }
     action_sequences[st] = old_as;
   }
 }
 
-void Walker::Go(bool show) {
+void Walker::Go(bool online, bool show) {
   string *action_sequences = new string[final_st_ + 1];
   for (unsigned int st = 0; st <= final_st_; ++st) {
     action_sequences[st] = "x";
   }
-  Walk(betting_tree_->Root(), action_sequences, 0, show);
+  Walk(betting_tree_->Root(), action_sequences, 0, online, show);
 
   unordered_map<string, unsigned int>::iterator it;
   for (it = counts_->begin(); it != counts_->end(); ++it) {
@@ -444,12 +447,13 @@ void Walker::Go(bool show) {
 
 static void Usage(const char *prog_name) {
   fprintf(stderr, "USAGE: %s <game params> <card params> <betting params> "
-	  "<CFR params> <it> <final st> [show|hide]\n", prog_name);
+	  "<CFR params> <it> <final st> [online|offline] [show|hide]\n",
+	  prog_name);
   exit(-1);
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 8) Usage(argv[0]);
+  if (argc != 9) Usage(argv[0]);
   Files::Init();
   unique_ptr<Params> game_params = CreateGameParams();
   game_params->ReadFromFile(argv[1]);
@@ -469,8 +473,12 @@ int main(int argc, char *argv[]) {
   unsigned int it, final_st;
   if (sscanf(argv[5], "%u", &it) != 1)       Usage(argv[0]);
   if (sscanf(argv[6], "%u", &final_st) != 1) Usage(argv[0]);
-  bool show;
-  string sarg = argv[7];
+  bool online, show;
+  string oarg = argv[7];
+  if (oarg == "online")       online = true;
+  else if (oarg == "offline") online = false;
+  else                        Usage(argv[0]);
+  string sarg = argv[8];
   if (sarg == "show")      show = true;
   else if (sarg == "hide") show = false;
   else                     Usage(argv[0]);
@@ -480,5 +488,5 @@ int main(int argc, char *argv[]) {
   Buckets buckets(*card_abstraction, true);
   Walker walker(*card_abstraction, *betting_abstraction, *cfr_config, buckets,
 		it, final_st);
-  walker.Go(show);
+  walker.Go(online, show);
 }

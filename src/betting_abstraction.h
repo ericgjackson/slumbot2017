@@ -30,16 +30,32 @@ class BettingAbstraction {
     else              return opp_max_bets_[st];
   }
   unsigned int NumBetSizes(unsigned int st, unsigned int npb,
-			   bool our_bet) const {
-    if (bet_sizes_)   return (*(*bet_sizes_)[st])[npb]->size();
-    else if (our_bet) return (*(*our_bet_sizes_)[st])[npb]->size();
-    else              return (*(*opp_bet_sizes_)[st])[npb]->size();
+			   bool our_bet, unsigned int p) const {
+    if (bet_sizes_) {
+      return (*(*bet_sizes_)[st])[npb]->size();
+    } else if (p0_bet_sizes_ && p == 0) {
+      return (*(*p0_bet_sizes_)[st])[npb]->size();
+    } else if (p1_bet_sizes_ && p == 1) {
+      return (*(*p1_bet_sizes_)[st])[npb]->size();
+    } else if (our_bet) {
+      return (*(*our_bet_sizes_)[st])[npb]->size();
+    } else {
+      return (*(*opp_bet_sizes_)[st])[npb]->size();
+    }
   }
   const vector<double> *BetSizes(unsigned int st, unsigned int npb,
-				 bool our_bet) const {
-    if (bet_sizes_)   return (*(*bet_sizes_)[st])[npb];
-    else if (our_bet) return (*(*our_bet_sizes_)[st])[npb];
-    else              return (*(*opp_bet_sizes_)[st])[npb];
+				 bool our_bet, unsigned int p) const {
+    if (bet_sizes_) {
+      return (*(*bet_sizes_)[st])[npb];
+    } else if (p0_bet_sizes_ && p == 0) {
+      return (*(*p0_bet_sizes_)[st])[npb];
+    } else if (p1_bet_sizes_ && p == 1) {
+      return (*(*p1_bet_sizes_)[st])[npb];
+    } else if (our_bet) {
+      return (*(*our_bet_sizes_)[st])[npb];
+    } else {
+      return (*(*opp_bet_sizes_)[st])[npb];
+    }
   }
   bool Asymmetric(void) const {return asymmetric_;}
   bool AlwaysAllIn(void) const {return always_all_in_;}
@@ -122,6 +138,8 @@ class BettingAbstraction {
   unsigned int *our_max_bets_;
   unsigned int *opp_max_bets_;
   vector<vector<vector<double> *> *> *bet_sizes_;
+  vector<vector<vector<double> *> *> *p0_bet_sizes_;
+  vector<vector<vector<double> *> *> *p1_bet_sizes_;
   vector<vector<vector<double> *> *> *our_bet_sizes_;
   vector<vector<vector<double> *> *> *opp_bet_sizes_;
   bool asymmetric_;

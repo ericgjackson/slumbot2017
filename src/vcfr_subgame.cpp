@@ -60,16 +60,12 @@ VCFRSubgame::VCFRSubgame(const CardAbstraction &ca,
   p_ = p;
   
   unsigned int max_street = Game::MaxStreet();
-
-  subtree_ = BettingTree::BuildSubtree(root);
-  
   unsigned int subtree_st = root->Street();
   subtree_streets_ = new bool[max_street + 1];
   for (unsigned int st = 0; st <= max_street; ++st) {
     subtree_streets_[st] = st >= subtree_st;
   }
 
-  hand_tree_ = new HandTree(root_bd_st_, root_bd_, max_street);
   opp_probs_ = nullptr;
 }
 
@@ -77,8 +73,6 @@ VCFRSubgame::~VCFRSubgame(void) {
   // Do not delete final_vals_; it has been passed to the parent VCFR object
   delete [] opp_probs_;
   delete [] subtree_streets_;
-  delete hand_tree_;
-  delete subtree_;
 }
 
 void VCFRSubgame::SetOppProbs(double *opp_probs) {
@@ -100,8 +94,8 @@ void VCFRSubgame::DeleteOldFiles(unsigned int it) {
   if (delete_it == last_checkpoint_it_) return;
   
   char dir[500], buf[500];
-  sprintf(dir, "%s/%s.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
-	  Game::GameName().c_str(),
+  sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
 	  card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	  Game::NumSuits(), Game::MaxStreet(),
 	  betting_abstraction_.BettingAbstractionName().c_str(),
@@ -159,11 +153,14 @@ void VCFRSubgame::Go(void) {
   if (! value_calculation_) {
     DeleteOldFiles(it_);
   }
+  subtree_ = BettingTree::BuildSubtree(root_);
+  unsigned int max_street = Game::MaxStreet();
+  hand_tree_ = new HandTree(root_bd_st_, root_bd_, max_street);
   unsigned int subtree_st = subtree_->Root()->Street();
 
   char dir[500];
-  sprintf(dir, "%s/%s.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
-	  Game::GameName().c_str(),
+  sprintf(dir, "%s/%s.%u.%s.%u.%u.%u.%s.%s", Files::OldCFRBase(),
+	  Game::GameName().c_str(), Game::NumPlayers(),
 	  card_abstraction_.CardAbstractionName().c_str(), Game::NumRanks(),
 	  Game::NumSuits(), Game::MaxStreet(),
 	  betting_abstraction_.BettingAbstractionName().c_str(),
@@ -251,6 +248,9 @@ void VCFRSubgame::Go(void) {
   // This should delete the regrets and sumprobs, no?
   regrets_.reset(nullptr);
   sumprobs_.reset(nullptr);
+
+  delete hand_tree_;
+  delete subtree_;
 
   cfr_->Post(thread_index_);
 }

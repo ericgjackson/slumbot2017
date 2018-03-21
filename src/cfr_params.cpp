@@ -47,6 +47,7 @@ unique_ptr<Params> CreateCFRParams(void) {
   params->AddParam("ScaledStreets", P_STRING);
   params->AddParam("DealTwice", P_BOOLEAN);
   params->AddParam("Boost", P_BOOLEAN);
+  params->AddParam("MaintainCVs", P_BOOLEAN);
 
   return params;
 }

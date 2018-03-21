@@ -199,4 +199,5 @@ CFRConfig::CFRConfig(const Params &params) {
   uniform_ = params.GetBooleanValue("Uniform");
   deal_twice_ = params.GetBooleanValue("DealTwice");
   boost_ = params.GetBooleanValue("Boost");
+  maintain_cvs_ = params.GetBooleanValue("MaintainCVs");
 }

@@ -209,56 +209,73 @@ BettingAbstraction::BettingAbstraction(const Params &params) {
   max_bets_ = nullptr;
   our_max_bets_ = nullptr;
   opp_max_bets_ = nullptr;
-  if (asymmetric_) {
-    our_max_bets_ = ParseMaxBets(params, "OurMaxBets");
-    opp_max_bets_ = ParseMaxBets(params, "OppMaxBets");
-  } else {
-    max_bets_ = ParseMaxBets(params, "MaxBets");
+  if (no_limit_tree_type_ != 3) {
+    if (asymmetric_) {
+      our_max_bets_ = ParseMaxBets(params, "OurMaxBets");
+      opp_max_bets_ = ParseMaxBets(params, "OppMaxBets");
+    } else {
+      max_bets_ = ParseMaxBets(params, "MaxBets");
+    }
   }
 
   bool need_bet_sizes = false;
-  for (unsigned int st = 0; st <= max_street; ++st) {
-    if (! all_bet_sizes_[st] && ! all_even_bet_sizes_[st]) {
-      need_bet_sizes = true;
-      break;
+  if (no_limit_tree_type_ != 3) {
+    for (unsigned int st = 0; st <= max_street; ++st) {
+      if (! all_bet_sizes_[st] && ! all_even_bet_sizes_[st]) {
+	need_bet_sizes = true;
+	break;
+      }
     }
   }
   
   bet_sizes_ = nullptr;
+  p0_bet_sizes_ = nullptr;
+  p1_bet_sizes_ = nullptr;
   our_bet_sizes_ = nullptr;
   opp_bet_sizes_ = nullptr;
-  if (no_limit_tree_type_ == 3) {
-  } else {
-    if (need_bet_sizes) {
-      if (asymmetric_) {
-	if (params.IsSet("BetSizes")) {
-	  fprintf(stderr, "Use OurBetSizes and OppBetSizes for asymmetric "
-		  "systems, not BetSizes\n");
+  
+  if (need_bet_sizes) {
+    if (asymmetric_) {
+      if (params.IsSet("BetSizes")) {
+	fprintf(stderr, "Use OurBetSizes and OppBetSizes for asymmetric "
+		"systems, not BetSizes\n");
+	exit(-1);
+      }
+      if (! params.IsSet("OurBetSizes") || ! params.IsSet("OppBetSizes")) {
+	fprintf(stderr, "Expect OurBetSizes and OppBetSizes to be set\n");
+	exit(-1);
+      }
+      ParseBetSizes(params.GetStringValue("OurBetSizes"), &our_bet_sizes_);
+      for (unsigned int st = 0; st <= max_street; ++st) {
+	if ((*our_bet_sizes_)[st]->size() != our_max_bets_[st]) {
+	  fprintf(stderr, "Max bets mismatch\n");
 	  exit(-1);
 	}
-	if (! params.IsSet("OurBetSizes") || ! params.IsSet("OppBetSizes")) {
-	  fprintf(stderr, "Expect OurBetSizes and OppBetSizes to be set\n");
+      }
+      ParseBetSizes(params.GetStringValue("OppBetSizes"), &opp_bet_sizes_);
+      for (unsigned int st = 0; st <= max_street; ++st) {
+	if ((*opp_bet_sizes_)[st]->size() != opp_max_bets_[st]) {
+	  fprintf(stderr, "Max bets mismatch\n");
 	  exit(-1);
 	}
-	ParseBetSizes(params.GetStringValue("OurBetSizes"), &our_bet_sizes_);
+      }
+    } else {
+      if (params.IsSet("P0BetSizes") && params.IsSet("P1BetSizes")) {
+	ParseBetSizes(params.GetStringValue("P0BetSizes"), &p0_bet_sizes_);
 	for (unsigned int st = 0; st <= max_street; ++st) {
-	  if ((*our_bet_sizes_)[st]->size() != our_max_bets_[st]) {
+	  if ((*p0_bet_sizes_)[st]->size() != max_bets_[st]) {
 	    fprintf(stderr, "Max bets mismatch\n");
 	    exit(-1);
 	  }
 	}
-	ParseBetSizes(params.GetStringValue("OppBetSizes"), &opp_bet_sizes_);
+	ParseBetSizes(params.GetStringValue("P1BetSizes"), &p1_bet_sizes_);
 	for (unsigned int st = 0; st <= max_street; ++st) {
-	  if ((*opp_bet_sizes_)[st]->size() != opp_max_bets_[st]) {
+	  if ((*p1_bet_sizes_)[st]->size() != max_bets_[st]) {
 	    fprintf(stderr, "Max bets mismatch\n");
 	    exit(-1);
 	  }
 	}
-      } else {
-	if (! params.IsSet("BetSizes")) {
-	  fprintf(stderr, "Expect BetSizes to be set\n");
-	  exit(-1);
-	}
+      } else if (params.IsSet("BetSizes")) {
 	ParseBetSizes(params.GetStringValue("BetSizes"), &bet_sizes_);
 	for (unsigned int st = 0; st <= max_street; ++st) {
 	  if ((*bet_sizes_)[st]->size() != max_bets_[st]) {
@@ -266,6 +283,9 @@ BettingAbstraction::BettingAbstraction(const Params &params) {
 	    exit(-1);
 	  }
 	}
+      } else {
+	fprintf(stderr, "Expect BetSizes to be set\n");
+	exit(-1);
       }
     }
   }

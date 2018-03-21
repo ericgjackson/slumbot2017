@@ -75,6 +75,7 @@ public:
   bool Uniform(void) const {return uniform_;}
   bool DealTwice(void) const {return deal_twice_;}
   bool Boost(void) const {return boost_;}
+  bool MaintainCVs(void) const {return maintain_cvs_;}
  private:
   string cfr_config_name_;
   string algorithm_;
@@ -113,6 +114,7 @@ public:
   bool uniform_;
   bool deal_twice_;
   bool boost_;
+  bool maintain_cvs_;
 };
 
 #endif
