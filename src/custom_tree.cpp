@@ -43,11 +43,13 @@ BettingTreeBuilder::GetBetSize(unsigned int st, unsigned int last_bet_to,
 
 shared_ptr<Node>
 BettingTreeBuilder::CreateCustomPostflopSubtree(unsigned int st,
-						unsigned int player_acting,
-						unsigned int last_bet_to,
-						unsigned int last_bet_size,
-						unsigned int num_previous_bets,
-						unsigned int *terminal_id) {
+					    unsigned int player_acting,
+					    unsigned int last_bet_to,
+					    unsigned int last_bet_size,
+					    unsigned int num_previous_bets,
+					    const vector<double> &open_fracs,
+					    const vector<double> &raise_fracs,
+					    unsigned int *terminal_id) {
   unsigned int all_in_bet_to = betting_abstraction_.StackSize();
   shared_ptr<Node> c, f;
   if (last_bet_size > 0 || player_acting != Game::FirstToAct(st)) {
@@ -55,7 +57,8 @@ BettingTreeBuilder::CreateCustomPostflopSubtree(unsigned int st,
     // next street.
     if (st < 3) {
       c = CreateCustomPostflopSubtree(st + 1, Game::FirstToAct(st + 1),
-				      last_bet_to, 0, 0, terminal_id);
+				      last_bet_to, 0, 0, open_fracs,
+				      raise_fracs, terminal_id);
     } else {
       c.reset(new Node((*terminal_id)++, st, 255, nullptr, nullptr, nullptr,
 		       2, last_bet_to));
@@ -63,7 +66,7 @@ BettingTreeBuilder::CreateCustomPostflopSubtree(unsigned int st,
   } else {
     // Open check
     c = CreateCustomPostflopSubtree(st, player_acting^1, last_bet_to, 0, 0,
-				    terminal_id);
+				    open_fracs, raise_fracs, terminal_id);
   }
   if (last_bet_size > 0) {
     unsigned int player_remaining = player_acting^1;
@@ -80,13 +83,15 @@ BettingTreeBuilder::CreateCustomPostflopSubtree(unsigned int st,
     bet_tos[all_in_bet_to] = true;
   }
   if (num_previous_bets < 2) {
-    unsigned int bet_to;
-    bet_to = GetBetSize(st, last_bet_to, 0.5, last_bet_size);
-    bet_tos[bet_to] = true;
-    bet_to = GetBetSize(st, last_bet_to, 0.75, last_bet_size);
-    bet_tos[bet_to] = true;
-    bet_to = GetBetSize(st, last_bet_to, 1.0, last_bet_size);
-    bet_tos[bet_to] = true;
+    const vector<double> &fracs = (num_previous_bets == 0 ? open_fracs :
+				   raise_fracs);
+    unsigned int num_fracs = fracs.size();
+    for (unsigned int i = 0; i < num_fracs; ++i) {
+      double frac = fracs[i];
+      unsigned int bet_to;
+      bet_to = GetBetSize(st, last_bet_to, frac, last_bet_size);
+      bet_tos[bet_to] = true;
+    }
   }
   vector< shared_ptr<Node> > bet_succs;
   for (unsigned int bet_to = last_bet_to + 1; bet_to <= all_in_bet_to;
@@ -96,7 +101,8 @@ BettingTreeBuilder::CreateCustomPostflopSubtree(unsigned int st,
       // For bets we pass in the pot size without the pending bet included
       shared_ptr<Node> bet =
 	CreateCustomPostflopSubtree(st, player_acting^1, bet_to, new_bet_size,
-				    num_previous_bets + 1, terminal_id);
+				    num_previous_bets + 1, open_fracs,
+				    raise_fracs, terminal_id);
       bet_succs.push_back(bet);
     }
   }
@@ -113,23 +119,49 @@ BettingTreeBuilder::CreateCustomTree(unsigned int *terminal_id) {
   // One for each flop subtree
   shared_ptr<Node> cc, b1c, b2c, b1bc, cb1c, cb2c, cb3c, cb1bc, cb2bc;
   unsigned int player_acting = Game::FirstToAct(1);
+  vector<double> no_open_fracs, no_raise_fracs;
+  // Postflop options after cc or min-raise followed by a call
+  vector<double> ccmr_open_fracs, ccmr_raise_fracs;
+  // Postflop options after check, small bet and a call
+  vector<double> cb1c_open_fracs, cb1c_raise_fracs;
+  // Postflop options after check, larger bet and a call
+  vector<double> cb2c_open_fracs, cb2c_raise_fracs;
+  ccmr_open_fracs.push_back(0.5);
+  ccmr_open_fracs.push_back(0.75);
+  ccmr_open_fracs.push_back(1.0);
+  ccmr_raise_fracs.push_back(0.5);
+  ccmr_raise_fracs.push_back(0.75);
+  ccmr_raise_fracs.push_back(1.0);
+  cb1c_open_fracs.push_back(0.3);
+  cb1c_open_fracs.push_back(0.6);
+  cb1c_raise_fracs.push_back(0.1); // This will get rounded up to a min-raise
+  cb2c_open_fracs.push_back(0.1875);
   cc = CreateCustomPostflopSubtree(1, player_acting, 2 * small_blind, 0, 0,
+				   ccmr_open_fracs, ccmr_raise_fracs,
 				   terminal_id);
   b1c = CreateCustomPostflopSubtree(1, player_acting, 4 * small_blind, 0, 0,
+				    ccmr_open_fracs, ccmr_raise_fracs,
 				    terminal_id);
   b2c = CreateCustomPostflopSubtree(1, player_acting, 20 * small_blind, 0, 0,
+				    no_open_fracs, no_raise_fracs,
 				    terminal_id);
   b1bc = CreateCustomPostflopSubtree(1, player_acting, 20 * small_blind, 0, 0,
+				     no_open_fracs, no_raise_fracs,
 				     terminal_id);
   cb1c = CreateCustomPostflopSubtree(1, player_acting, 5 * small_blind, 0, 0,
+				     cb1c_open_fracs, cb1c_raise_fracs,
 				     terminal_id);
   cb2c = CreateCustomPostflopSubtree(1, player_acting, 8 * small_blind, 0, 0,
+				     cb2c_open_fracs, cb2c_raise_fracs,
 				     terminal_id);
   cb3c = CreateCustomPostflopSubtree(1, player_acting, 20 * small_blind, 0, 0,
+				     no_open_fracs, no_raise_fracs,
 				     terminal_id);
   cb1bc = CreateCustomPostflopSubtree(1, player_acting, 20 * small_blind, 0, 0,
-				     terminal_id);
+				      no_open_fracs, no_raise_fracs,
+				      terminal_id);
   cb2bc = CreateCustomPostflopSubtree(1, player_acting, 20 * small_blind, 0, 0,
+				      no_open_fracs, no_raise_fracs,
 				      terminal_id);
 
   shared_ptr<Node> f(new Node((*terminal_id)++, 0, 0, nullptr, nullptr,

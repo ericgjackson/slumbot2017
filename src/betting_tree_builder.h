@@ -301,6 +301,8 @@ private:
 				unsigned int last_bet_to,
 				unsigned int last_bet_size,
 				unsigned int num_previous_bets,
+				const vector<double> &open_fracs,
+				const vector<double> &raise_fracs,
 				unsigned int *terminal_id);
   shared_ptr<Node> CreateCustomTree(unsigned int *terminal_id);
   
