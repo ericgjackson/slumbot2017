@@ -166,7 +166,7 @@ BettingTreeBuilder::CreateCustomTree(unsigned int *terminal_id) {
   vector<double> b1b1c_open_fracs, b1b1c_raise_fracs;
 
   unsigned int all_in_bet_to = betting_abstraction_.StackSize() * small_blind;
-  unsigned int cb1_bet_to, cb2_bet_to;
+  unsigned int cb1_bet_to = 0, cb2_bet_to = 0;
   if (betting_abstraction_.StackSize() == 12 ||
       betting_abstraction_.StackSize() == 14) {
     cb1_bet_to = 4 * small_blind;
