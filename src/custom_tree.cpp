@@ -1,4 +1,39 @@
 // For now, hard-coded to Li's proposed 10 big blind tree.
+//
+// Preflop (10BB):
+//   Button can min-raise or all-in
+//   After call, big-blind can raise to 2.5BB or 4BB.
+//   Only raises are all-in
+//
+// Postflop (10BB):
+//   Flop, turn and river all the same
+//   In limped or mr pots I would like halfpot, ¾ pot and pot for bets and
+//     raises.
+//   In 2.5bb limp-raise pots, have 1.5bb, 3bb as betting options with min
+//     raise as an option
+//   In 4bb iso pots have 1.5bb as betting option with only all in as raise
+//     size.
+//   Finally- any postflop betsize or raise that puts in over 50% of a player’s
+//     stack can be removed, and all in is always an option.
+//
+// Incorporates tweaks for 6-8BB and 12-13BB.
+// From Li's e-mail:
+//   -9bb and 11bb same as this 10bb model
+//   -6,7,8bb could we have 2.25x and 3.5x vs limp preflop instead of 2.5x and
+//     4x
+//   -12, 13bb could we have 3x and 4.5x instead vs limp, and add also a 3bet
+//     to 4bb vs 2bb min raise preflop (postflop sizes can be 2bb/all in on all
+//     streets)
+//
+// Postflop in all situations have the same as the new 10bb model- except could
+// you add min bet in position for MR pots for 12-13bb? VS the min bet, OOP can
+// raise to halfpot/pot/1.5x pot/shove as before. This is because there should
+// be a non-trivial MR range at those depths.
+//
+// After I asked for no 2.25x bet, Li specified:
+// In this case can we have- 2x bet in the 6bb 7bb, and 2.5x bet in the 8bb
+//   model?
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -117,7 +152,8 @@ shared_ptr<Node>
 BettingTreeBuilder::CreateCustomTree(unsigned int *terminal_id) {
   unsigned int small_blind = Game::SmallBlind();
   // One for each flop subtree
-  shared_ptr<Node> cc, b1c, b2c, b1bc, cb1c, cb2c, cb3c, cb1bc, cb2bc;
+  shared_ptr<Node> cc, b1c, b2c, b1b1c, b1b2c, cb1c, cb2c, cb3c, cb1bc, cb2bc;
+  shared_ptr<Node> b1b1bc;
   unsigned int player_acting = Game::FirstToAct(1);
   vector<double> no_open_fracs, no_raise_fracs;
   // Postflop options after cc or min-raise followed by a call
@@ -126,6 +162,32 @@ BettingTreeBuilder::CreateCustomTree(unsigned int *terminal_id) {
   vector<double> cb1c_open_fracs, cb1c_raise_fracs;
   // Postflop options after check, larger bet and a call
   vector<double> cb2c_open_fracs, cb2c_raise_fracs;
+  // Postflop options after min-bet, small raise and a call.
+  vector<double> b1b1c_open_fracs, b1b1c_raise_fracs;
+
+  unsigned int all_in_bet_to = betting_abstraction_.StackSize() * small_blind;
+  unsigned int cb1_bet_to, cb2_bet_to;
+  if (betting_abstraction_.StackSize() == 12 ||
+      betting_abstraction_.StackSize() == 14) {
+    cb1_bet_to = 4 * small_blind;
+  } else if (betting_abstraction_.StackSize() == 16) {
+    cb1_bet_to = 5 * small_blind;
+    cb2_bet_to = 7 * small_blind;
+  } else if (betting_abstraction_.StackSize() == 18 ||
+	     betting_abstraction_.StackSize() == 20 ||
+	     betting_abstraction_.StackSize() == 22) {
+    cb1_bet_to = 5 * small_blind;
+    cb2_bet_to = 8 * small_blind;
+  } else if (betting_abstraction_.StackSize() == 24 ||
+	     betting_abstraction_.StackSize() == 26) {
+    cb1_bet_to = 6 * small_blind;
+    cb2_bet_to = 9 * small_blind;
+  }
+  bool small_3bet = betting_abstraction_.StackSize() >= 24;
+
+  if (betting_abstraction_.StackSize() >= 24) {
+    ccmr_open_fracs.push_back(0.25);
+  }
   ccmr_open_fracs.push_back(0.5);
   ccmr_open_fracs.push_back(0.75);
   ccmr_open_fracs.push_back(1.0);
@@ -136,42 +198,60 @@ BettingTreeBuilder::CreateCustomTree(unsigned int *terminal_id) {
   cb1c_open_fracs.push_back(0.6);
   cb1c_raise_fracs.push_back(0.1); // This will get rounded up to a min-raise
   cb2c_open_fracs.push_back(0.1875);
+  b1b1c_open_fracs.push_back(0.125); // Should be 2BB into 16BB
   cc = CreateCustomPostflopSubtree(1, player_acting, 2 * small_blind, 0, 0,
 				   ccmr_open_fracs, ccmr_raise_fracs,
 				   terminal_id);
   b1c = CreateCustomPostflopSubtree(1, player_acting, 4 * small_blind, 0, 0,
 				    ccmr_open_fracs, ccmr_raise_fracs,
 				    terminal_id);
-  b2c = CreateCustomPostflopSubtree(1, player_acting, 20 * small_blind, 0, 0,
+  b2c = CreateCustomPostflopSubtree(1, player_acting, all_in_bet_to, 0, 0,
 				    no_open_fracs, no_raise_fracs,
 				    terminal_id);
-  b1bc = CreateCustomPostflopSubtree(1, player_acting, 20 * small_blind, 0, 0,
-				     no_open_fracs, no_raise_fracs,
-				     terminal_id);
-  cb1c = CreateCustomPostflopSubtree(1, player_acting, 5 * small_blind, 0, 0,
-				     cb1c_open_fracs, cb1c_raise_fracs,
-				     terminal_id);
-  cb2c = CreateCustomPostflopSubtree(1, player_acting, 8 * small_blind, 0, 0,
-				     cb2c_open_fracs, cb2c_raise_fracs,
-				     terminal_id);
-  cb3c = CreateCustomPostflopSubtree(1, player_acting, 20 * small_blind, 0, 0,
-				     no_open_fracs, no_raise_fracs,
-				     terminal_id);
-  cb1bc = CreateCustomPostflopSubtree(1, player_acting, 20 * small_blind, 0, 0,
+  b1b2c = CreateCustomPostflopSubtree(1, player_acting, all_in_bet_to, 0, 0,
 				      no_open_fracs, no_raise_fracs,
 				      terminal_id);
-  cb2bc = CreateCustomPostflopSubtree(1, player_acting, 20 * small_blind, 0, 0,
+  if (small_3bet) {
+    b1b1c = CreateCustomPostflopSubtree(1, player_acting, 8 * small_blind, 0,
+					0, b1b1c_open_fracs, b1b1c_raise_fracs,
+					terminal_id);
+    b1b1bc = CreateCustomPostflopSubtree(1, player_acting, all_in_bet_to, 0,
+					 0, no_open_fracs, no_raise_fracs,
+					 terminal_id);
+  }
+  cb1c = CreateCustomPostflopSubtree(1, player_acting, cb1_bet_to, 0, 0,
+				     cb1c_open_fracs, cb1c_raise_fracs,
+				     terminal_id);
+  cb2c = CreateCustomPostflopSubtree(1, player_acting, cb2_bet_to, 0, 0,
+				     cb2c_open_fracs, cb2c_raise_fracs,
+				     terminal_id);
+  cb3c = CreateCustomPostflopSubtree(1, player_acting, all_in_bet_to, 0, 0,
+				     no_open_fracs, no_raise_fracs,
+				     terminal_id);
+  cb1bc = CreateCustomPostflopSubtree(1, player_acting, all_in_bet_to, 0, 0,
+				      no_open_fracs, no_raise_fracs,
+				      terminal_id);
+  cb2bc = CreateCustomPostflopSubtree(1, player_acting, all_in_bet_to, 0, 0,
 				      no_open_fracs, no_raise_fracs,
 				      terminal_id);
 
+  // Fold nodes
   shared_ptr<Node> f(new Node((*terminal_id)++, 0, 0, nullptr, nullptr,
 			      nullptr, 1, small_blind));
   shared_ptr<Node> b1f(new Node((*terminal_id)++, 0, 1, nullptr, nullptr,
 				nullptr, 1, 2 * small_blind));
   shared_ptr<Node> b2f(new Node((*terminal_id)++, 0, 1, nullptr, nullptr,
 				nullptr, 1, 2 * small_blind));
-  shared_ptr<Node> b1bf(new Node((*terminal_id)++, 0, 0, nullptr, nullptr,
-				 nullptr, 1, 4 * small_blind));
+  shared_ptr<Node> b1b2f(new Node((*terminal_id)++, 0, 0, nullptr, nullptr,
+				  nullptr, 1, 4 * small_blind));
+  shared_ptr<Node> b1b1f, b1b1bf;
+  if (small_3bet) {
+    b1b1f.reset(new Node((*terminal_id)++, 0, 0, nullptr, nullptr, nullptr, 1,
+			 4 * small_blind));
+    b1b1bf.reset(new Node((*terminal_id)++, 0, 0, nullptr, nullptr, nullptr, 1,
+			  8 * small_blind));
+    
+  }
   shared_ptr<Node> cb1f(new Node((*terminal_id)++, 0, 0, nullptr, nullptr,
 				 nullptr, 1, 2 * small_blind));
   shared_ptr<Node> cb2f(new Node((*terminal_id)++, 0, 0, nullptr, nullptr,
@@ -179,38 +259,52 @@ BettingTreeBuilder::CreateCustomTree(unsigned int *terminal_id) {
   shared_ptr<Node> cb3f(new Node((*terminal_id)++, 0, 0, nullptr, nullptr,
 				 nullptr, 1, 2 * small_blind));
   shared_ptr<Node> cb1bf(new Node((*terminal_id)++, 0, 1, nullptr, nullptr,
-				  nullptr, 1, 5 * small_blind));
+				  nullptr, 1, cb1_bet_to));
   shared_ptr<Node> cb2bf(new Node((*terminal_id)++, 0, 1, nullptr, nullptr,
-				  nullptr, 1, 8 * small_blind));
-  
-  shared_ptr<Node> cb1b, cb2b, cb1, cb2, cb3, b1b, b1, b2, c, root;
+				  nullptr, 1, cb2_bet_to));
+
+  // Bet nodes
+  shared_ptr<Node> cb1b, cb2b, cb1, cb2, cb3, b1b1, b1b2, b1, b2, c, root;
   vector< shared_ptr<Node> > bet_succs;
   cb1b.reset(new Node(kMaxUInt, 0, 0, cb1bc, cb1bf, &bet_succs, 2,
-		      20 * small_blind));
+		      all_in_bet_to));
   bet_succs.clear();
   cb2b.reset(new Node(kMaxUInt, 0, 0, cb2bc, cb2bf, &bet_succs, 2,
-		      20 * small_blind));
+		      all_in_bet_to));
   bet_succs.clear();
   bet_succs.push_back(cb1b);
   cb1.reset(new Node(kMaxUInt, 0, 1, cb1c, cb1f, &bet_succs, 2,
-		     5 * small_blind));
+		     cb1_bet_to));
   bet_succs.clear();
   bet_succs.push_back(cb2b);
   cb2.reset(new Node(kMaxUInt, 0, 1, cb2c, cb2f, &bet_succs, 2,
-		     8 * small_blind));
+		     cb2_bet_to));
   bet_succs.clear();
   cb3.reset(new Node(kMaxUInt, 0, 1, cb3c, cb3f, &bet_succs, 2,
-		     20 * small_blind));
+		     all_in_bet_to));
+  if (small_3bet) {
+    shared_ptr<Node> b1b1b;
+    bet_succs.clear();
+    b1b1b.reset(new Node(kMaxUInt, 0, 0, b1b1bc, b1b1bf, &bet_succs, 2,
+			 all_in_bet_to));
+    bet_succs.clear();
+    bet_succs.push_back(b1b1b);
+    b1b1.reset(new Node(kMaxUInt, 0, 1, b1b1c, b1b1f, &bet_succs, 2,
+			8 * small_blind));
+  }
   bet_succs.clear();
-  b1b.reset(new Node(kMaxUInt, 0, 1, b1bc, b1bf, &bet_succs, 2,
-		     20 * small_blind));
+  b1b2.reset(new Node(kMaxUInt, 0, 1, b1b2c, b1b2f, &bet_succs, 2,
+		      all_in_bet_to));
   bet_succs.clear();
-  bet_succs.push_back(b1b);
+  if (small_3bet) {
+    bet_succs.push_back(b1b1);
+  }
+  bet_succs.push_back(b1b2);
   b1.reset(new Node(kMaxUInt, 0, 0, b1c, b1f, &bet_succs, 2,
 		    4 * small_blind));
   bet_succs.clear();
   b2.reset(new Node(kMaxUInt, 0, 0, b2c, b2f, &bet_succs, 2,
-		    20 * small_blind));
+		    all_in_bet_to));
   bet_succs.clear();
   bet_succs.push_back(cb1);
   bet_succs.push_back(cb2);
