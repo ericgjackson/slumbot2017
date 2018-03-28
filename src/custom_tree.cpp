@@ -170,6 +170,7 @@ BettingTreeBuilder::CreateCustomTree(unsigned int *terminal_id) {
   if (betting_abstraction_.StackSize() == 12 ||
       betting_abstraction_.StackSize() == 14) {
     cb1_bet_to = 4 * small_blind;
+    cb2_bet_to = 7 * small_blind;
   } else if (betting_abstraction_.StackSize() == 16) {
     cb1_bet_to = 5 * small_blind;
     cb2_bet_to = 7 * small_blind;
