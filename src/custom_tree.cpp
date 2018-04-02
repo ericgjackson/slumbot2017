@@ -183,6 +183,13 @@ BettingTreeBuilder::CreateCustomTree(unsigned int *terminal_id) {
 	     betting_abstraction_.StackSize() == 26) {
     cb1_bet_to = 6 * small_blind;
     cb2_bet_to = 9 * small_blind;
+  } else if (betting_abstraction_.StackSize() == 28) {
+    cb1_bet_to = 6 * small_blind;
+    cb2_bet_to = 10 * small_blind;
+  } else {
+    fprintf(stderr, "Unhandled stack size: %u\n",
+	    betting_abstraction_.StackSize());
+    exit(-1);
   }
   bool small_3bet = betting_abstraction_.StackSize() >= 24;
 
