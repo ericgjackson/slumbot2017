@@ -395,6 +395,10 @@ bin/extract_cvs:	obj/extract_cvs.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/extract_cvs obj/extract_cvs.o \
 	$(OBJS) $(LIBRARIES)
 
+bin/verify_tree:	obj/verify_tree.o $(OBJS) $(HEADS)
+	g++ $(LDFLAGS) $(CFLAGS) -o bin/verify_tree obj/verify_tree.o \
+	$(OBJS) $(LIBRARIES)
+
 bin/x:	obj/x.o $(OBJS) $(HEADS)
 	g++ $(LDFLAGS) $(CFLAGS) -o bin/x obj/x.o \
 	$(OBJS) $(LIBRARIES)
