@@ -32,11 +32,6 @@
 
 using namespace std;
 
-static Node *g_c_node = nullptr;
-static unsigned char *g_c_ptr = nullptr;
-static long long int **g_c_sum_vals = nullptr;
-static long long int **g_c_counts = nullptr;
-
 // #define BC 1
 #define SWITCH 1
 
@@ -751,10 +746,6 @@ T_VALUE TCFRThread::Process(unsigned char *ptr,
 	  }
 	  val = Process(data_ + succ_offset, player_acting, st, adjust);
 	  contributions_[p_] = old_contribution;
-	  if (ptr == g_c_ptr) {
-	    g_c_sum_vals[our_bucket][s] += val;
-	    ++g_c_counts[our_bucket][s];
-	  }
 	  if (maintain_cvs_) {
 	    int *cvs_and_counts = (int *)
 	      (ptr1 + num_succs * (sizeof(T_REGRET) + sizeof(T_SUM_PROB)));
@@ -802,12 +793,6 @@ T_VALUE TCFRThread::Process(unsigned char *ptr,
 	      --stack_index_;
 	      contributions_[p_] = old_contribution;
 	    }
-	  }
-	}
-	if (ptr == g_c_ptr) {
-	  for (unsigned int s = 0; s < num_succs; ++s) {
-	    g_c_sum_vals[our_bucket][s] += succ_values[s];
-	    ++g_c_counts[our_bucket][s];
 	  }
 	}
 	if (maintain_cvs_) {
@@ -1753,16 +1738,6 @@ void TCFR::Run(void) {
   }
   delete [] g_preflop_vals;
   delete [] g_preflop_nums;
-
-  fflush(stdout);
-  unsigned int num_buckets = buckets_.NumBuckets(0);
-  for (unsigned int b = 0; b < num_buckets; ++b) {
-    for (unsigned int s = 0; s < 3; ++s) {
-      printf("B %u s %u avg val at C %f\n", b, s,
-	     g_c_sum_vals[b][s] / (double)g_c_counts[b][s]);
-    }
-  }
-  fflush(stdout);
 }
 
 void TCFR::RunBatch(unsigned int batch_size) {
@@ -1940,7 +1915,6 @@ unsigned char *TCFR::Prepare(unsigned char *ptr, Node *node,
   ptr[5] = pa;
   *(unsigned short *)(ptr + 6) = last_bet_to;
   unsigned char *succ_ptr = ptr + 8;
-  if (node == g_c_node) g_c_ptr = ptr;
 
   unsigned char *ptr1 = succ_ptr + num_succs * 8;
   if (num_succs > 1) {
@@ -2130,7 +2104,6 @@ void TCFR::Prepare(void) {
       }
     }
   }
-  g_c_node = betting_tree_->Root()->IthSucc(0);
   unsigned char *end = Prepare(data_, betting_tree_->Root(), Game::BigBlind(),
 			       offsets);
   unsigned long long int sz = end - data_;
@@ -2336,19 +2309,6 @@ TCFR::TCFR(const CardAbstraction &ca, const BettingAbstraction &ba,
   time_t end_t = time(NULL);
   double diff_sec = difftime(end_t, start_t);
   fprintf(stderr, "Initialization took %.1f seconds\n", diff_sec);
-
-  unsigned int num_buckets = buckets_.NumBuckets(0);
-  g_c_sum_vals = new long long int *[num_buckets];
-  g_c_counts = new long long int *[num_buckets];
-  for (unsigned int b = 0; b < num_buckets; ++b) {
-    // There should be less than 10
-    g_c_sum_vals[b] = new long long int[10];
-    g_c_counts[b] = new long long int[10];
-    for (unsigned int s = 0; s < 10; ++s) {
-      g_c_sum_vals[b][s] = 0;
-      g_c_counts[b][s] = 0;
-    }
-  }
 }
 
 TCFR::~TCFR(void) {
